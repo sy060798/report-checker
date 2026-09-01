@@ -2,19 +2,59 @@
    REPORT CHECKER
    material-parser.js
 
-   VERSION:
-   - Strict Master Material
-   - Alias Material
-   - Exact + Similar matching
-   - Menyimpan tulisan asli dari CIR
-   - Quantity
-   - Unit
-   - Material code
-   - Material section detection
-   - Ticket wajib ada
-   - Tidak mengambil material di luar master
-   - Tidak mengambil: protek, sleeve, tisu alkohol, dll
-   - Support variasi penulisan report
+   UPDATED VERSION
+   ---------------------------------------------------------
+   ATURAN UTAMA:
+
+   1. Ticket WAJIB menggunakan:
+      TT Number = KOLOM D
+
+   2. Customer Ticket TIDAK digunakan sebagai ticket.
+
+   3. Ref Ticket TIDAK digunakan sebagai ticket.
+
+   4. Jika TT Number kosong:
+      => NO TICKET
+      => material tidak diproses.
+
+   5. CIR diambil dari kolom:
+      CIR
+
+   6. Material hanya boleh berasal dari:
+      MATERIAL_MASTER
+
+   7. Material di luar master:
+      => DIABAIKAN
+
+   8. Support:
+      - Exact matching
+      - Contains matching
+      - Similar / typo ringan
+      - Alias
+      - Quantity
+      - Unit
+      - Material code
+      - Raw material
+      - Raw line
+
+   9. Material section harus berada di antara:
+      Material
+      sampai
+      section berikutnya seperti:
+      Team QN
+      PIC FS
+      RFO
+      Action
+      CIR separator
+
+   10. Tidak mengambil material seperti:
+       - protek
+       - sleeve
+       - tisu alkohol
+       - alcohol tissue
+       - dll
+       selama tidak ada di MATERIAL_MASTER.
+
 ========================================================= */
 
 (function () {
@@ -428,7 +468,26 @@
             "Belum tersedia",
             "Pending",
             "N/A"
-        ]
+        ],
+
+        /*
+         * Nama kolom Excel.
+         *
+         * Struktur yang digunakan:
+         *
+         * A = Datetime Receive
+         * B = Customer Ticket
+         * C = Ref Ticket
+         * D = TT Number
+         * ...
+         * AF = CIR
+         */
+
+        ticketField:
+            "TT Number",
+
+        cirField:
+            "CIR"
 
     };
 
@@ -443,7 +502,9 @@
             value === null ||
             value === undefined
         ) {
+
             return "";
+
         }
 
         return String(value)
@@ -517,14 +578,19 @@
                 window.ReportCheckerSettings.get();
 
             return {
+
                 ...DEFAULT_SETTINGS,
+
                 ...settings
+
             };
 
         }
 
         return {
+
             ...DEFAULT_SETTINGS
+
         };
 
     }
@@ -537,6 +603,7 @@
     function buildAliasList() {
 
         const candidates = [];
+
 
         MATERIAL_MASTER.forEach(
             function (item) {
@@ -566,11 +633,6 @@
         );
 
 
-        /*
-         * Material paling spesifik
-         * selalu dicek lebih dulu.
-         */
-
         candidates.sort(
             function (a, b) {
 
@@ -599,13 +661,21 @@
     function findMasterMaterial(value) {
 
         const text =
-            normalizeMaterialText(value);
+            normalizeMaterialText(
+                value
+            );
 
 
         if (!text) {
+
             return null;
+
         }
 
+
+        /*
+         * EXACT
+         */
 
         for (
             const candidate of ALIAS_LIST
@@ -638,13 +708,13 @@
 
 
         /*
-         * Cek jika alias berada di dalam kalimat.
+         * CONTAINS
          *
          * Contoh:
          *
          * Kabel 96f terpakai : 149 m
          *
-         * akan cocok dengan 96f.
+         * => 96C
          */
 
         for (
@@ -658,7 +728,9 @@
             if (
                 alias.length < 2
             ) {
+
                 continue;
+
             }
 
 
@@ -709,11 +781,7 @@
 
 
     /* =====================================================
-       SIMILARITY
-       
-       Digunakan hanya sebagai bantuan.
-       
-       Tidak semua teks mirip langsung dianggap material.
+       LEVENSHTEIN
     ===================================================== */
 
     function levenshtein(
@@ -766,8 +834,7 @@
             ) {
 
                 if (
-                    b.charAt(i - 1)
-                    ===
+                    b.charAt(i - 1) ===
                     a.charAt(j - 1)
                 ) {
 
@@ -799,6 +866,10 @@
     }
 
 
+    /* =====================================================
+       SIMILARITY
+    ===================================================== */
+
     function similarity(
         a,
         b
@@ -806,6 +877,7 @@
 
         const first =
             normalizeMaterialText(a);
+
 
         const second =
             normalizeMaterialText(b);
@@ -836,7 +908,9 @@
 
 
         if (!maxLength) {
+
             return 1;
+
         }
 
 
@@ -853,11 +927,6 @@
 
     /* =====================================================
        FIND SIMILAR MASTER
-       
-       Hanya digunakan pada:
-       - nama pendek
-       - typo ringan
-       - tidak ada angka material yang membingungkan
     ===================================================== */
 
     function findSimilarMaterial(
@@ -865,7 +934,9 @@
     ) {
 
         const text =
-            normalizeMaterialText(value);
+            normalizeMaterialText(
+                value
+            );
 
 
         if (
@@ -890,11 +961,6 @@
                 candidate.normalized;
 
 
-            /*
-             * Jangan similarity terhadap alias
-             * yang terlalu pendek.
-             */
-
             if (
                 alias.length < 4
             ) {
@@ -905,15 +971,14 @@
 
 
             /*
-             * Untuk material fiber,
-             * angka harus tetap sama.
+             * Angka material harus sama.
              *
-             * Contoh:
-             * 96c jangan dianggap 48c.
+             * 96C tidak boleh menjadi 48C.
              */
 
             const textNumbers =
                 text.match(/\d+/g) || [];
+
 
             const aliasNumbers =
                 alias.match(/\d+/g) || [];
@@ -965,11 +1030,6 @@
 
         }
 
-
-        /*
-         * Threshold cukup tinggi
-         * agar tidak banyak false positive.
-         */
 
         if (
             best &&
@@ -1169,7 +1229,9 @@
     ) {
 
         if (!text) {
+
             return "";
+
         }
 
 
@@ -1181,7 +1243,9 @@
 
 
         if (!match) {
+
             return "";
+
         }
 
 
@@ -1226,7 +1290,7 @@
 
 
     /* =====================================================
-       CLEAN MATERIAL LINE
+       CLEAN MATERIAL NAME
     ===================================================== */
 
     function cleanMaterialName(
@@ -1276,7 +1340,7 @@
 
 
     /* =====================================================
-       EXTRACT MASTER MATERIAL FROM LINE
+       EXTRACT MASTER MATERIAL
     ===================================================== */
 
     function extractMasterFromLine(
@@ -1292,9 +1356,15 @@
 
 
         if (!clean) {
+
             return null;
+
         }
 
+
+        /*
+         * EXACT / CONTAINS
+         */
 
         const exact =
             findMasterMaterial(
@@ -1310,8 +1380,7 @@
 
 
         /*
-         * Coba bagian nama setelah
-         * quantity/code dibuang.
+         * Setelah quantity dan code dibuang.
          */
 
         const cleanedName =
@@ -1340,6 +1409,26 @@
         }
 
 
+        /*
+         * Similar hanya sebagai bantuan.
+         *
+         * Tidak otomatis digunakan untuk semua line.
+         * Ini mencegah false positive.
+         */
+
+        const similar =
+            findSimilarMaterial(
+                cleanedName || clean
+            );
+
+
+        if (similar) {
+
+            return similar;
+
+        }
+
+
         return null;
 
     }
@@ -1347,9 +1436,6 @@
 
     /* =====================================================
        CHECK MATERIAL LINE
-       
-       STRICT:
-       Hanya line yang mengandung material master.
     ===================================================== */
 
     function looksLikeMaterialLine(
@@ -1357,7 +1443,9 @@
     ) {
 
         if (!line) {
+
             return false;
+
         }
 
 
@@ -1370,7 +1458,9 @@
 
 
         if (!clean) {
+
             return false;
+
         }
 
 
@@ -1380,12 +1470,7 @@
             );
 
 
-        if (master) {
-            return true;
-        }
-
-
-        return false;
+        return !!master;
 
     }
 
@@ -1405,7 +1490,9 @@
 
 
         if (!original) {
+
             return null;
+
         }
 
 
@@ -1423,8 +1510,7 @@
 
         /*
          * STRICT:
-         * Kalau tidak cocok master,
-         * jangan dimasukkan sebagai material.
+         * Tidak cocok master = tidak masuk.
          */
 
         if (!materialMatch) {
@@ -1452,30 +1538,13 @@
             );
 
 
-        /*
-         * Material standar.
-         */
-
-        const normalizedName =
-            materialMatch.name;
-
-
         return {
 
             material:
-                normalizedName,
-
-            /*
-             * Tulisan material sebagaimana
-             * terbaca dari CIR.
-             */
+                materialMatch.name,
 
             originalMaterial:
                 rawName,
-
-            /*
-             * Seluruh baris asli.
-             */
 
             raw:
                 original,
@@ -1525,7 +1594,9 @@
 
 
             if (!line) {
+
                 continue;
+
             }
 
 
@@ -1534,7 +1605,9 @@
             ) {
 
                 if (!phrase) {
+
                     continue;
+
                 }
 
 
@@ -1542,6 +1615,10 @@
                     String(phrase)
                         .trim();
 
+
+                /*
+                 * "Material" harus berdiri sendiri.
+                 */
 
                 if (
                     p.toLowerCase() ===
@@ -1607,7 +1684,9 @@
 
 
             if (!line) {
+
                 continue;
+
             }
 
 
@@ -1649,7 +1728,9 @@
         ) {
 
             if (!phrase) {
+
                 continue;
+
             }
 
 
@@ -1776,6 +1857,117 @@
 
 
     /* =====================================================
+       GET TT NUMBER
+       
+       PENTING:
+       Hanya TT Number yang dipakai.
+    ===================================================== */
+
+    function getTTNumber(
+        row,
+        ticketField
+    ) {
+
+        /*
+         * Jika object Excel:
+         *
+         * row["TT Number"]
+         */
+
+        if (
+            row &&
+            typeof row === "object" &&
+            !Array.isArray(row)
+        ) {
+
+            const value =
+                row[
+                    ticketField ||
+                    "TT Number"
+                ];
+
+
+            return String(
+                value ?? ""
+            ).trim();
+
+        }
+
+
+        /*
+         * Jika row berupa array:
+         *
+         * Kolom D = index 3
+         */
+
+        if (
+            Array.isArray(row)
+        ) {
+
+            return String(
+                row[3] ?? ""
+            ).trim();
+
+        }
+
+
+        return "";
+
+    }
+
+
+    /* =====================================================
+       GET CIR
+       
+       Default:
+       CIR = kolom AF
+       
+       Jika object:
+       row["CIR"]
+       
+       Jika array:
+       AF = index 31
+    ===================================================== */
+
+    function getCIR(
+        row,
+        cirField
+    ) {
+
+        if (
+            row &&
+            typeof row === "object" &&
+            !Array.isArray(row)
+        ) {
+
+            return row[
+                cirField ||
+                "CIR"
+            ] || "";
+
+        }
+
+
+        /*
+         * Kolom AF = 32
+         * index JavaScript = 31
+         */
+
+        if (
+            Array.isArray(row)
+        ) {
+
+            return row[31] || "";
+
+        }
+
+
+        return "";
+
+    }
+
+
+    /* =====================================================
        PARSE MATERIALS
     ===================================================== */
 
@@ -1819,9 +2011,9 @@
         };
 
 
-        /*
-         * TICKET WAJIB ADA
-         */
+        /* =================================================
+           TT NUMBER WAJIB ADA
+        ================================================= */
 
         if (!cleanTicket) {
 
@@ -1829,7 +2021,7 @@
                 "NO TICKET";
 
             result.note =
-                "Material tidak diproses karena Ticket kosong.";
+                "Material tidak diproses karena TT Number pada kolom D kosong.";
 
             return result;
 
@@ -1860,7 +2052,7 @@
 
 
         /* =================================================
-           PARSE SETIAP BARIS
+           PARSE SETIAP LINE
         ================================================= */
 
         for (
@@ -1874,8 +2066,7 @@
 
 
             /*
-             * Hanya material MASTER
-             * yang masuk hasil.
+             * Hanya master material.
              */
 
             if (!parsed) {
@@ -1886,7 +2077,7 @@
 
 
             /*
-             * Ticket selalu ikut.
+             * Ticket selalu TT Number.
              */
 
             parsed.ticket =
@@ -1901,7 +2092,7 @@
 
 
         /* =================================================
-           JIKA TIDAK ADA MATERIAL
+           TIDAK ADA MATERIAL
         ================================================= */
 
         if (
@@ -1930,6 +2121,7 @@
         result.note =
             `Ditemukan ${result.materials.length} material master.`;
 
+
         return result;
 
     }
@@ -1937,6 +2129,10 @@
 
     /* =====================================================
        PARSE MULTIPLE ROWS
+       
+       DEFAULT:
+       ticketField = TT Number
+       cirField    = CIR
     ===================================================== */
 
     function parseMultipleMaterials(
@@ -1954,19 +2150,37 @@
         }
 
 
+        const settings =
+            getSettings();
+
+
+        const actualCirField =
+            cirField ||
+            settings.cirField ||
+            "CIR";
+
+
+        const actualTicketField =
+            ticketField ||
+            settings.ticketField ||
+            "TT Number";
+
+
         return rows.map(
             function (row) {
 
                 const cir =
-                    row
-                        ? row[cirField]
-                        : "";
+                    getCIR(
+                        row,
+                        actualCirField
+                    );
 
 
                 const ticket =
-                    row
-                        ? row[ticketField]
-                        : "";
+                    getTTNumber(
+                        row,
+                        actualTicketField
+                    );
 
 
                 return parseMaterials(
@@ -2022,7 +2236,7 @@
 
                 /*
                  * SAFETY:
-                 * Material tanpa Ticket
+                 * Material tanpa TT Number
                  * tidak boleh keluar.
                  */
 
@@ -2040,6 +2254,10 @@
 
 
                 output.push({
+
+                    /*
+                     * Ticket = TT Number
+                     */
 
                     ticket:
                         String(
@@ -2099,6 +2317,11 @@
                 ticket || ""
             ).trim();
 
+
+        /*
+         * TT Number kosong:
+         * jangan membuat record.
+         */
 
         if (!cleanTicket) {
 
@@ -2270,8 +2493,7 @@
 
 
         /*
-         * Rebuild alias list secara sederhana
-         * agar alias baru langsung bisa dipakai.
+         * Alias baru langsung aktif.
          */
 
         ALIAS_LIST.push({
@@ -2316,6 +2538,117 @@
 
 
     /* =====================================================
+       GET COLUMN INFO
+       
+       Helper untuk memastikan mapping Excel.
+    ===================================================== */
+
+    function getColumnMapping() {
+
+        return {
+
+            A:
+                "Datetime Receive",
+
+            B:
+                "Customer Ticket",
+
+            C:
+                "Ref Ticket",
+
+            D:
+                "TT Number",
+
+            E:
+                "Cust ID",
+
+            F:
+                "Segment/Link",
+
+            G:
+                "Span Length",
+
+            H:
+                "LFO Id",
+
+            I:
+                "City Name",
+
+            J:
+                "Branch",
+
+            K:
+                "Type Workorder",
+
+            L:
+                "Customer Name",
+
+            M:
+                "Parsing Name",
+
+            N:
+                "Region",
+
+            O:
+                "Problem Subject",
+
+            P:
+                "Status TT",
+
+            Q:
+                "Shift",
+
+            R:
+                "Team Name",
+
+            S:
+                "Teknisi Name",
+
+            T:
+                "Restore Time",
+
+            U:
+                "MTTR",
+
+            V:
+                "Final SLA",
+
+            W:
+                "Start Stopclock 1",
+
+            X:
+                "End Stopclock 1",
+
+            Y:
+                "Start Stopclock 2",
+
+            Z:
+                "End Stopclock 2",
+
+            AA:
+                "RCA",
+
+            AB:
+                "SUB RCA",
+
+            AC:
+                "ACTION",
+
+            AD:
+                "TIKOR 1",
+
+            AE:
+                "TIKOR 2",
+
+            AF:
+                "CIR"
+
+        };
+
+    }
+
+
+    /* =====================================================
        PUBLIC API
     ===================================================== */
 
@@ -2343,7 +2676,11 @@
 
 
         /*
-         * Banyak row
+         * Parse multiple Excel rows
+         *
+         * Default:
+         * D  = TT Number
+         * AF = CIR
          */
         parseMultiple:
             parseMultipleMaterials,
@@ -2378,7 +2715,7 @@
 
 
         /*
-         * Cari material yang typo/mirip
+         * Cari material typo/mirip
          */
         findSimilar:
             findSimilarMaterial,
@@ -2395,7 +2732,21 @@
          * Tambah alias
          */
         addAlias:
-            addAlias
+            addAlias,
+
+
+        /*
+         * Mapping kolom Excel
+         */
+        getColumnMapping:
+            getColumnMapping,
+
+
+        /*
+         * Setting default
+         */
+        settings:
+            DEFAULT_SETTINGS
 
     };
 
