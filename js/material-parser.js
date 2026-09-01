@@ -3,14 +3,17 @@
    material-parser.js
 
    VERSION:
-   - Master material
-   - Alias material
-   - CUSTOM / UNKNOWN detection
+   - Strict Master Material
+   - Alias Material
+   - Exact + Similar matching
+   - Menyimpan tulisan asli dari CIR
    - Quantity
    - Unit
    - Material code
    - Material section detection
    - Ticket wajib ada
+   - Tidak mengambil material di luar master
+   - Tidak mengambil: protek, sleeve, tisu alkohol, dll
    - Support variasi penulisan report
 ========================================================= */
 
@@ -45,7 +48,8 @@
             aliases: [
                 "splitter 1:2",
                 "splitter 1/2",
-                "splitter 1x2"
+                "splitter 1x2",
+                "splitter 1 2"
             ]
         },
 
@@ -54,7 +58,8 @@
             aliases: [
                 "splitter 1:4",
                 "splitter 1/4",
-                "splitter 1x4"
+                "splitter 1x4",
+                "splitter 1 4"
             ]
         },
 
@@ -63,7 +68,8 @@
             aliases: [
                 "splitter 1:8",
                 "splitter 1/8",
-                "splitter 1x8"
+                "splitter 1x8",
+                "splitter 1 8"
             ]
         },
 
@@ -72,7 +78,8 @@
             aliases: [
                 "splitter 1:16",
                 "splitter 1/16",
-                "splitter 1x16"
+                "splitter 1x16",
+                "splitter 1 16"
             ]
         },
 
@@ -84,7 +91,8 @@
                 "2 core",
                 "2 core meter",
                 "kabel 2c",
-                "kabel 2 c"
+                "kabel 2 c",
+                "kabel 2 core"
             ]
         },
 
@@ -96,7 +104,10 @@
                 "12 core",
                 "12 core meter",
                 "kabel 12c",
-                "kabel 12 c"
+                "kabel 12 c",
+                "kabel 12 core",
+                "12f",
+                "12 f"
             ]
         },
 
@@ -108,7 +119,10 @@
                 "24 core",
                 "24 core meter",
                 "kabel 24c",
-                "kabel 24 c"
+                "kabel 24 c",
+                "kabel 24 core",
+                "24f",
+                "24 f"
             ]
         },
 
@@ -120,7 +134,10 @@
                 "48 core",
                 "48 core meter",
                 "kabel 48c",
-                "kabel 48 c"
+                "kabel 48 c",
+                "kabel 48 core",
+                "48f",
+                "48 f"
             ]
         },
 
@@ -134,9 +151,12 @@
                 "96f",
                 "96 f",
                 "96 fiber",
+                "kabel 96c",
+                "kabel 96 c",
                 "kabel 96f",
                 "kabel 96 f",
-                "kabel 96 core"
+                "kabel 96 core",
+                "kabel 96 fiber"
             ]
         },
 
@@ -153,7 +173,8 @@
                 "12c dome",
                 "12 c dome",
                 "dome 12c",
-                "dome 12 c"
+                "dome 12 c",
+                "12f dome"
             ]
         },
 
@@ -163,7 +184,8 @@
                 "24c dome",
                 "24 c dome",
                 "dome 24c",
-                "dome 24 c"
+                "dome 24 c",
+                "24f dome"
             ]
         },
 
@@ -173,7 +195,8 @@
                 "48c dome",
                 "48 c dome",
                 "dome 48c",
-                "dome 48 c"
+                "dome 48 c",
+                "48f dome"
             ]
         },
 
@@ -183,7 +206,8 @@
                 "96c dome",
                 "96 c dome",
                 "dome 96c",
-                "dome 96 c"
+                "dome 96 c",
+                "96f dome"
             ]
         },
 
@@ -193,7 +217,8 @@
                 "144c dome",
                 "144 c dome",
                 "dome 144c",
-                "dome 144 c"
+                "dome 144 c",
+                "144f dome"
             ]
         },
 
@@ -204,7 +229,8 @@
                 "24 c inline",
                 "inline 24c",
                 "24c inlane",
-                "24 c inlane"
+                "24 c inlane",
+                "inline 24 c"
             ]
         },
 
@@ -215,7 +241,8 @@
                 "48 c inline",
                 "inline 48c",
                 "48c inlane",
-                "48 c inlane"
+                "48 c inlane",
+                "inline 48 c"
             ]
         },
 
@@ -226,7 +253,8 @@
                 "96 c inline",
                 "inline 96c",
                 "96c inlane",
-                "96 c inlane"
+                "96 c inlane",
+                "inline 96 c"
             ]
         },
 
@@ -237,7 +265,8 @@
                 "144 c inline",
                 "inline 144c",
                 "144c inlane",
-                "144 c inlane"
+                "144 c inlane",
+                "inline 144 c"
             ]
         },
 
@@ -256,7 +285,11 @@
                 "kaset jb",
                 "kaset",
                 "cassette jb",
-                "jb cassette"
+                "jb cassette",
+                "jb 96f",
+                "jb 96 f",
+                "jb96f",
+                "jb96 f"
             ]
         },
 
@@ -302,7 +335,8 @@
                 "handhole 40 x 40",
                 "handhole 40x40",
                 "hand hole 40 x 40",
-                "hand hole 40x40"
+                "hand hole 40x40",
+                "handhole 40"
             ]
         },
 
@@ -312,7 +346,8 @@
                 "handhole 60 x 60",
                 "handhole 60x60",
                 "hand hole 60 x 60",
-                "hand hole 60x60"
+                "hand hole 60x60",
+                "handhole 60"
             ]
         },
 
@@ -322,7 +357,8 @@
                 "handhole 80 x 80",
                 "handhole 80x80",
                 "hand hole 80 x 80",
-                "hand hole 80x80"
+                "hand hole 80x80",
+                "handhole 80"
             ]
         },
 
@@ -336,7 +372,8 @@
                 "deathend",
                 "death ned",
                 "death net",
-                "dead ned"
+                "dead ned",
+                "dead net"
             ]
         }
 
@@ -379,24 +416,18 @@
             "Act",
             "Act:",
             "===CIR===",
+            "======CIR======",
+            "======CIR========",
             "==="
         ],
 
         notFoundPhrases: [
             "NOT YET",
-            "Not Yet",
-            "not yet",
             "NOT FOUND",
-            "Not Found",
-            "not found",
             "Belum ada",
-            "belum ada",
             "Belum tersedia",
-            "belum tersedia",
             "Pending",
-            "pending",
-            "N/A",
-            "n/a"
+            "N/A"
         ]
 
     };
@@ -412,11 +443,8 @@
             value === null ||
             value === undefined
         ) {
-
             return "";
-
         }
-
 
         return String(value)
             .replace(/\r\n/g, "\n")
@@ -434,6 +462,23 @@
     function normalizeLine(value) {
 
         return String(value || "")
+            .replace(/\s+/g, " ")
+            .trim();
+
+    }
+
+
+    /* =====================================================
+       NORMALIZE MATERIAL TEXT
+    ===================================================== */
+
+    function normalizeMaterialText(value) {
+
+        return String(value || "")
+            .toLowerCase()
+            .replace(/\u00a0/g, " ")
+            .replace(/[“”"]/g, "")
+            .replace(/[‐-‒–—]/g, "-")
             .replace(/\s+/g, " ")
             .trim();
 
@@ -471,108 +516,60 @@
             const settings =
                 window.ReportCheckerSettings.get();
 
-
             return {
-
                 ...DEFAULT_SETTINGS,
-
                 ...settings
-
             };
 
         }
 
-
         return {
-
             ...DEFAULT_SETTINGS
-
         };
 
     }
 
 
     /* =====================================================
-       NORMALIZE MATERIAL NAME
+       BUILD ALIAS LIST
     ===================================================== */
 
-    function normalizeMaterialText(
-        value
-    ) {
-
-        return String(value || "")
-            .toLowerCase()
-            .replace(/\u00a0/g, " ")
-            .replace(/[“”"]/g, "")
-            .replace(/\s+/g, " ")
-            .trim();
-
-    }
-
-
-    /* =====================================================
-       FIND MASTER MATERIAL
-    ===================================================== */
-
-    function findMasterMaterial(
-        value
-    ) {
-
-        const text =
-            normalizeMaterialText(
-                value
-            );
-
-
-        if (!text) {
-
-            return null;
-
-        }
-
-
-        /*
-         * Urutkan alias dari yang paling panjang.
-         *
-         * Ini penting supaya:
-         *
-         * 96C DOME
-         *
-         * tidak lebih dulu terbaca sebagai:
-         *
-         * 96C
-         */
+    function buildAliasList() {
 
         const candidates = [];
 
+        MATERIAL_MASTER.forEach(
+            function (item) {
 
-        for (
-            const item of MATERIAL_MASTER
-        ) {
+                item.aliases.forEach(
+                    function (alias) {
 
-            for (
-                const alias of item.aliases
-            ) {
+                        candidates.push({
 
-                candidates.push({
+                            master:
+                                item.name,
 
-                    master:
-                        item.name,
+                            alias:
+                                alias,
 
-                    alias:
-                        alias,
+                            normalized:
+                                normalizeMaterialText(
+                                    alias
+                                )
 
-                    normalized:
-                        normalizeMaterialText(
-                            alias
-                        )
+                        });
 
-                });
+                    }
+                );
 
             }
+        );
 
-        }
 
+        /*
+         * Material paling spesifik
+         * selalu dicek lebih dulu.
+         */
 
         candidates.sort(
             function (a, b) {
@@ -586,14 +583,37 @@
         );
 
 
+        return candidates;
+
+    }
+
+
+    const ALIAS_LIST =
+        buildAliasList();
+
+
+    /* =====================================================
+       FIND MASTER MATERIAL
+    ===================================================== */
+
+    function findMasterMaterial(value) {
+
+        const text =
+            normalizeMaterialText(value);
+
+
+        if (!text) {
+            return null;
+        }
+
+
         for (
-            const candidate of candidates
+            const candidate of ALIAS_LIST
         ) {
 
             if (
-                text.includes(
-                    candidate.normalized
-                )
+                text ===
+                candidate.normalized
             ) {
 
                 return {
@@ -605,7 +625,76 @@
                         candidate.alias,
 
                     type:
-                        "MASTER"
+                        "MASTER",
+
+                    confidence:
+                        "EXACT"
+
+                };
+
+            }
+
+        }
+
+
+        /*
+         * Cek jika alias berada di dalam kalimat.
+         *
+         * Contoh:
+         *
+         * Kabel 96f terpakai : 149 m
+         *
+         * akan cocok dengan 96f.
+         */
+
+        for (
+            const candidate of ALIAS_LIST
+        ) {
+
+            const alias =
+                candidate.normalized;
+
+
+            if (
+                alias.length < 2
+            ) {
+                continue;
+            }
+
+
+            const escaped =
+                alias.replace(
+                    /[.*+?^${}()|[\]\\]/g,
+                    "\\$&"
+                );
+
+
+            const regex =
+                new RegExp(
+                    "(^|[^a-z0-9])" +
+                    escaped +
+                    "([^a-z0-9]|$)",
+                    "i"
+                );
+
+
+            if (
+                regex.test(text)
+            ) {
+
+                return {
+
+                    name:
+                        candidate.master,
+
+                    alias:
+                        candidate.alias,
+
+                    type:
+                        "MASTER",
+
+                    confidence:
+                        "CONTAINS"
 
                 };
 
@@ -620,7 +709,301 @@
 
 
     /* =====================================================
-       NORMALIZE MATERIAL NAME PUBLIC
+       SIMILARITY
+       
+       Digunakan hanya sebagai bantuan.
+       
+       Tidak semua teks mirip langsung dianggap material.
+    ===================================================== */
+
+    function levenshtein(
+        a,
+        b
+    ) {
+
+        a =
+            String(a || "");
+
+        b =
+            String(b || "");
+
+
+        const matrix = [];
+
+
+        for (
+            let i = 0;
+            i <= b.length;
+            i++
+        ) {
+
+            matrix[i] = [i];
+
+        }
+
+
+        for (
+            let j = 0;
+            j <= a.length;
+            j++
+        ) {
+
+            matrix[0][j] = j;
+
+        }
+
+
+        for (
+            let i = 1;
+            i <= b.length;
+            i++
+        ) {
+
+            for (
+                let j = 1;
+                j <= a.length;
+                j++
+            ) {
+
+                if (
+                    b.charAt(i - 1)
+                    ===
+                    a.charAt(j - 1)
+                ) {
+
+                    matrix[i][j] =
+                        matrix[i - 1][j - 1];
+
+                } else {
+
+                    matrix[i][j] =
+                        Math.min(
+
+                            matrix[i - 1][j - 1] + 1,
+
+                            matrix[i][j - 1] + 1,
+
+                            matrix[i - 1][j] + 1
+
+                        );
+
+                }
+
+            }
+
+        }
+
+
+        return matrix[b.length][a.length];
+
+    }
+
+
+    function similarity(
+        a,
+        b
+    ) {
+
+        const first =
+            normalizeMaterialText(a);
+
+        const second =
+            normalizeMaterialText(b);
+
+
+        if (
+            !first ||
+            !second
+        ) {
+
+            return 0;
+
+        }
+
+
+        const distance =
+            levenshtein(
+                first,
+                second
+            );
+
+
+        const maxLength =
+            Math.max(
+                first.length,
+                second.length
+            );
+
+
+        if (!maxLength) {
+            return 1;
+        }
+
+
+        return (
+            1 -
+            (
+                distance /
+                maxLength
+            )
+        );
+
+    }
+
+
+    /* =====================================================
+       FIND SIMILAR MASTER
+       
+       Hanya digunakan pada:
+       - nama pendek
+       - typo ringan
+       - tidak ada angka material yang membingungkan
+    ===================================================== */
+
+    function findSimilarMaterial(
+        value
+    ) {
+
+        const text =
+            normalizeMaterialText(value);
+
+
+        if (
+            !text ||
+            text.length < 4
+        ) {
+
+            return null;
+
+        }
+
+
+        let best =
+            null;
+
+
+        for (
+            const candidate of ALIAS_LIST
+        ) {
+
+            const alias =
+                candidate.normalized;
+
+
+            /*
+             * Jangan similarity terhadap alias
+             * yang terlalu pendek.
+             */
+
+            if (
+                alias.length < 4
+            ) {
+
+                continue;
+
+            }
+
+
+            /*
+             * Untuk material fiber,
+             * angka harus tetap sama.
+             *
+             * Contoh:
+             * 96c jangan dianggap 48c.
+             */
+
+            const textNumbers =
+                text.match(/\d+/g) || [];
+
+            const aliasNumbers =
+                alias.match(/\d+/g) || [];
+
+
+            if (
+                aliasNumbers.length &&
+                textNumbers.length
+            ) {
+
+                if (
+                    aliasNumbers.join(",") !==
+                    textNumbers.join(",")
+                ) {
+
+                    continue;
+
+                }
+
+            }
+
+
+            const score =
+                similarity(
+                    text,
+                    alias
+                );
+
+
+            if (
+                !best ||
+                score > best.score
+            ) {
+
+                best = {
+
+                    name:
+                        candidate.master,
+
+                    alias:
+                        candidate.alias,
+
+                    score:
+                        score
+
+                };
+
+            }
+
+        }
+
+
+        /*
+         * Threshold cukup tinggi
+         * agar tidak banyak false positive.
+         */
+
+        if (
+            best &&
+            best.score >= 0.72
+        ) {
+
+            return {
+
+                name:
+                    best.name,
+
+                alias:
+                    best.alias,
+
+                type:
+                    "SIMILAR",
+
+                confidence:
+                    Math.round(
+                        best.score * 100
+                    ) + "%"
+
+            };
+
+        }
+
+
+        return null;
+
+    }
+
+
+    /* =====================================================
+       NORMALIZE MATERIAL NAME
     ===================================================== */
 
     function normalizeMaterialName(
@@ -640,8 +1023,9 @@
         }
 
 
-        return String(value || "")
-            .trim();
+        return String(
+            value || ""
+        ).trim();
 
     }
 
@@ -658,9 +1042,11 @@
 
             return {
 
-                quantity: null,
+                quantity:
+                    null,
 
-                unit: ""
+                unit:
+                    ""
 
             };
 
@@ -672,17 +1058,6 @@
                 .trim();
 
 
-        /*
-         * Format:
-         *
-         * 1 pcs
-         * 70 pcs
-         * 149 m
-         * 1508 meter
-         * 2 unit
-         * 10 batang
-         */
-
         const match =
             value.match(
                 /(?:^|\s|:)(\d+(?:[.,]\d+)?)\s*(pcs|pc|buah|unit|units|set|m|meter|meters|km|core|cores|lembar|roll|batang)\b/i
@@ -693,9 +1068,11 @@
 
             return {
 
-                quantity: null,
+                quantity:
+                    null,
 
-                unit: ""
+                unit:
+                    ""
 
             };
 
@@ -717,35 +1094,50 @@
 
         const unitMap = {
 
-            pc: "pcs",
+            pc:
+                "pcs",
 
-            pcs: "pcs",
+            pcs:
+                "pcs",
 
-            buah: "pcs",
+            buah:
+                "pcs",
 
-            unit: "unit",
+            unit:
+                "unit",
 
-            units: "unit",
+            units:
+                "unit",
 
-            set: "set",
+            set:
+                "set",
 
-            m: "m",
+            m:
+                "m",
 
-            meter: "m",
+            meter:
+                "m",
 
-            meters: "m",
+            meters:
+                "m",
 
-            km: "km",
+            km:
+                "km",
 
-            core: "core",
+            core:
+                "core",
 
-            cores: "core",
+            cores:
+                "core",
 
-            lembar: "lembar",
+            lembar:
+                "lembar",
 
-            roll: "roll",
+            roll:
+                "roll",
 
-            batang: "batang"
+            batang:
+                "batang"
 
         };
 
@@ -777,9 +1169,7 @@
     ) {
 
         if (!text) {
-
             return "";
-
         }
 
 
@@ -791,9 +1181,7 @@
 
 
         if (!match) {
-
             return "";
-
         }
 
 
@@ -804,7 +1192,7 @@
 
 
     /* =====================================================
-       REMOVE CODE
+       REMOVE MATERIAL CODE
     ===================================================== */
 
     function removeMaterialCode(
@@ -838,7 +1226,7 @@
 
 
     /* =====================================================
-       CLEAN MATERIAL NAME
+       CLEAN MATERIAL LINE
     ===================================================== */
 
     function cleanMaterialName(
@@ -868,20 +1256,12 @@
             );
 
 
-        /*
-         * Hapus colon / equal di akhir
-         */
-
         value =
             value.replace(
                 /\s*[:=]\s*$/,
                 ""
             );
 
-
-        /*
-         * Hapus separator yang tersisa
-         */
 
         value =
             value.replace(
@@ -890,90 +1270,86 @@
             );
 
 
-        value =
-            value.trim();
-
-
-        return value;
+        return value.trim();
 
     }
 
 
     /* =====================================================
-       DETECT MATERIAL TYPE
-       
-       MASTER
-       CUSTOM
-       UNKNOWN
+       EXTRACT MASTER MATERIAL FROM LINE
     ===================================================== */
 
-    function detectMaterialType(
-        materialName
+    function extractMasterFromLine(
+        line
     ) {
 
-        const found =
-            findMasterMaterial(
-                materialName
+        const clean =
+            removeBullet(
+                normalizeLine(
+                    line
+                )
             );
 
 
-        if (found) {
+        if (!clean) {
+            return null;
+        }
 
-            return {
 
-                type:
-                    "MASTER",
+        const exact =
+            findMasterMaterial(
+                clean
+            );
 
-                normalizedName:
-                    found.name,
 
-                matchedAlias:
-                    found.alias
+        if (exact) {
 
-            };
+            return exact;
 
         }
+
+
+        /*
+         * Coba bagian nama setelah
+         * quantity/code dibuang.
+         */
+
+        const cleanedName =
+            cleanMaterialName(
+                clean
+            );
 
 
         if (
-            materialName &&
-            materialName.trim()
+            cleanedName &&
+            cleanedName !== clean
         ) {
 
-            return {
+            const second =
+                findMasterMaterial(
+                    cleanedName
+                );
 
-                type:
-                    "CUSTOM",
 
-                normalizedName:
-                    materialName.trim(),
+            if (second) {
 
-                matchedAlias:
-                    ""
+                return second;
 
-            };
+            }
 
         }
 
 
-        return {
-
-            type:
-                "UNKNOWN",
-
-            normalizedName:
-                "",
-
-            matchedAlias:
-                ""
-
-        };
+        return null;
 
     }
 
 
     /* =====================================================
        CHECK MATERIAL LINE
+       
+       STRICT:
+       Hanya line yang mengandung material master.
     ===================================================== */
 
     function looksLikeMaterialLine(
@@ -981,9 +1357,7 @@
     ) {
 
         if (!line) {
-
             return false;
-
         }
 
 
@@ -996,60 +1370,18 @@
 
 
         if (!clean) {
-
             return false;
-
         }
 
 
-        /*
-         * Jika mempunyai quantity + unit,
-         * sangat mungkin material.
-         */
-
-        const quantity =
-            parseQuantityUnit(
+        const master =
+            extractMasterFromLine(
                 clean
             );
 
 
-        if (
-            quantity.quantity !== null
-        ) {
-
+        if (master) {
             return true;
-
-        }
-
-
-        /*
-         * Jika ada kode material.
-         */
-
-        if (
-            /\b(?:kode|code|item\s*code|material\s*code)\s*[:=]/i
-                .test(clean)
-        ) {
-
-            return true;
-
-        }
-
-
-        /*
-         * Jika cocok dengan master material,
-         * tetap dianggap material walaupun quantity
-         * tidak tertulis.
-         */
-
-        if (
-            findMasterMaterial(
-                clean
-            )
-        ) {
-
-            return true;
-
         }
 
 
@@ -1073,9 +1405,7 @@
 
 
         if (!original) {
-
             return null;
-
         }
 
 
@@ -1085,11 +1415,19 @@
             );
 
 
-        if (
-            !looksLikeMaterialLine(
+        const materialMatch =
+            extractMasterFromLine(
                 cleanLine
-            )
-        ) {
+            );
+
+
+        /*
+         * STRICT:
+         * Kalau tidak cocok master,
+         * jangan dimasukkan sebagai material.
+         */
+
+        if (!materialMatch) {
 
             return null;
 
@@ -1114,26 +1452,33 @@
             );
 
 
-        if (!rawName) {
+        /*
+         * Material standar.
+         */
 
-            return null;
-
-        }
-
-
-        const materialInfo =
-            detectMaterialType(
-                rawName
-            );
+        const normalizedName =
+            materialMatch.name;
 
 
         return {
 
             material:
-                materialInfo.normalizedName,
+                normalizedName,
+
+            /*
+             * Tulisan material sebagaimana
+             * terbaca dari CIR.
+             */
 
             originalMaterial:
                 rawName,
+
+            /*
+             * Seluruh baris asli.
+             */
+
+            raw:
+                original,
 
             quantity:
                 quantity.quantity,
@@ -1145,13 +1490,13 @@
                 code,
 
             type:
-                materialInfo.type,
+                "MASTER",
+
+            matchType:
+                materialMatch.confidence,
 
             matchedAlias:
-                materialInfo.matchedAlias,
-
-            raw:
-                original
+                materialMatch.alias
 
         };
 
@@ -1180,9 +1525,7 @@
 
 
             if (!line) {
-
                 continue;
-
             }
 
 
@@ -1191,9 +1534,7 @@
             ) {
 
                 if (!phrase) {
-
                     continue;
-
                 }
 
 
@@ -1222,7 +1563,8 @@
 
 
                 if (
-                    line.toLowerCase()
+                    line
+                        .toLowerCase()
                         .startsWith(
                             p.toLowerCase()
                         )
@@ -1265,9 +1607,7 @@
 
 
             if (!line) {
-
                 continue;
-
             }
 
 
@@ -1309,9 +1649,7 @@
         ) {
 
             if (!phrase) {
-
                 continue;
-
             }
 
 
@@ -1469,6 +1807,9 @@
             customMaterials:
                 [],
 
+            reviewMaterials:
+                [],
+
             rawLines:
                 [],
 
@@ -1518,9 +1859,9 @@
             block.lines;
 
 
-        /*
-         * Parse setiap line.
-         */
+        /* =================================================
+           PARSE SETIAP BARIS
+        ================================================= */
 
         for (
             const line of block.lines
@@ -1531,6 +1872,11 @@
                     line
                 );
 
+
+            /*
+             * Hanya material MASTER
+             * yang masuk hasil.
+             */
 
             if (!parsed) {
 
@@ -1551,24 +1897,12 @@
                 parsed
             );
 
-
-            if (
-                parsed.type ===
-                "CUSTOM"
-            ) {
-
-                result.customMaterials.push(
-                    parsed
-                );
-
-            }
-
         }
 
 
-        /* ---------------------------------------------
-           Tidak ada material
-        --------------------------------------------- */
+        /* =================================================
+           JIKA TIDAK ADA MATERIAL
+        ================================================= */
 
         if (
             result.materials.length === 0
@@ -1578,7 +1912,7 @@
                 "NOT FOUND";
 
             result.note =
-                "Section Material ditemukan tetapi tidak ada material yang dapat dibaca.";
+                "Section Material ditemukan tetapi tidak ada material yang cocok dengan master material.";
 
             return result;
 
@@ -1594,7 +1928,7 @@
 
 
         result.note =
-            `Ditemukan ${result.materials.length} material.`;
+            `Ditemukan ${result.materials.length} material master.`;
 
         return result;
 
@@ -1648,15 +1982,6 @@
 
     /* =====================================================
        FLATTEN MATERIALS
-       
-       1 Ticket
-       3 Material
-       
-       menjadi 3 row:
-       
-       Ticket | Material 1
-       Ticket | Material 2
-       Ticket | Material 3
     ===================================================== */
 
     function flattenMaterials(
@@ -1697,8 +2022,8 @@
 
                 /*
                  * SAFETY:
-                 * material tanpa Ticket
-                 * tidak boleh masuk output.
+                 * Material tanpa Ticket
+                 * tidak boleh keluar.
                  */
 
                 if (
@@ -1739,6 +2064,9 @@
                     type:
                         material.type,
 
+                    matchType:
+                        material.matchType,
+
                     matchedAlias:
                         material.matchedAlias,
 
@@ -1759,8 +2087,6 @@
 
     /* =====================================================
        CREATE NO MATERIAL RECORD
-       
-       Tetap memiliki Ticket.
     ===================================================== */
 
     function createNoMaterialRecord(
@@ -1804,6 +2130,9 @@
             type:
                 "UNKNOWN",
 
+            matchType:
+                "",
+
             matchedAlias:
                 "",
 
@@ -1845,16 +2174,7 @@
 
 
     /* =====================================================
-       ADD CUSTOM ALIAS
-       
-       Digunakan nanti oleh Settings.
-       
-       Contoh:
-       
-       addAlias(
-           "Dead End",
-           "death ned"
-       );
+       ADD ALIAS
     ===================================================== */
 
     function addAlias(
@@ -1949,6 +2269,39 @@
         );
 
 
+        /*
+         * Rebuild alias list secara sederhana
+         * agar alias baru langsung bisa dipakai.
+         */
+
+        ALIAS_LIST.push({
+
+            master:
+                master.name,
+
+            alias:
+                cleanAlias,
+
+            normalized:
+                normalizeMaterialText(
+                    cleanAlias
+                )
+
+        });
+
+
+        ALIAS_LIST.sort(
+            function (a, b) {
+
+                return (
+                    b.normalized.length -
+                    a.normalized.length
+                );
+
+            }
+        );
+
+
         return {
 
             success:
@@ -2022,6 +2375,13 @@
          */
         findMaster:
             findMasterMaterial,
+
+
+        /*
+         * Cari material yang typo/mirip
+         */
+        findSimilar:
+            findSimilarMaterial,
 
 
         /*
