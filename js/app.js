@@ -3239,154 +3239,161 @@
 
     async function runProcess() {
 
-        if (!checkDependencies()) {
-            return;
-        }
+    if (!checkDependencies()) {
+        return;
+    }
 
+    if (!state.file) {
+        alert(
+            "Silakan pilih file Excel terlebih dahulu."
+        );
+        return;
+    }
 
-        if (!state.file) {
+    if (!state.workbook) {
+        updateProgress(10, "Membaca file Excel...");
 
-            alert(
-                "Silakan pilih file Excel terlebih dahulu."
-            );
-
-            return;
-
-        }
-
+        await readAndPrepareFile(
+            state.file
+        );
 
         if (!state.workbook) {
+            return;
+        }
+    }
 
-            await readAndPrepareFile(
-                state.file
+    setProcessing(
+        true,
+        "Sedang memproses..."
+    );
+
+    updateProgress(
+        20,
+        "Mempersiapkan data..."
+    );
+
+    setSystemStatus(
+        "Memproses...",
+        "online"
+    );
+
+    try {
+
+        if (state.sheetName) {
+
+            loadSheet(
+                state.sheetName
             );
-
-
-            if (!state.workbook) {
-                return;
-            }
 
         }
 
-
-        setProcessing(
-            true,
+        updateProgress(
+            35,
             "Memvalidasi data Excel..."
         );
 
+        await new Promise(
+            resolve => setTimeout(resolve, 20)
+        );
+
+        updateProgress(
+            55,
+            "Memeriksa TT Number..."
+        );
+
+        const results =
+            processData();
+
+        updateProgress(
+            80,
+            "Memproses material..."
+        );
+
+        await new Promise(
+            resolve => setTimeout(resolve, 20)
+        );
+
+        renderAll();
+
+        updateProgress(
+            100,
+            "Selesai memproses data"
+        );
+
+        const summary =
+            getSummary(
+                results
+            );
+
+        const sesuai =
+            Number(
+                summary.sesuai ??
+                summary.valid ??
+                0
+            );
+
+        const tidakSesuai =
+            Number(
+                summary.tidakSesuai ??
+                0
+            );
 
         setSystemStatus(
-            "Memproses...",
+            "Selesai",
             "online"
         );
 
+        console.log(
+            "Report Checker result:",
+            {
+                total:
+                    results.length,
 
-        try {
+                sesuai:
+                    sesuai,
 
-            /*
-             * Pastikan worksheet terbaru
-             * digunakan.
-             */
+                tidakSesuai:
+                    tidakSesuai,
 
-            if (
-                state.sheetName
-            ) {
+                material:
+                    state.materialRows.length,
 
-                loadSheet(
-                    state.sheetName
-                );
-
+                materialError:
+                    state.materialErrorRows.length
             }
+        );
 
-
-            const results =
-                processData();
-
-
-            renderAll();
-
-
-            const summary =
-                getSummary(
-                    results
-                );
-
-
-            const sesuai =
-                Number(
-                    summary.sesuai ??
-                    summary.valid ??
-                    0
-                );
-
-
-            const tidakSesuai =
-                Number(
-                    summary.tidakSesuai ??
-                    0
-                );
-
-
-            setProcessing(
-                false
-            );
-
-
-            setSystemStatus(
-                "Selesai",
-                "online"
-            );
-
-
-            console.log(
-                "Report Checker result:",
-                {
-                    total:
-                        results.length,
-
-                    sesuai:
-                        sesuai,
-
-                    tidakSesuai:
-                        tidakSesuai,
-
-                    material:
-                        state.materialRows.length,
-
-                    materialError:
-                        state.materialErrorRows.length
-                }
-            );
-
-        }
-        catch (error) {
-
-            console.error(
-                "Process error:",
-                error
-            );
-
-
-            setProcessing(
-                false
-            );
-
-
-            setSystemStatus(
-                "Error",
-                "offline"
-            );
-
-
-            alert(
-                error.message ||
-                "Terjadi kesalahan saat memproses Excel."
-            );
-
-        }
+        setTimeout(
+            function () {
+                setProcessing(false);
+            },
+            500
+        );
 
     }
+    catch (error) {
 
+        console.error(
+            "Process error:",
+            error
+        );
+
+        setProcessing(
+            false
+        );
+
+        setSystemStatus(
+            "Error",
+            "offline"
+        );
+
+        alert(
+            error.message ||
+            "Terjadi kesalahan saat memproses Excel."
+        );
+
+    }
+}
 
     /* =====================================================
        EXPORT HELPERS
