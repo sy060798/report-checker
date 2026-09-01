@@ -2,20 +2,10 @@
    REPORT CHECKER - APP.JS
    Controller utama UI
    Cocok dengan index.html versi terbaru
-
-   UPDATE:
-   - Ticket yang ditampilkan menggunakan TT Number
-   - TT Number menjadi prioritas utama
-   - Mendukung beberapa variasi nama field TT Number
-   - Material ikut mengambil TT Number dari parent/original row
-   - Customer Ticket / Ref Ticket tidak diprioritaskan
-   - Sistem result lama tetap dipertahankan
 ========================================================= */
 
 (function () {
-
     "use strict";
-
 
     /* =====================================================
        STATE
@@ -38,54 +28,41 @@
         return document.querySelector(selector);
     }
 
-
     function $$(selector) {
         return Array.from(
             document.querySelectorAll(selector)
         );
     }
 
-
     function escapeHtml(value) {
-
         return String(value ?? "")
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;");
-
     }
-
 
     function number(value) {
-
         return new Intl.NumberFormat("id-ID")
             .format(Number(value) || 0);
-
     }
 
-
     function setText(selector, value) {
-
         const element = $(selector);
 
         if (element) {
             element.textContent = value ?? "";
         }
-
     }
 
-
     function show(element, visible) {
-
         if (!element) return;
 
         element.classList.toggle(
             "hidden",
             !visible
         );
-
     }
 
 
@@ -94,53 +71,31 @@
     ===================================================== */
 
     function getData() {
-
         if (
             window.ReportCheckerExcel &&
-            typeof window.ReportCheckerExcel.getState ===
-            "function"
+            typeof window.ReportCheckerExcel.getState === "function"
         ) {
-
             return window.ReportCheckerExcel.getState();
-
         }
 
         return {
-
             rows: [],
-
             validationResults: [],
-
             sesuai: [],
-
             tidakSesuai: [],
-
             invalid: [],
-
             materials: [],
-
             materialError: [],
-
             materialNotFound: [],
-
             summary: {
-
                 total: 0,
-
                 sesuai: 0,
-
                 tidakSesuai: 0,
-
                 invalid: 0,
-
                 material: 0,
-
                 materialError: 0
-
             }
-
         };
-
     }
 
 
@@ -152,18 +107,14 @@
         text,
         type = "ready"
     ) {
-
-        const element =
-            $("#systemStatus");
+        const element = $("#systemStatus");
 
         if (!element) return;
 
-        element.textContent =
-            text;
+        element.textContent = text;
 
         element.className =
             "status-badge " + type;
-
     }
 
 
@@ -175,7 +126,6 @@
         visible,
         text = "Membaca data Excel..."
     ) {
-
         const box =
             $("#processingStatus");
 
@@ -183,21 +133,15 @@
             $("#processingText");
 
         if (box) {
-
             box.classList.toggle(
                 "hidden",
                 !visible
             );
-
         }
 
         if (message) {
-
-            message.textContent =
-                text;
-
+            message.textContent = text;
         }
-
     }
 
 
@@ -206,38 +150,29 @@
     ===================================================== */
 
     function setupFileInput() {
-
-        const input =
-            $("#excelFile");
+        const input = $("#excelFile");
 
         if (!input) return;
 
         input.addEventListener(
             "change",
             function () {
-
                 const file =
                     input.files &&
                     input.files[0];
 
                 if (!file) {
-
                     clearSelectedFile();
-
                     return;
-
                 }
 
                 setSelectedFile(file);
-
             }
         );
-
     }
 
 
     function setSelectedFile(file) {
-
         const selected =
             $("#selectedFile");
 
@@ -251,41 +186,30 @@
             $("#processBtn");
 
         if (fileName) {
-
             fileName.textContent =
                 file.name;
-
         }
 
         if (fileSize) {
-
             fileSize.textContent =
                 formatFileSize(
                     file.size
                 );
-
         }
 
         if (selected) {
-
             selected.classList.remove(
                 "hidden"
             );
-
         }
 
         if (processBtn) {
-
-            processBtn.disabled =
-                false;
-
+            processBtn.disabled = false;
         }
-
     }
 
 
     function clearSelectedFile() {
-
         const selected =
             $("#selectedFile");
 
@@ -302,50 +226,32 @@
             $("#excelFile");
 
         if (input) {
-
-            input.value =
-                "";
-
+            input.value = "";
         }
 
         if (fileName) {
-
-            fileName.textContent =
-                "-";
-
+            fileName.textContent = "-";
         }
 
         if (fileSize) {
-
-            fileSize.textContent =
-                "-";
-
+            fileSize.textContent = "-";
         }
 
         if (selected) {
-
             selected.classList.add(
                 "hidden"
             );
-
         }
 
         if (processBtn) {
-
-            processBtn.disabled =
-                true;
-
+            processBtn.disabled = true;
         }
-
     }
 
 
     function formatFileSize(bytes) {
-
         if (!bytes) {
-
             return "0 KB";
-
         }
 
         const units = [
@@ -355,33 +261,24 @@
             "GB"
         ];
 
-        let size =
-            bytes;
-
-        let index =
-            0;
+        let size = bytes;
+        let index = 0;
 
         while (
             size >= 1024 &&
             index < units.length - 1
         ) {
-
             size /= 1024;
-
             index++;
-
         }
 
         return (
             size.toFixed(
-                index === 0
-                    ? 0
-                    : 2
+                index === 0 ? 0 : 2
             ) +
             " " +
             units[index]
         );
-
     }
 
 
@@ -390,7 +287,6 @@
     ===================================================== */
 
     function setupRemoveFile() {
-
         const button =
             $("#removeFileBtn");
 
@@ -399,7 +295,6 @@
         button.addEventListener(
             "click",
             function () {
-
                 clearSelectedFile();
 
                 resetApplicationData();
@@ -413,10 +308,8 @@
                     "Ready",
                     "offline"
                 );
-
             }
         );
-
     }
 
 
@@ -425,7 +318,6 @@
     ===================================================== */
 
     function setupDropZone() {
-
         const zone =
             $("#dropZone");
 
@@ -433,39 +325,32 @@
             $("#excelFile");
 
         if (!zone || !input) {
-
             return;
-
         }
 
         zone.addEventListener(
             "dragover",
             function (event) {
-
                 event.preventDefault();
 
                 zone.classList.add(
                     "dragging"
                 );
-
             }
         );
 
         zone.addEventListener(
             "dragleave",
             function () {
-
                 zone.classList.remove(
                     "dragging"
                 );
-
             }
         );
 
         zone.addEventListener(
             "drop",
             function (event) {
-
                 event.preventDefault();
 
                 zone.classList.remove(
@@ -480,17 +365,13 @@
                 if (!file) return;
 
                 if (!isExcelFile(file)) {
-
                     alert(
-                        "File harus Excel (.xlsx, .xls, atau .xlsm)."
+                        "File harus Excel (.xlsx atau .xls)."
                     );
-
                     return;
-
                 }
 
                 try {
-
                     const dataTransfer =
                         new DataTransfer();
 
@@ -500,44 +381,34 @@
 
                     input.files =
                         dataTransfer.files;
-
                 } catch (error) {
-
                     console.warn(
                         "DataTransfer tidak tersedia.",
                         error
                     );
-
                 }
 
                 setSelectedFile(file);
-
             }
         );
 
         zone.addEventListener(
             "keydown",
             function (event) {
-
                 if (
                     event.key === "Enter" ||
                     event.key === " "
                 ) {
-
                     event.preventDefault();
 
                     input.click();
-
                 }
-
             }
         );
-
     }
 
 
     function isExcelFile(file) {
-
         const name =
             String(
                 file?.name || ""
@@ -548,7 +419,6 @@
             name.endsWith(".xls") ||
             name.endsWith(".xlsm")
         );
-
     }
 
 
@@ -557,7 +427,6 @@
     ===================================================== */
 
     function setupProcessButton() {
-
         const button =
             $("#processBtn");
 
@@ -565,45 +434,34 @@
             $("#excelFile");
 
         if (!button || !input) {
-
             return;
-
         }
 
         button.addEventListener(
             "click",
             async function () {
-
                 const file =
                     input.files?.[0];
 
                 if (!file) {
-
                     alert(
                         "Silakan pilih file Excel terlebih dahulu."
                     );
-
                     return;
-
                 }
 
                 await processExcel(file);
-
             }
         );
-
     }
 
 
     async function processExcel(file) {
-
         const button =
             $("#processBtn");
 
         try {
-
-            button.disabled =
-                true;
+            button.disabled = true;
 
             processing(
                 true,
@@ -618,11 +476,9 @@
             if (
                 !window.ReportCheckerExcel
             ) {
-
                 throw new Error(
                     "excel.js belum berhasil dimuat."
                 );
-
             }
 
             if (
@@ -630,16 +486,14 @@
                     .ReportCheckerExcel
                     .load !== "function"
             ) {
-
                 throw new Error(
                     "Fungsi load() belum tersedia di excel.js."
                 );
-
             }
 
             processing(
                 true,
-                "Membaca kolom Excel..."
+                "Membaca kolom A sampai AF..."
             );
 
             const result =
@@ -647,11 +501,8 @@
                     .ReportCheckerExcel
                     .load(file);
 
-            state.page =
-                1;
-
-            state.search =
-                "";
+            state.page = 1;
+            state.search = "";
 
             show(
                 $("#dashboardSection"),
@@ -675,7 +526,6 @@
             );
 
         } catch (error) {
-
             console.error(
                 "Report Checker Error:",
                 error
@@ -696,17 +546,12 @@
             );
 
         } finally {
-
-            button.disabled =
-                false;
-
+            button.disabled = false;
         }
-
     }
 
 
     function buildSummaryText(result) {
-
         const summary =
             result?.summary ||
             getData().summary ||
@@ -725,7 +570,6 @@
             "Material " +
             number(summary.material || 0)
         );
-
     }
 
 
@@ -734,7 +578,6 @@
     ===================================================== */
 
     function updateDashboard() {
-
         const data =
             getData();
 
@@ -822,7 +665,6 @@
         renderMaterialErrorTable();
 
         updateDownloadButtons();
-
     }
 
 
@@ -831,344 +673,64 @@
     ===================================================== */
 
     function getValidRows() {
-
-        const data =
-            getData();
+        const data = getData();
 
         return (
             data.sesuai ||
             data.valid ||
             []
         );
-
     }
 
 
     function getInvalidRows() {
-
-        const data =
-            getData();
+        const data = getData();
 
         return (
             data.tidakSesuai ||
             data.invalid ||
             []
         );
-
     }
 
 
     function getMaterialRows() {
-
-        const data =
-            getData();
+        const data = getData();
 
         return (
             data.materials ||
             data.material ||
             []
         );
-
     }
 
 
     function getMaterialErrorRows() {
-
-        const data =
-            getData();
+        const data = getData();
 
         return (
             data.materialError ||
             data.materialNotFound ||
             []
         );
-
     }
 
 
     function getValue(row, keys) {
-
-        if (!row) {
-
-            return "";
-
-        }
-
         for (
             const key of keys
         ) {
-
             if (
+                row &&
                 row[key] !== undefined &&
                 row[key] !== null &&
                 String(row[key]).trim() !== ""
             ) {
-
                 return row[key];
-
             }
-
         }
 
         return "";
-
-    }
-
-
-    /* =====================================================
-       FIND ORIGINAL / PARENT DATA
-       
-       Material kadang dibuat sebagai object baru
-       sehingga TT Number berada di parent row.
-    ===================================================== */
-
-    function getParentRow(row) {
-
-        if (!row) {
-
-            return {};
-
-        }
-
-        const possibleParents = [
-
-            row.originalRow,
-
-            row.source,
-
-            row.parentRow,
-
-            row.parent,
-
-            row.original,
-
-            row.ticketRow,
-
-            row.reportRow,
-
-            row.mainRow,
-
-            row.data,
-
-            row.sourceRow
-
-        ];
-
-        for (
-            const parent of possibleParents
-        ) {
-
-            if (
-                parent &&
-                typeof parent === "object"
-            ) {
-
-                return parent;
-
-            }
-
-        }
-
-        return {};
-
-    }
-
-
-    /* =====================================================
-       GET TT NUMBER
-       
-       PRIORITAS:
-       
-       1. ttNumber
-       2. TT Number
-       3. variasi TT Number
-       4. parent/original row
-       
-       Customer Ticket / Ref Ticket TIDAK digunakan
-       sebagai prioritas.
-    ===================================================== */
-
-    function getTicketNumber(row) {
-
-        if (!row) {
-
-            return "-";
-
-        }
-
-
-        const original =
-            getParentRow(row);
-
-
-        /*
-         * Field TT Number yang didukung.
-         */
-
-        const ticketKeys = [
-
-            "ttNumber",
-            "TT Number",
-            "TT number",
-            "TT NUMBER",
-
-            "tt_number",
-            "TT_Number",
-
-            "TTNumber",
-            "TTNUMBER",
-
-            "ticketNumber",
-            "Ticket Number",
-
-            "ticket_number",
-
-            "ttNo",
-            "TT No",
-            "TT NO",
-
-            "tt_no",
-            "TT_No",
-
-            "ticketNo",
-            "Ticket No",
-
-            "ticket_no",
-
-            "tt"
-
-        ];
-
-
-        /*
-         * Cari langsung pada row.
-         */
-
-        const direct =
-            getValue(
-                row,
-                ticketKeys
-            );
-
-
-        if (
-            direct !== ""
-        ) {
-
-            return String(
-                direct
-            ).trim();
-
-        }
-
-
-        /*
-         * Cari pada original / parent.
-         */
-
-        const parent =
-            getValue(
-                original,
-                ticketKeys
-            );
-
-
-        if (
-            parent !== ""
-        ) {
-
-            return String(
-                parent
-            ).trim();
-
-        }
-
-
-        /*
-         * Beberapa parser menyimpan data
-         * Excel mentah dengan key yang berbeda.
-         *
-         * Cari key secara case-insensitive.
-         */
-
-        const allObjects = [
-            row,
-            original
-        ];
-
-
-        for (
-            const object of allObjects
-        ) {
-
-            if (
-                !object ||
-                typeof object !== "object"
-            ) {
-
-                continue;
-
-            }
-
-
-            const keys =
-                Object.keys(
-                    object
-                );
-
-
-            for (
-                const key of keys
-            ) {
-
-                const normalizedKey =
-                    String(key)
-                        .toLowerCase()
-                        .replace(
-                            /[\s_-]+/g,
-                            ""
-                        );
-
-
-                if (
-                    normalizedKey ===
-                    "ttnumber" ||
-
-                    normalizedKey ===
-                    "ttno" ||
-
-                    normalizedKey ===
-                    "ticketnumber"
-                ) {
-
-                    const value =
-                        object[key];
-
-
-                    if (
-                        value !==
-                        undefined &&
-                        value !==
-                        null &&
-                        String(value).trim() !==
-                        ""
-                    ) {
-
-                        return String(
-                            value
-                        ).trim();
-
-                    }
-
-                }
-
-            }
-
-        }
-
-
-        return "-";
-
     }
 
 
@@ -1177,7 +739,6 @@
     ===================================================== */
 
     function renderValidTable() {
-
         const tbody =
             $("#validTableBody");
 
@@ -1191,36 +752,38 @@
                 getValidRows()
             );
 
-        tbody.innerHTML =
-            "";
+        tbody.innerHTML = "";
 
         if (!rows.length) {
-
-            show(
-                empty,
-                true
-            );
-
+            show(empty, true);
             return;
-
         }
 
-        show(
-            empty,
-            false
-        );
+        show(empty, false);
 
         rows.forEach(
             function (row) {
+                const original =
+                    row.originalRow ||
+                    row.source ||
+                    {};
 
                 const ticket =
-                    getTicketNumber(
-                        row
-                    );
-
-                const original =
-                    getParentRow(
-                        row
+                    getValue(
+                        row,
+                        [
+                            "ticket",
+                            "Ticket",
+                            "customerTicket"
+                        ]
+                    ) ||
+                    getValue(
+                        original,
+                        [
+                            "Customer Ticket",
+                            "TT Number",
+                            "Ref Ticket"
+                        ]
                     );
 
                 const receive =
@@ -1264,7 +827,7 @@
                     "beforeend",
                     `
                     <tr>
-                        <td>${escapeHtml(ticket)}</td>
+                        <td>${escapeHtml(ticket || "-")}</td>
                         <td>${escapeHtml(receive || "-")}</td>
                         <td>${escapeHtml(release || "-")}</td>
                         <td>
@@ -1276,10 +839,8 @@
                     </tr>
                     `
                 );
-
             }
         );
-
     }
 
 
@@ -1288,7 +849,6 @@
     ===================================================== */
 
     function renderInvalidTable() {
-
         const tbody =
             $("#invalidTableBody");
 
@@ -1302,36 +862,38 @@
                 getInvalidRows()
             );
 
-        tbody.innerHTML =
-            "";
+        tbody.innerHTML = "";
 
         if (!rows.length) {
-
-            show(
-                empty,
-                true
-            );
-
+            show(empty, true);
             return;
-
         }
 
-        show(
-            empty,
-            false
-        );
+        show(empty, false);
 
         rows.forEach(
             function (row) {
+                const original =
+                    row.originalRow ||
+                    row.source ||
+                    {};
 
                 const ticket =
-                    getTicketNumber(
-                        row
-                    );
-
-                const original =
-                    getParentRow(
-                        row
+                    getValue(
+                        row,
+                        [
+                            "ticket",
+                            "Ticket",
+                            "customerTicket"
+                        ]
+                    ) ||
+                    getValue(
+                        original,
+                        [
+                            "Customer Ticket",
+                            "TT Number",
+                            "Ref Ticket"
+                        ]
                     );
 
                 const receive =
@@ -1375,7 +937,7 @@
                     "beforeend",
                     `
                     <tr>
-                        <td>${escapeHtml(ticket)}</td>
+                        <td>${escapeHtml(ticket || "-")}</td>
                         <td>${escapeHtml(receive || "-")}</td>
                         <td>${escapeHtml(release || "-")}</td>
                         <td>
@@ -1387,23 +949,16 @@
                     </tr>
                     `
                 );
-
             }
         );
-
     }
 
 
     /* =====================================================
        TABLE MATERIAL
-       
-       Ticket = TT Number
-       
-       Material tetap ditampilkan seperti sebelumnya.
     ===================================================== */
 
     function renderMaterialTable() {
-
         const tbody =
             $("#materialTableBody");
 
@@ -1417,36 +972,25 @@
                 getMaterialRows()
             );
 
-        tbody.innerHTML =
-            "";
+        tbody.innerHTML = "";
 
         if (!rows.length) {
-
-            show(
-                empty,
-                true
-            );
-
+            show(empty, true);
             return;
-
         }
 
-        show(
-            empty,
-            false
-        );
+        show(empty, false);
 
         rows.forEach(
             function (row) {
-
-                /*
-                 * TT Number sekarang selalu dicari
-                 * dari material row DAN parent row.
-                 */
-
                 const ticket =
-                    getTicketNumber(
-                        row
+                    getValue(
+                        row,
+                        [
+                            "ticket",
+                            "Ticket",
+                            "customerTicket"
+                        ]
                     );
 
                 const material =
@@ -1455,9 +999,7 @@
                         [
                             "material",
                             "Material",
-                            "name",
-                            "materialName",
-                            "Material Name"
+                            "name"
                         ]
                     );
 
@@ -1467,8 +1009,7 @@
                         [
                             "quantity",
                             "qty",
-                            "Qty",
-                            "Quantity"
+                            "Qty"
                         ]
                     );
 
@@ -1478,8 +1019,7 @@
                         [
                             "unit",
                             "satuan",
-                            "Unit",
-                            "Satuan"
+                            "Unit"
                         ]
                     );
 
@@ -1489,9 +1029,7 @@
                         [
                             "code",
                             "kode",
-                            "Kode",
-                            "materialCode",
-                            "Material Code"
+                            "Kode"
                         ]
                     );
 
@@ -1499,7 +1037,7 @@
                     "beforeend",
                     `
                     <tr>
-                        <td>${escapeHtml(ticket)}</td>
+                        <td>${escapeHtml(ticket || "-")}</td>
                         <td>${escapeHtml(material || "-")}</td>
                         <td>${escapeHtml(qty || "-")}</td>
                         <td>${escapeHtml(unit || "-")}</td>
@@ -1507,10 +1045,8 @@
                     </tr>
                     `
                 );
-
             }
         );
-
     }
 
 
@@ -1519,7 +1055,6 @@
     ===================================================== */
 
     function renderMaterialErrorTable() {
-
         const tbody =
             $("#materialErrorTableBody");
 
@@ -1533,31 +1068,25 @@
                 getMaterialErrorRows()
             );
 
-        tbody.innerHTML =
-            "";
+        tbody.innerHTML = "";
 
         if (!rows.length) {
-
-            show(
-                empty,
-                true
-            );
-
+            show(empty, true);
             return;
-
         }
 
-        show(
-            empty,
-            false
-        );
+        show(empty, false);
 
         rows.forEach(
             function (row) {
-
                 const ticket =
-                    getTicketNumber(
-                        row
+                    getValue(
+                        row,
+                        [
+                            "ticket",
+                            "Ticket",
+                            "customerTicket"
+                        ]
                     );
 
                 const material =
@@ -1567,8 +1096,7 @@
                             "material",
                             "Material",
                             "raw",
-                            "originalMaterial",
-                            "name"
+                            "originalMaterial"
                         ]
                     );
 
@@ -1578,8 +1106,7 @@
                         [
                             "quantity",
                             "qty",
-                            "Qty",
-                            "Quantity"
+                            "Qty"
                         ]
                     );
 
@@ -1589,8 +1116,7 @@
                         [
                             "unit",
                             "satuan",
-                            "Unit",
-                            "Satuan"
+                            "Unit"
                         ]
                     );
 
@@ -1600,9 +1126,7 @@
                         [
                             "code",
                             "kode",
-                            "Kode",
-                            "materialCode",
-                            "Material Code"
+                            "Kode"
                         ]
                     );
 
@@ -1622,7 +1146,7 @@
                     "beforeend",
                     `
                     <tr>
-                        <td>${escapeHtml(ticket)}</td>
+                        <td>${escapeHtml(ticket || "-")}</td>
                         <td>${escapeHtml(material || "-")}</td>
                         <td>${escapeHtml(qty || "-")}</td>
                         <td>${escapeHtml(unit || "-")}</td>
@@ -1631,10 +1155,8 @@
                     </tr>
                     `
                 );
-
             }
         );
-
     }
 
 
@@ -1643,26 +1165,21 @@
     ===================================================== */
 
     function filterRows(rows) {
-
         const query =
             state.search
                 .trim()
                 .toLowerCase();
 
         if (!query) {
-
             return rows;
-
         }
 
         return rows.filter(
             function (row) {
-
                 return Object
                     .values(row || {})
                     .some(
                         function (value) {
-
                             return String(
                                 value ?? ""
                             )
@@ -1670,13 +1187,10 @@
                                 .includes(
                                     query
                                 );
-
                         }
                     );
-
             }
         );
-
     }
 
 
@@ -1685,16 +1199,13 @@
     ===================================================== */
 
     function setupTabs() {
-
         $$(
             "[data-tab]"
         ).forEach(
             function (button) {
-
                 button.addEventListener(
                     "click",
                     function () {
-
                         const tab =
                             button.getAttribute(
                                 "data-tab"
@@ -1704,23 +1215,18 @@
                             tab;
 
                         updateTabs();
-
                     }
                 );
-
             }
         );
-
     }
 
 
     function updateTabs() {
-
         $$(
             ".tab-button"
         ).forEach(
             function (button) {
-
                 const active =
                     button.getAttribute(
                         "data-tab"
@@ -1731,14 +1237,12 @@
                     "active",
                     active
                 );
-
             }
         );
 
         $$(".tab-content")
             .forEach(
                 function (content) {
-
                     const id =
                         content.id ||
                         "";
@@ -1754,10 +1258,8 @@
                         tabName ===
                         state.activeTab
                     );
-
                 }
             );
-
     }
 
 
@@ -1766,7 +1268,6 @@
     ===================================================== */
 
     function setupDownloads() {
-
         bindDownload(
             "#downloadValidBtn",
             "valid"
@@ -1786,7 +1287,6 @@
             "#downloadMaterialErrorBtn",
             "material-error"
         );
-
     }
 
 
@@ -1794,7 +1294,6 @@
         selector,
         type
     ) {
-
         const button =
             $(selector);
 
@@ -1803,68 +1302,60 @@
         button.addEventListener(
             "click",
             function () {
-
                 downloadResult(
                     type
                 );
-
             }
         );
-
     }
 
 
     function downloadResult(type) {
-
         if (
             !window.ReportCheckerExcel
         ) {
-
             alert(
                 "excel.js belum tersedia."
             );
-
             return;
-
         }
 
         const excel =
             window.ReportCheckerExcel;
 
         try {
-
             if (
                 typeof excel.exportResult ===
                 "function"
             ) {
-
                 excel.exportResult(
                     type
                 );
 
                 return;
-
             }
 
             if (
                 typeof excel.exportExcel ===
                 "function"
             ) {
-
                 excel.exportExcel(
                     type
                 );
 
                 return;
-
             }
 
-            fallbackExport(
-                type
-            );
+            /*
+             * Fallback:
+             * Jika excel.js belum menyediakan
+             * fungsi export, app mencoba
+             * membuat Excel langsung.
+             */
+
+            fallbackExport(type);
 
         } catch (error) {
-
             console.error(
                 error
             );
@@ -1873,23 +1364,18 @@
                 error?.message ||
                 "Gagal membuat file Excel."
             );
-
         }
-
     }
 
 
     function fallbackExport(type) {
-
         if (
             typeof XLSX ===
             "undefined"
         ) {
-
             throw new Error(
                 "Library XLSX belum dimuat."
             );
-
         }
 
         let rows = [];
@@ -1898,82 +1384,54 @@
             "Report_Checker.xlsx";
 
         if (type === "valid") {
-
             rows =
                 getValidRows();
 
             filename =
                 "Sesuai.xlsx";
-
         }
 
         else if (
             type === "invalid"
         ) {
-
             rows =
                 getInvalidRows();
 
             filename =
                 "Tidak_Sesuai.xlsx";
-
         }
 
         else if (
             type === "material"
         ) {
-
             rows =
                 getMaterialRows();
 
             filename =
                 "Material.xlsx";
-
         }
 
         else if (
             type === "material-error"
         ) {
-
             rows =
                 getMaterialErrorRows();
 
             filename =
                 "Material_Error.xlsx";
-
         }
-
-        /*
-         * Sebelum export, pastikan TT Number
-         * ikut masuk sebagai kolom Ticket.
-         */
 
         const cleanRows =
             rows.map(
                 function (row) {
-
                     const copy = {
                         ...row
                     };
 
-                    copy.Ticket =
-                        getTicketNumber(
-                            row
-                        );
-
                     delete copy.originalRow;
                     delete copy.source;
-                    delete copy.parentRow;
-                    delete copy.parent;
-                    delete copy.original;
-                    delete copy.ticketRow;
-                    delete copy.reportRow;
-                    delete copy.mainRow;
-                    delete copy.data;
-                    delete copy.sourceRow;
 
                     return copy;
-
                 }
             );
 
@@ -1995,12 +1453,10 @@
             workbook,
             filename
         );
-
     }
 
 
     function updateDownloadButtons() {
-
         const valid =
             getValidRows();
 
@@ -2032,7 +1488,6 @@
             "#downloadMaterialErrorBtn",
             materialError.length > 0
         );
-
     }
 
 
@@ -2040,7 +1495,6 @@
         selector,
         enabled
     ) {
-
         const button =
             $(selector);
 
@@ -2048,16 +1502,15 @@
 
         button.disabled =
             !enabled;
-
     }
 
 
     /* =====================================================
        SETTINGS
+       settings.js yang menangani penyimpanan.
     ===================================================== */
 
     function setupSettings() {
-
         const toggle =
             $("#toggleSettingsBtn");
 
@@ -2065,11 +1518,9 @@
             $("#settingsPanel");
 
         if (toggle && panel) {
-
             toggle.addEventListener(
                 "click",
                 function () {
-
                     panel.classList.toggle(
                         "hidden"
                     );
@@ -2080,10 +1531,8 @@
                         )
                             ? "Buka Pengaturan"
                             : "Tutup Pengaturan";
-
                 }
             );
-
         }
 
 
@@ -2091,16 +1540,12 @@
             $("#saveSettingsBtn");
 
         if (save) {
-
             save.addEventListener(
                 "click",
                 function () {
-
                     saveParserSettings();
-
                 }
             );
-
         }
 
 
@@ -2108,71 +1553,55 @@
             $("#resetSettingsBtn");
 
         if (reset) {
-
             reset.addEventListener(
                 "click",
                 function () {
-
                     resetParserSettings();
-
                 }
             );
-
         }
 
         loadParserSettings();
-
     }
 
 
     function saveParserSettings() {
-
         if (
             window.ReportCheckerSettings &&
             typeof window
                 .ReportCheckerSettings
                 .saveFromUI === "function"
         ) {
-
             window
                 .ReportCheckerSettings
                 .saveFromUI();
 
         } else {
-
             saveSettingsFallback();
-
         }
 
         const message =
             $("#settingsSavedMessage");
 
         if (message) {
-
             message.classList.remove(
                 "hidden"
             );
 
             setTimeout(
                 function () {
-
                     message.classList.add(
                         "hidden"
                     );
-
                 },
                 2000
             );
-
         }
-
     }
 
 
     function saveSettingsFallback() {
-
         const settings = {
-
             materialStartPhrases:
                 readTextarea(
                     "#materialStartPhrases"
@@ -2204,7 +1633,6 @@
                         ?.value ||
                     0
                 )
-
         };
 
         localStorage.setItem(
@@ -2213,21 +1641,17 @@
                 settings
             )
         );
-
     }
 
 
     function readTextarea(
         selector
     ) {
-
         const element =
             $(selector);
 
         if (!element) {
-
             return [];
-
         }
 
         return element.value
@@ -2237,29 +1661,24 @@
                     value.trim()
             )
             .filter(Boolean);
-
     }
 
 
     function loadParserSettings() {
-
         if (
             window.ReportCheckerSettings &&
             typeof window
                 .ReportCheckerSettings
                 .loadToUI === "function"
         ) {
-
             window
                 .ReportCheckerSettings
                 .loadToUI();
 
             return;
-
         }
 
         try {
-
             const raw =
                 localStorage.getItem(
                     "reportCheckerSettings"
@@ -2298,11 +1717,9 @@
                 $("#validationType") &&
                 settings.validationType
             ) {
-
                 $("#validationType")
                     .value =
                     settings.validationType;
-
             }
 
             if (
@@ -2310,22 +1727,17 @@
                 settings.maxReleaseMinutes !==
                 undefined
             ) {
-
                 $("#maxReleaseMinutes")
                     .value =
                     settings.maxReleaseMinutes;
-
             }
 
         } catch (error) {
-
             console.warn(
                 "Gagal membaca settings.",
                 error
             );
-
         }
-
     }
 
 
@@ -2333,7 +1745,6 @@
         selector,
         values
     ) {
-
         const element =
             $(selector);
 
@@ -2342,24 +1753,19 @@
         if (
             Array.isArray(values)
         ) {
-
             element.value =
                 values.join("\n");
-
         }
-
     }
 
 
     function resetParserSettings() {
-
         if (
             window.ReportCheckerSettings &&
             typeof window
                 .ReportCheckerSettings
                 .reset === "function"
         ) {
-
             window
                 .ReportCheckerSettings
                 .reset();
@@ -2367,7 +1773,6 @@
             loadParserSettings();
 
             return;
-
         }
 
         localStorage.removeItem(
@@ -2375,7 +1780,6 @@
         );
 
         location.reload();
-
     }
 
 
@@ -2384,7 +1788,6 @@
     ===================================================== */
 
     function setupReset() {
-
         const button =
             $("#resetBtn");
 
@@ -2393,7 +1796,6 @@
         button.addEventListener(
             "click",
             function () {
-
                 resetApplicationData();
 
                 clearSelectedFile();
@@ -2415,65 +1817,48 @@
                     "Ready",
                     "offline"
                 );
-
             }
         );
-
     }
 
 
     function resetApplicationData() {
-
         if (
             window.ReportCheckerExcel &&
             typeof window
                 .ReportCheckerExcel
                 .reset === "function"
         ) {
-
             window
                 .ReportCheckerExcel
                 .reset();
-
         }
 
         clearTables();
 
         updateDashboard();
-
     }
 
 
     function clearTables() {
-
         const ids = [
-
             "#validTableBody",
-
             "#invalidTableBody",
-
             "#materialTableBody",
-
             "#materialErrorTableBody"
-
         ];
 
         ids.forEach(
             function (selector) {
-
                 const element =
                     $(selector);
 
                 if (element) {
-
                     element.innerHTML =
                         "";
-
                 }
-
             }
         );
-
     }
 
 
@@ -2482,7 +1867,6 @@
     ===================================================== */
 
     function initializeEmptyState() {
-
         updateDashboard();
 
         show(
@@ -2496,7 +1880,6 @@
         );
 
         updateTabs();
-
     }
 
 
@@ -2505,13 +1888,10 @@
     ===================================================== */
 
     function init() {
-
         if (
             state.initialized
         ) {
-
             return;
-
         }
 
         setupFileInput();
@@ -2538,7 +1918,6 @@
         console.log(
             "Report Checker initialized."
         );
-
     }
 
 
@@ -2547,35 +1926,14 @@
     ===================================================== */
 
     window.ReportCheckerApp = {
-
         init,
-
         processExcel,
-
-        render:
-            updateDashboard,
-
-        getState:
-            function () {
-
-                return {
-                    ...state
-                };
-
-            },
-
-        /*
-         * Debug helper.
-         *
-         * Bisa dipanggil dari Console:
-         *
-         * ReportCheckerApp.getTicketNumber(row)
-         *
-         * untuk mengecek TT Number.
-         */
-
-        getTicketNumber
-
+        render: updateDashboard,
+        getState: function () {
+            return {
+                ...state
+            };
+        }
     };
 
 
@@ -2587,16 +1945,12 @@
         document.readyState ===
         "loading"
     ) {
-
         document.addEventListener(
             "DOMContentLoaded",
             init
         );
-
     } else {
-
         init();
-
     }
 
 })();
