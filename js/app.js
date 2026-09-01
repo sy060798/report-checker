@@ -2,10 +2,16 @@
    REPORT CHECKER - APP.JS
    Controller utama UI
    Cocok dengan index.html versi terbaru
+
+   UPDATE:
+   - Ticket yang ditampilkan sekarang mengambil dari TT Number
+   - Customer Ticket / Ref Ticket tidak lagi menjadi prioritas
+   - Fallback tetap disediakan jika data TT Number tidak tersedia
 ========================================================= */
 
 (function () {
     "use strict";
+
 
     /* =====================================================
        STATE
@@ -28,11 +34,13 @@
         return document.querySelector(selector);
     }
 
+
     function $$(selector) {
         return Array.from(
             document.querySelectorAll(selector)
         );
     }
+
 
     function escapeHtml(value) {
         return String(value ?? "")
@@ -43,10 +51,12 @@
             .replace(/'/g, "&#039;");
     }
 
+
     function number(value) {
         return new Intl.NumberFormat("id-ID")
             .format(Number(value) || 0);
     }
+
 
     function setText(selector, value) {
         const element = $(selector);
@@ -55,6 +65,7 @@
             element.textContent = value ?? "";
         }
     }
+
 
     function show(element, visible) {
         if (!element) return;
@@ -71,31 +82,52 @@
     ===================================================== */
 
     function getData() {
+
         if (
             window.ReportCheckerExcel &&
             typeof window.ReportCheckerExcel.getState === "function"
         ) {
+
             return window.ReportCheckerExcel.getState();
+
         }
 
         return {
+
             rows: [],
+
             validationResults: [],
+
             sesuai: [],
+
             tidakSesuai: [],
+
             invalid: [],
+
             materials: [],
+
             materialError: [],
+
             materialNotFound: [],
+
             summary: {
+
                 total: 0,
+
                 sesuai: 0,
+
                 tidakSesuai: 0,
+
                 invalid: 0,
+
                 material: 0,
+
                 materialError: 0
+
             }
+
         };
+
     }
 
 
@@ -107,14 +139,18 @@
         text,
         type = "ready"
     ) {
-        const element = $("#systemStatus");
+
+        const element =
+            $("#systemStatus");
 
         if (!element) return;
 
-        element.textContent = text;
+        element.textContent =
+            text;
 
         element.className =
             "status-badge " + type;
+
     }
 
 
@@ -126,6 +162,7 @@
         visible,
         text = "Membaca data Excel..."
     ) {
+
         const box =
             $("#processingStatus");
 
@@ -133,15 +170,21 @@
             $("#processingText");
 
         if (box) {
+
             box.classList.toggle(
                 "hidden",
                 !visible
             );
+
         }
 
         if (message) {
-            message.textContent = text;
+
+            message.textContent =
+                text;
+
         }
+
     }
 
 
@@ -150,29 +193,38 @@
     ===================================================== */
 
     function setupFileInput() {
-        const input = $("#excelFile");
+
+        const input =
+            $("#excelFile");
 
         if (!input) return;
 
         input.addEventListener(
             "change",
             function () {
+
                 const file =
                     input.files &&
                     input.files[0];
 
                 if (!file) {
+
                     clearSelectedFile();
+
                     return;
+
                 }
 
                 setSelectedFile(file);
+
             }
         );
+
     }
 
 
     function setSelectedFile(file) {
+
         const selected =
             $("#selectedFile");
 
@@ -186,30 +238,41 @@
             $("#processBtn");
 
         if (fileName) {
+
             fileName.textContent =
                 file.name;
+
         }
 
         if (fileSize) {
+
             fileSize.textContent =
                 formatFileSize(
                     file.size
                 );
+
         }
 
         if (selected) {
+
             selected.classList.remove(
                 "hidden"
             );
+
         }
 
         if (processBtn) {
-            processBtn.disabled = false;
+
+            processBtn.disabled =
+                false;
+
         }
+
     }
 
 
     function clearSelectedFile() {
+
         const selected =
             $("#selectedFile");
 
@@ -226,32 +289,50 @@
             $("#excelFile");
 
         if (input) {
-            input.value = "";
+
+            input.value =
+                "";
+
         }
 
         if (fileName) {
-            fileName.textContent = "-";
+
+            fileName.textContent =
+                "-";
+
         }
 
         if (fileSize) {
-            fileSize.textContent = "-";
+
+            fileSize.textContent =
+                "-";
+
         }
 
         if (selected) {
+
             selected.classList.add(
                 "hidden"
             );
+
         }
 
         if (processBtn) {
-            processBtn.disabled = true;
+
+            processBtn.disabled =
+                true;
+
         }
+
     }
 
 
     function formatFileSize(bytes) {
+
         if (!bytes) {
+
             return "0 KB";
+
         }
 
         const units = [
@@ -261,24 +342,33 @@
             "GB"
         ];
 
-        let size = bytes;
-        let index = 0;
+        let size =
+            bytes;
+
+        let index =
+            0;
 
         while (
             size >= 1024 &&
             index < units.length - 1
         ) {
+
             size /= 1024;
+
             index++;
+
         }
 
         return (
             size.toFixed(
-                index === 0 ? 0 : 2
+                index === 0
+                    ? 0
+                    : 2
             ) +
             " " +
             units[index]
         );
+
     }
 
 
@@ -287,6 +377,7 @@
     ===================================================== */
 
     function setupRemoveFile() {
+
         const button =
             $("#removeFileBtn");
 
@@ -295,6 +386,7 @@
         button.addEventListener(
             "click",
             function () {
+
                 clearSelectedFile();
 
                 resetApplicationData();
@@ -308,8 +400,10 @@
                     "Ready",
                     "offline"
                 );
+
             }
         );
+
     }
 
 
@@ -318,6 +412,7 @@
     ===================================================== */
 
     function setupDropZone() {
+
         const zone =
             $("#dropZone");
 
@@ -325,32 +420,39 @@
             $("#excelFile");
 
         if (!zone || !input) {
+
             return;
+
         }
 
         zone.addEventListener(
             "dragover",
             function (event) {
+
                 event.preventDefault();
 
                 zone.classList.add(
                     "dragging"
                 );
+
             }
         );
 
         zone.addEventListener(
             "dragleave",
             function () {
+
                 zone.classList.remove(
                     "dragging"
                 );
+
             }
         );
 
         zone.addEventListener(
             "drop",
             function (event) {
+
                 event.preventDefault();
 
                 zone.classList.remove(
@@ -365,13 +467,17 @@
                 if (!file) return;
 
                 if (!isExcelFile(file)) {
+
                     alert(
                         "File harus Excel (.xlsx atau .xls)."
                     );
+
                     return;
+
                 }
 
                 try {
+
                     const dataTransfer =
                         new DataTransfer();
 
@@ -381,34 +487,44 @@
 
                     input.files =
                         dataTransfer.files;
+
                 } catch (error) {
+
                     console.warn(
                         "DataTransfer tidak tersedia.",
                         error
                     );
+
                 }
 
                 setSelectedFile(file);
+
             }
         );
 
         zone.addEventListener(
             "keydown",
             function (event) {
+
                 if (
                     event.key === "Enter" ||
                     event.key === " "
                 ) {
+
                     event.preventDefault();
 
                     input.click();
+
                 }
+
             }
         );
+
     }
 
 
     function isExcelFile(file) {
+
         const name =
             String(
                 file?.name || ""
@@ -419,6 +535,7 @@
             name.endsWith(".xls") ||
             name.endsWith(".xlsm")
         );
+
     }
 
 
@@ -427,6 +544,7 @@
     ===================================================== */
 
     function setupProcessButton() {
+
         const button =
             $("#processBtn");
 
@@ -434,34 +552,45 @@
             $("#excelFile");
 
         if (!button || !input) {
+
             return;
+
         }
 
         button.addEventListener(
             "click",
             async function () {
+
                 const file =
                     input.files?.[0];
 
                 if (!file) {
+
                     alert(
                         "Silakan pilih file Excel terlebih dahulu."
                     );
+
                     return;
+
                 }
 
                 await processExcel(file);
+
             }
         );
+
     }
 
 
     async function processExcel(file) {
+
         const button =
             $("#processBtn");
 
         try {
-            button.disabled = true;
+
+            button.disabled =
+                true;
 
             processing(
                 true,
@@ -476,9 +605,11 @@
             if (
                 !window.ReportCheckerExcel
             ) {
+
                 throw new Error(
                     "excel.js belum berhasil dimuat."
                 );
+
             }
 
             if (
@@ -486,9 +617,11 @@
                     .ReportCheckerExcel
                     .load !== "function"
             ) {
+
                 throw new Error(
                     "Fungsi load() belum tersedia di excel.js."
                 );
+
             }
 
             processing(
@@ -501,8 +634,11 @@
                     .ReportCheckerExcel
                     .load(file);
 
-            state.page = 1;
-            state.search = "";
+            state.page =
+                1;
+
+            state.search =
+                "";
 
             show(
                 $("#dashboardSection"),
@@ -526,6 +662,7 @@
             );
 
         } catch (error) {
+
             console.error(
                 "Report Checker Error:",
                 error
@@ -546,12 +683,17 @@
             );
 
         } finally {
-            button.disabled = false;
+
+            button.disabled =
+                false;
+
         }
+
     }
 
 
     function buildSummaryText(result) {
+
         const summary =
             result?.summary ||
             getData().summary ||
@@ -570,6 +712,7 @@
             "Material " +
             number(summary.material || 0)
         );
+
     }
 
 
@@ -578,6 +721,7 @@
     ===================================================== */
 
     function updateDashboard() {
+
         const data =
             getData();
 
@@ -665,6 +809,7 @@
         renderMaterialErrorTable();
 
         updateDownloadButtons();
+
     }
 
 
@@ -673,64 +818,127 @@
     ===================================================== */
 
     function getValidRows() {
-        const data = getData();
+
+        const data =
+            getData();
 
         return (
             data.sesuai ||
             data.valid ||
             []
         );
+
     }
 
 
     function getInvalidRows() {
-        const data = getData();
+
+        const data =
+            getData();
 
         return (
             data.tidakSesuai ||
             data.invalid ||
             []
         );
+
     }
 
 
     function getMaterialRows() {
-        const data = getData();
+
+        const data =
+            getData();
 
         return (
             data.materials ||
             data.material ||
             []
         );
+
     }
 
 
     function getMaterialErrorRows() {
-        const data = getData();
+
+        const data =
+            getData();
 
         return (
             data.materialError ||
             data.materialNotFound ||
             []
         );
+
     }
 
 
     function getValue(row, keys) {
+
         for (
             const key of keys
         ) {
+
             if (
                 row &&
                 row[key] !== undefined &&
                 row[key] !== null &&
                 String(row[key]).trim() !== ""
             ) {
+
                 return row[key];
+
             }
+
         }
 
         return "";
+
+    }
+
+
+    /* =====================================================
+       GET TT NUMBER
+       
+       PRIORITAS:
+       1. TT Number dari hasil parser
+       2. TT Number dari originalRow/source
+       
+       Customer Ticket dan Ref Ticket sengaja
+       tidak diprioritaskan lagi.
+    ===================================================== */
+
+    function getTicketNumber(row) {
+
+        const original =
+            row?.originalRow ||
+            row?.source ||
+            {};
+
+        return (
+            getValue(
+                row,
+                [
+                    "ttNumber",
+                    "TT Number",
+                    "tt_number",
+                    "TTNumber",
+                    "ticketNumber"
+                ]
+            ) ||
+            getValue(
+                original,
+                [
+                    "TT Number",
+                    "ttNumber",
+                    "tt_number",
+                    "TTNumber",
+                    "ticketNumber"
+                ]
+            ) ||
+            "-"
+        );
+
     }
 
 
@@ -739,6 +947,7 @@
     ===================================================== */
 
     function renderValidTable() {
+
         const tbody =
             $("#validTableBody");
 
@@ -752,39 +961,37 @@
                 getValidRows()
             );
 
-        tbody.innerHTML = "";
+        tbody.innerHTML =
+            "";
 
         if (!rows.length) {
-            show(empty, true);
+
+            show(
+                empty,
+                true
+            );
+
             return;
+
         }
 
-        show(empty, false);
+        show(
+            empty,
+            false
+        );
 
         rows.forEach(
             function (row) {
+
+                const ticket =
+                    getTicketNumber(
+                        row
+                    );
+
                 const original =
                     row.originalRow ||
                     row.source ||
                     {};
-
-                const ticket =
-                    getValue(
-                        row,
-                        [
-                            "ticket",
-                            "Ticket",
-                            "customerTicket"
-                        ]
-                    ) ||
-                    getValue(
-                        original,
-                        [
-                            "Customer Ticket",
-                            "TT Number",
-                            "Ref Ticket"
-                        ]
-                    );
 
                 const receive =
                     getValue(
@@ -827,7 +1034,7 @@
                     "beforeend",
                     `
                     <tr>
-                        <td>${escapeHtml(ticket || "-")}</td>
+                        <td>${escapeHtml(ticket)}</td>
                         <td>${escapeHtml(receive || "-")}</td>
                         <td>${escapeHtml(release || "-")}</td>
                         <td>
@@ -839,8 +1046,10 @@
                     </tr>
                     `
                 );
+
             }
         );
+
     }
 
 
@@ -849,6 +1058,7 @@
     ===================================================== */
 
     function renderInvalidTable() {
+
         const tbody =
             $("#invalidTableBody");
 
@@ -862,39 +1072,37 @@
                 getInvalidRows()
             );
 
-        tbody.innerHTML = "";
+        tbody.innerHTML =
+            "";
 
         if (!rows.length) {
-            show(empty, true);
+
+            show(
+                empty,
+                true
+            );
+
             return;
+
         }
 
-        show(empty, false);
+        show(
+            empty,
+            false
+        );
 
         rows.forEach(
             function (row) {
+
+                const ticket =
+                    getTicketNumber(
+                        row
+                    );
+
                 const original =
                     row.originalRow ||
                     row.source ||
                     {};
-
-                const ticket =
-                    getValue(
-                        row,
-                        [
-                            "ticket",
-                            "Ticket",
-                            "customerTicket"
-                        ]
-                    ) ||
-                    getValue(
-                        original,
-                        [
-                            "Customer Ticket",
-                            "TT Number",
-                            "Ref Ticket"
-                        ]
-                    );
 
                 const receive =
                     getValue(
@@ -937,7 +1145,7 @@
                     "beforeend",
                     `
                     <tr>
-                        <td>${escapeHtml(ticket || "-")}</td>
+                        <td>${escapeHtml(ticket)}</td>
                         <td>${escapeHtml(receive || "-")}</td>
                         <td>${escapeHtml(release || "-")}</td>
                         <td>
@@ -949,8 +1157,10 @@
                     </tr>
                     `
                 );
+
             }
         );
+
     }
 
 
@@ -959,6 +1169,7 @@
     ===================================================== */
 
     function renderMaterialTable() {
+
         const tbody =
             $("#materialTableBody");
 
@@ -972,25 +1183,31 @@
                 getMaterialRows()
             );
 
-        tbody.innerHTML = "";
+        tbody.innerHTML =
+            "";
 
         if (!rows.length) {
-            show(empty, true);
+
+            show(
+                empty,
+                true
+            );
+
             return;
+
         }
 
-        show(empty, false);
+        show(
+            empty,
+            false
+        );
 
         rows.forEach(
             function (row) {
+
                 const ticket =
-                    getValue(
-                        row,
-                        [
-                            "ticket",
-                            "Ticket",
-                            "customerTicket"
-                        ]
+                    getTicketNumber(
+                        row
                     );
 
                 const material =
@@ -1037,7 +1254,7 @@
                     "beforeend",
                     `
                     <tr>
-                        <td>${escapeHtml(ticket || "-")}</td>
+                        <td>${escapeHtml(ticket)}</td>
                         <td>${escapeHtml(material || "-")}</td>
                         <td>${escapeHtml(qty || "-")}</td>
                         <td>${escapeHtml(unit || "-")}</td>
@@ -1045,8 +1262,10 @@
                     </tr>
                     `
                 );
+
             }
         );
+
     }
 
 
@@ -1055,6 +1274,7 @@
     ===================================================== */
 
     function renderMaterialErrorTable() {
+
         const tbody =
             $("#materialErrorTableBody");
 
@@ -1068,25 +1288,31 @@
                 getMaterialErrorRows()
             );
 
-        tbody.innerHTML = "";
+        tbody.innerHTML =
+            "";
 
         if (!rows.length) {
-            show(empty, true);
+
+            show(
+                empty,
+                true
+            );
+
             return;
+
         }
 
-        show(empty, false);
+        show(
+            empty,
+            false
+        );
 
         rows.forEach(
             function (row) {
+
                 const ticket =
-                    getValue(
-                        row,
-                        [
-                            "ticket",
-                            "Ticket",
-                            "customerTicket"
-                        ]
+                    getTicketNumber(
+                        row
                     );
 
                 const material =
@@ -1146,7 +1372,7 @@
                     "beforeend",
                     `
                     <tr>
-                        <td>${escapeHtml(ticket || "-")}</td>
+                        <td>${escapeHtml(ticket)}</td>
                         <td>${escapeHtml(material || "-")}</td>
                         <td>${escapeHtml(qty || "-")}</td>
                         <td>${escapeHtml(unit || "-")}</td>
@@ -1155,8 +1381,10 @@
                     </tr>
                     `
                 );
+
             }
         );
+
     }
 
 
@@ -1165,21 +1393,26 @@
     ===================================================== */
 
     function filterRows(rows) {
+
         const query =
             state.search
                 .trim()
                 .toLowerCase();
 
         if (!query) {
+
             return rows;
+
         }
 
         return rows.filter(
             function (row) {
+
                 return Object
                     .values(row || {})
                     .some(
                         function (value) {
+
                             return String(
                                 value ?? ""
                             )
@@ -1187,10 +1420,13 @@
                                 .includes(
                                     query
                                 );
+
                         }
                     );
+
             }
         );
+
     }
 
 
@@ -1199,13 +1435,16 @@
     ===================================================== */
 
     function setupTabs() {
+
         $$(
             "[data-tab]"
         ).forEach(
             function (button) {
+
                 button.addEventListener(
                     "click",
                     function () {
+
                         const tab =
                             button.getAttribute(
                                 "data-tab"
@@ -1215,18 +1454,23 @@
                             tab;
 
                         updateTabs();
+
                     }
                 );
+
             }
         );
+
     }
 
 
     function updateTabs() {
+
         $$(
             ".tab-button"
         ).forEach(
             function (button) {
+
                 const active =
                     button.getAttribute(
                         "data-tab"
@@ -1237,12 +1481,14 @@
                     "active",
                     active
                 );
+
             }
         );
 
         $$(".tab-content")
             .forEach(
                 function (content) {
+
                     const id =
                         content.id ||
                         "";
@@ -1258,8 +1504,10 @@
                         tabName ===
                         state.activeTab
                     );
+
                 }
             );
+
     }
 
 
@@ -1268,6 +1516,7 @@
     ===================================================== */
 
     function setupDownloads() {
+
         bindDownload(
             "#downloadValidBtn",
             "valid"
@@ -1287,6 +1536,7 @@
             "#downloadMaterialErrorBtn",
             "material-error"
         );
+
     }
 
 
@@ -1294,6 +1544,7 @@
         selector,
         type
     ) {
+
         const button =
             $(selector);
 
@@ -1302,60 +1553,68 @@
         button.addEventListener(
             "click",
             function () {
+
                 downloadResult(
                     type
                 );
+
             }
         );
+
     }
 
 
     function downloadResult(type) {
+
         if (
             !window.ReportCheckerExcel
         ) {
+
             alert(
                 "excel.js belum tersedia."
             );
+
             return;
+
         }
 
         const excel =
             window.ReportCheckerExcel;
 
         try {
+
             if (
                 typeof excel.exportResult ===
                 "function"
             ) {
+
                 excel.exportResult(
                     type
                 );
 
                 return;
+
             }
 
             if (
                 typeof excel.exportExcel ===
                 "function"
             ) {
+
                 excel.exportExcel(
                     type
                 );
 
                 return;
+
             }
 
-            /*
-             * Fallback:
-             * Jika excel.js belum menyediakan
-             * fungsi export, app mencoba
-             * membuat Excel langsung.
-             */
-
-            fallbackExport(type);
+            fallbackExport(
+                type
+            );
 
         } catch (error) {
+
             console.error(
                 error
             );
@@ -1364,18 +1623,23 @@
                 error?.message ||
                 "Gagal membuat file Excel."
             );
+
         }
+
     }
 
 
     function fallbackExport(type) {
+
         if (
             typeof XLSX ===
             "undefined"
         ) {
+
             throw new Error(
                 "Library XLSX belum dimuat."
             );
+
         }
 
         let rows = [];
@@ -1384,46 +1648,55 @@
             "Report_Checker.xlsx";
 
         if (type === "valid") {
+
             rows =
                 getValidRows();
 
             filename =
                 "Sesuai.xlsx";
+
         }
 
         else if (
             type === "invalid"
         ) {
+
             rows =
                 getInvalidRows();
 
             filename =
                 "Tidak_Sesuai.xlsx";
+
         }
 
         else if (
             type === "material"
         ) {
+
             rows =
                 getMaterialRows();
 
             filename =
                 "Material.xlsx";
+
         }
 
         else if (
             type === "material-error"
         ) {
+
             rows =
                 getMaterialErrorRows();
 
             filename =
                 "Material_Error.xlsx";
+
         }
 
         const cleanRows =
             rows.map(
                 function (row) {
+
                     const copy = {
                         ...row
                     };
@@ -1432,6 +1705,7 @@
                     delete copy.source;
 
                     return copy;
+
                 }
             );
 
@@ -1453,10 +1727,12 @@
             workbook,
             filename
         );
+
     }
 
 
     function updateDownloadButtons() {
+
         const valid =
             getValidRows();
 
@@ -1488,6 +1764,7 @@
             "#downloadMaterialErrorBtn",
             materialError.length > 0
         );
+
     }
 
 
@@ -1495,6 +1772,7 @@
         selector,
         enabled
     ) {
+
         const button =
             $(selector);
 
@@ -1502,6 +1780,7 @@
 
         button.disabled =
             !enabled;
+
     }
 
 
@@ -1511,6 +1790,7 @@
     ===================================================== */
 
     function setupSettings() {
+
         const toggle =
             $("#toggleSettingsBtn");
 
@@ -1518,9 +1798,11 @@
             $("#settingsPanel");
 
         if (toggle && panel) {
+
             toggle.addEventListener(
                 "click",
                 function () {
+
                     panel.classList.toggle(
                         "hidden"
                     );
@@ -1531,8 +1813,10 @@
                         )
                             ? "Buka Pengaturan"
                             : "Tutup Pengaturan";
+
                 }
             );
+
         }
 
 
@@ -1540,12 +1824,16 @@
             $("#saveSettingsBtn");
 
         if (save) {
+
             save.addEventListener(
                 "click",
                 function () {
+
                     saveParserSettings();
+
                 }
             );
+
         }
 
 
@@ -1553,55 +1841,71 @@
             $("#resetSettingsBtn");
 
         if (reset) {
+
             reset.addEventListener(
                 "click",
                 function () {
+
                     resetParserSettings();
+
                 }
             );
+
         }
 
         loadParserSettings();
+
     }
 
 
     function saveParserSettings() {
+
         if (
             window.ReportCheckerSettings &&
             typeof window
                 .ReportCheckerSettings
                 .saveFromUI === "function"
         ) {
+
             window
                 .ReportCheckerSettings
                 .saveFromUI();
 
         } else {
+
             saveSettingsFallback();
+
         }
 
         const message =
             $("#settingsSavedMessage");
 
         if (message) {
+
             message.classList.remove(
                 "hidden"
             );
 
             setTimeout(
                 function () {
+
                     message.classList.add(
                         "hidden"
                     );
+
                 },
                 2000
             );
+
         }
+
     }
 
 
     function saveSettingsFallback() {
+
         const settings = {
+
             materialStartPhrases:
                 readTextarea(
                     "#materialStartPhrases"
@@ -1633,6 +1937,7 @@
                         ?.value ||
                     0
                 )
+
         };
 
         localStorage.setItem(
@@ -1641,17 +1946,21 @@
                 settings
             )
         );
+
     }
 
 
     function readTextarea(
         selector
     ) {
+
         const element =
             $(selector);
 
         if (!element) {
+
             return [];
+
         }
 
         return element.value
@@ -1661,24 +1970,29 @@
                     value.trim()
             )
             .filter(Boolean);
+
     }
 
 
     function loadParserSettings() {
+
         if (
             window.ReportCheckerSettings &&
             typeof window
                 .ReportCheckerSettings
                 .loadToUI === "function"
         ) {
+
             window
                 .ReportCheckerSettings
                 .loadToUI();
 
             return;
+
         }
 
         try {
+
             const raw =
                 localStorage.getItem(
                     "reportCheckerSettings"
@@ -1717,9 +2031,11 @@
                 $("#validationType") &&
                 settings.validationType
             ) {
+
                 $("#validationType")
                     .value =
                     settings.validationType;
+
             }
 
             if (
@@ -1727,17 +2043,22 @@
                 settings.maxReleaseMinutes !==
                 undefined
             ) {
+
                 $("#maxReleaseMinutes")
                     .value =
                     settings.maxReleaseMinutes;
+
             }
 
         } catch (error) {
+
             console.warn(
                 "Gagal membaca settings.",
                 error
             );
+
         }
+
     }
 
 
@@ -1745,6 +2066,7 @@
         selector,
         values
     ) {
+
         const element =
             $(selector);
 
@@ -1753,19 +2075,24 @@
         if (
             Array.isArray(values)
         ) {
+
             element.value =
                 values.join("\n");
+
         }
+
     }
 
 
     function resetParserSettings() {
+
         if (
             window.ReportCheckerSettings &&
             typeof window
                 .ReportCheckerSettings
                 .reset === "function"
         ) {
+
             window
                 .ReportCheckerSettings
                 .reset();
@@ -1773,6 +2100,7 @@
             loadParserSettings();
 
             return;
+
         }
 
         localStorage.removeItem(
@@ -1780,6 +2108,7 @@
         );
 
         location.reload();
+
     }
 
 
@@ -1788,6 +2117,7 @@
     ===================================================== */
 
     function setupReset() {
+
         const button =
             $("#resetBtn");
 
@@ -1796,6 +2126,7 @@
         button.addEventListener(
             "click",
             function () {
+
                 resetApplicationData();
 
                 clearSelectedFile();
@@ -1817,48 +2148,65 @@
                     "Ready",
                     "offline"
                 );
+
             }
         );
+
     }
 
 
     function resetApplicationData() {
+
         if (
             window.ReportCheckerExcel &&
             typeof window
                 .ReportCheckerExcel
                 .reset === "function"
         ) {
+
             window
                 .ReportCheckerExcel
                 .reset();
+
         }
 
         clearTables();
 
         updateDashboard();
+
     }
 
 
     function clearTables() {
+
         const ids = [
+
             "#validTableBody",
+
             "#invalidTableBody",
+
             "#materialTableBody",
+
             "#materialErrorTableBody"
+
         ];
 
         ids.forEach(
             function (selector) {
+
                 const element =
                     $(selector);
 
                 if (element) {
+
                     element.innerHTML =
                         "";
+
                 }
+
             }
         );
+
     }
 
 
@@ -1867,6 +2215,7 @@
     ===================================================== */
 
     function initializeEmptyState() {
+
         updateDashboard();
 
         show(
@@ -1880,6 +2229,7 @@
         );
 
         updateTabs();
+
     }
 
 
@@ -1888,10 +2238,13 @@
     ===================================================== */
 
     function init() {
+
         if (
             state.initialized
         ) {
+
             return;
+
         }
 
         setupFileInput();
@@ -1918,6 +2271,7 @@
         console.log(
             "Report Checker initialized."
         );
+
     }
 
 
@@ -1926,14 +2280,23 @@
     ===================================================== */
 
     window.ReportCheckerApp = {
+
         init,
+
         processExcel,
-        render: updateDashboard,
-        getState: function () {
-            return {
-                ...state
-            };
-        }
+
+        render:
+            updateDashboard,
+
+        getState:
+            function () {
+
+                return {
+                    ...state
+                };
+
+            }
+
     };
 
 
@@ -1945,12 +2308,16 @@
         document.readyState ===
         "loading"
     ) {
+
         document.addEventListener(
             "DOMContentLoaded",
             init
         );
+
     } else {
+
         init();
+
     }
 
 })();
