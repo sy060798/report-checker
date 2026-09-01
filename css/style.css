@@ -1,6 +1,6 @@
 /* =========================================================
    REPORT CHECKER
-   Global Styles
+   GLOBAL STYLES
 ========================================================= */
 
 :root {
@@ -33,14 +33,9 @@
     --background: #f3f4f6;
     --white: #ffffff;
 
-    --shadow-sm:
-        0 1px 2px rgba(0, 0, 0, 0.05);
-
-    --shadow:
-        0 4px 12px rgba(0, 0, 0, 0.07);
-
-    --shadow-lg:
-        0 12px 30px rgba(0, 0, 0, 0.10);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.07);
+    --shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.10);
 
     --radius-sm: 8px;
     --radius: 12px;
@@ -107,6 +102,12 @@ button:disabled {
 ========================================================= */
 
 .app-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+
+    color: white;
+
     background:
         linear-gradient(
             135deg,
@@ -115,14 +116,8 @@ button:disabled {
             #3b82f6 100%
         );
 
-    color: white;
-
     box-shadow:
         0 4px 15px rgba(37, 99, 235, 0.25);
-
-    position: sticky;
-    top: 0;
-    z-index: 100;
 }
 
 .header-content {
@@ -141,6 +136,8 @@ button:disabled {
 .header-content h1 {
     margin: 0;
 
+    color: white;
+
     font-size: 24px;
     font-weight: 750;
 
@@ -150,9 +147,9 @@ button:disabled {
 .header-content p {
     margin: 3px 0 0;
 
-    font-size: 13px;
-
     color: rgba(255, 255, 255, 0.82);
+
+    font-size: 13px;
 }
 
 .header-status {
@@ -162,22 +159,20 @@ button:disabled {
 
 .status-badge {
     display: inline-flex;
-
     align-items: center;
     justify-content: center;
 
     padding: 6px 12px;
 
-    border-radius: 999px;
-
-    font-size: 12px;
-    font-weight: 700;
-
     border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 999px;
 
     background: rgba(255, 255, 255, 0.12);
 
     backdrop-filter: blur(8px);
+
+    font-size: 12px;
+    font-weight: 700;
 }
 
 .status-badge::before {
@@ -186,9 +181,9 @@ button:disabled {
     width: 7px;
     height: 7px;
 
-    border-radius: 50%;
-
     margin-right: 7px;
+
+    border-radius: 50%;
 
     background: #22c55e;
 
@@ -213,15 +208,14 @@ button:disabled {
 ========================================================= */
 
 .card {
+    overflow: hidden;
+
     background: var(--white);
 
     border: 1px solid var(--border);
-
     border-radius: var(--radius-lg);
 
     box-shadow: var(--shadow);
-
-    overflow: hidden;
 }
 
 .upload-card {
@@ -240,7 +234,6 @@ button:disabled {
 
 .section-title {
     display: flex;
-
     align-items: center;
     justify-content: space-between;
 
@@ -252,9 +245,9 @@ button:disabled {
 .section-title h2 {
     margin: 0;
 
-    font-size: 18px;
-
     color: var(--dark);
+
+    font-size: 18px;
 }
 
 .section-title p {
@@ -273,19 +266,16 @@ button:disabled {
 .drop-zone {
     min-height: 240px;
 
+    padding: 30px;
+
     display: flex;
-
     flex-direction: column;
-
     align-items: center;
     justify-content: center;
 
     text-align: center;
 
-    padding: 30px;
-
     border: 2px dashed #bfdbfe;
-
     border-radius: var(--radius);
 
     background:
@@ -298,7 +288,8 @@ button:disabled {
     transition:
         border-color var(--transition),
         background var(--transition),
-        transform var(--transition);
+        transform var(--transition),
+        box-shadow var(--transition);
 }
 
 .drop-zone:hover,
@@ -313,11 +304,13 @@ button:disabled {
         );
 
     transform: translateY(-1px);
+
+    box-shadow:
+        0 8px 20px rgba(37, 99, 235, 0.08);
 }
 
 .drop-zone:focus {
     outline: 3px solid rgba(37, 99, 235, 0.18);
-
     outline-offset: 3px;
 }
 
@@ -325,12 +318,11 @@ button:disabled {
     width: 62px;
     height: 62px;
 
-    display: flex;
+    margin-bottom: 12px;
 
+    display: flex;
     align-items: center;
     justify-content: center;
-
-    margin-bottom: 12px;
 
     border-radius: 16px;
 
@@ -381,14 +373,12 @@ button:disabled {
     padding: 13px 15px;
 
     display: flex;
-
     align-items: center;
     justify-content: space-between;
 
     gap: 15px;
 
     border: 1px solid #bfdbfe;
-
     border-radius: var(--radius-sm);
 
     background: #eff6ff;
@@ -420,20 +410,18 @@ button:disabled {
 ========================================================= */
 
 .btn {
-    border: 1px solid transparent;
-
-    border-radius: var(--radius-sm);
+    min-height: 38px;
 
     padding: 9px 14px;
 
-    min-height: 38px;
-
     display: inline-flex;
-
     align-items: center;
     justify-content: center;
 
     gap: 7px;
+
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
 
     font-size: 13px;
     font-weight: 650;
@@ -460,7 +448,7 @@ button:disabled {
     background: var(--primary);
 
     box-shadow:
-        0 3px 8px rgba(37, 99, 235, 0.2);
+        0 3px 8px rgba(37, 99, 235, 0.20);
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -483,7 +471,6 @@ button:disabled {
 
 .btn-success {
     color: white;
-
     background: var(--success);
 }
 
@@ -493,7 +480,6 @@ button:disabled {
 
 .btn-danger {
     color: white;
-
     background: var(--danger);
 }
 
@@ -503,7 +489,6 @@ button:disabled {
 
 .btn-warning {
     color: white;
-
     background: var(--warning);
 }
 
@@ -512,11 +497,10 @@ button:disabled {
 }
 
 .upload-actions {
-    display: flex;
-
-    justify-content: flex-end;
-
     margin-top: 16px;
+
+    display: flex;
+    justify-content: flex-end;
 }
 
 
@@ -530,13 +514,11 @@ button:disabled {
     padding: 15px;
 
     display: flex;
-
     align-items: center;
 
     gap: 13px;
 
     border: 1px solid #bfdbfe;
-
     border-radius: var(--radius);
 
     background: #eff6ff;
@@ -565,7 +547,6 @@ button:disabled {
     flex: 0 0 auto;
 
     border: 3px solid #bfdbfe;
-
     border-top-color: var(--primary);
 
     border-radius: 50%;
@@ -592,7 +573,6 @@ button:disabled {
     margin-bottom: 18px;
 
     display: flex;
-
     align-items: center;
     justify-content: space-between;
 
@@ -602,9 +582,9 @@ button:disabled {
 .dashboard-header h2 {
     margin: 0;
 
-    font-size: 20px;
-
     color: var(--dark);
+
+    font-size: 20px;
 }
 
 .dashboard-header p {
@@ -617,7 +597,7 @@ button:disabled {
 
 
 /* =========================================================
-   STAT CARDS
+   STATISTICS
 ========================================================= */
 
 .stats-grid {
@@ -637,7 +617,6 @@ button:disabled {
     padding: 18px;
 
     display: flex;
-
     align-items: center;
 
     gap: 13px;
@@ -645,7 +624,6 @@ button:disabled {
     background: var(--white);
 
     border: 1px solid var(--border);
-
     border-radius: var(--radius);
 
     box-shadow: var(--shadow-sm);
@@ -663,6 +641,10 @@ button:disabled {
     border-left: 4px solid var(--warning);
 }
 
+.stat-card:nth-child(5) {
+    border-left: 4px solid var(--purple);
+}
+
 .stat-icon {
     width: 42px;
     height: 42px;
@@ -670,7 +652,6 @@ button:disabled {
     flex: 0 0 auto;
 
     display: flex;
-
     align-items: center;
     justify-content: center;
 
@@ -682,31 +663,26 @@ button:disabled {
 
 .stat-icon.blue {
     color: var(--primary);
-
     background: var(--primary-light);
 }
 
 .stat-icon.green {
     color: var(--success);
-
     background: var(--success-light);
 }
 
 .stat-icon.red {
     color: var(--danger);
-
     background: var(--danger-light);
 }
 
 .stat-icon.orange {
     color: var(--warning);
-
     background: var(--warning-light);
 }
 
 .stat-icon.purple {
     color: var(--purple);
-
     background: var(--purple-light);
 }
 
@@ -766,14 +742,12 @@ button:disabled {
     padding: 0 18px;
 
     display: inline-flex;
-
     align-items: center;
     justify-content: center;
 
     gap: 7px;
 
     border: 0;
-
     border-bottom: 3px solid transparent;
 
     background: transparent;
@@ -791,7 +765,6 @@ button:disabled {
 
 .tab-button:hover {
     color: var(--dark);
-
     background: #f3f4f6;
 }
 
@@ -821,7 +794,6 @@ button:disabled {
 
 .tab-button.active .tab-count {
     background: var(--primary-light);
-
     color: var(--primary);
 }
 
@@ -849,7 +821,6 @@ button:disabled {
     margin-bottom: 17px;
 
     display: flex;
-
     align-items: center;
     justify-content: space-between;
 
@@ -874,7 +845,7 @@ button:disabled {
 
 
 /* =========================================================
-   TABLE
+   TABLE WRAPPER
 ========================================================= */
 
 .table-wrapper {
@@ -883,18 +854,19 @@ button:disabled {
     overflow-x: auto;
 
     border: 1px solid var(--border);
-
     border-radius: var(--radius);
 
     background: white;
+
+    scrollbar-width: thin;
 }
 
 table {
     width: 100%;
 
-    border-collapse: collapse;
-
     min-width: 720px;
+
+    border-collapse: collapse;
 }
 
 thead {
@@ -928,6 +900,10 @@ td {
     vertical-align: top;
 }
 
+tbody tr {
+    transition: background var(--transition);
+}
+
 tbody tr:hover {
     background: #f8fafc;
 }
@@ -959,7 +935,6 @@ td.muted-cell {
 
 .status-label {
     display: inline-flex;
-
     align-items: center;
 
     padding: 4px 8px;
@@ -974,25 +949,21 @@ td.muted-cell {
 
 .status-label.success {
     color: #166534;
-
     background: var(--success-light);
 }
 
 .status-label.danger {
     color: #991b1b;
-
     background: var(--danger-light);
 }
 
 .status-label.warning {
     color: #92400e;
-
     background: var(--warning-light);
 }
 
 .status-label.info {
     color: #155e75;
-
     background: var(--info-light);
 }
 
@@ -1005,11 +976,8 @@ td.muted-cell {
     padding: 55px 20px;
 
     display: flex;
-
     flex-direction: column;
-
     align-items: center;
-
     justify-content: center;
 
     text-align: center;
@@ -1022,7 +990,6 @@ td.muted-cell {
     margin-bottom: 10px;
 
     display: flex;
-
     align-items: center;
     justify-content: center;
 
@@ -1051,12 +1018,74 @@ td.muted-cell {
 
 
 /* =========================================================
+   PAGINATION
+========================================================= */
+
+.pagination {
+    margin-top: 16px;
+    padding: 12px 0 2px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 12px;
+
+    border-top: 1px solid var(--border);
+}
+
+.pagination-info {
+    min-width: 120px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    gap: 6px;
+
+    color: var(--muted);
+
+    font-size: 12px;
+
+    text-align: center;
+}
+
+.pagination-info strong {
+    min-width: 28px;
+
+    padding: 4px 7px;
+
+    border-radius: 6px;
+
+    background: var(--primary-light);
+
+    color: var(--primary);
+
+    font-size: 12px;
+
+    text-align: center;
+}
+
+.pagination .btn {
+    min-width: 120px;
+
+    min-height: 36px;
+
+    font-size: 12px;
+}
+
+.pagination-prev,
+.pagination-next {
+    white-space: nowrap;
+}
+
+
+/* =========================================================
    SETTINGS
 ========================================================= */
 
 .settings-panel {
     margin-top: 22px;
-
     padding-top: 22px;
 
     border-top: 1px solid var(--border);
@@ -1092,11 +1121,9 @@ select {
     width: 100%;
 
     border: 1px solid var(--border-dark);
-
     border-radius: var(--radius-sm);
 
     background: white;
-
     color: var(--dark);
 
     outline: none;
@@ -1114,7 +1141,6 @@ textarea {
     resize: vertical;
 
     font-size: 12px;
-
     line-height: 1.65;
 }
 
@@ -1159,13 +1185,12 @@ select:focus {
 }
 
 .settings-actions {
-    display: flex;
+    padding-top: 4px;
 
+    display: flex;
     align-items: center;
 
     gap: 10px;
-
-    padding-top: 4px;
 }
 
 .settings-saved {
@@ -1174,7 +1199,6 @@ select:focus {
     padding: 10px 12px;
 
     border: 1px solid #bbf7d0;
-
     border-radius: var(--radius-sm);
 
     background: #f0fdf4;
@@ -1193,11 +1217,11 @@ select:focus {
 .app-footer {
     padding: 0 20px 30px;
 
-    text-align: center;
-
     color: var(--muted);
 
     font-size: 11px;
+
+    text-align: center;
 }
 
 .app-footer p {
@@ -1240,7 +1264,7 @@ select:focus {
 
 
 /* =========================================================
-   RESPONSIVE - TABLET
+   TABLET
 ========================================================= */
 
 @media (max-width: 1100px) {
@@ -1254,7 +1278,7 @@ select:focus {
 
 
 /* =========================================================
-   RESPONSIVE - MOBILE
+   MOBILE
 ========================================================= */
 
 @media (max-width: 700px) {
@@ -1263,6 +1287,7 @@ select:focus {
         width: min(100% - 20px, 1400px);
 
         margin-top: 15px;
+        margin-bottom: 35px;
     }
 
     .header-content {
@@ -1292,6 +1317,12 @@ select:focus {
         align-items: flex-start;
 
         flex-direction: column;
+
+        gap: 12px;
+    }
+
+    .section-title .btn {
+        width: 100%;
     }
 
     .drop-zone {
@@ -1336,9 +1367,9 @@ select:focus {
     }
 
     .stat-card {
-        padding: 13px;
-
         min-height: 85px;
+
+        padding: 13px;
     }
 
     .stat-icon {
@@ -1352,7 +1383,17 @@ select:focus {
         font-size: 20px;
     }
 
+    .tabs {
+        scrollbar-width: none;
+    }
+
+    .tabs::-webkit-scrollbar {
+        display: none;
+    }
+
     .tab-button {
+        min-height: 52px;
+
         padding: 0 13px;
 
         font-size: 11px;
@@ -1372,6 +1413,36 @@ select:focus {
         width: 100%;
     }
 
+    .table-wrapper {
+        border-radius: 9px;
+    }
+
+    table {
+        min-width: 680px;
+    }
+
+    .pagination {
+        flex-wrap: wrap;
+
+        justify-content: center;
+
+        gap: 8px;
+    }
+
+    .pagination-info {
+        width: 100%;
+
+        order: -1;
+
+        margin-bottom: 2px;
+    }
+
+    .pagination .btn {
+        flex: 1;
+
+        min-width: 0;
+    }
+
     .setting-row {
         grid-template-columns: 1fr;
     }
@@ -1389,7 +1460,7 @@ select:focus {
 
 
 /* =========================================================
-   RESPONSIVE - SMALL MOBILE
+   SMALL MOBILE
 ========================================================= */
 
 @media (max-width: 430px) {
@@ -1413,4 +1484,12 @@ select:focus {
         min-height: 76px;
     }
 
+    .pagination .btn {
+        font-size: 11px;
+        padding: 8px 9px;
+    }
+
+    .pagination-info {
+        font-size: 11px;
+    }
 }
