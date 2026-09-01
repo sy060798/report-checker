@@ -1,24 +1,17 @@
 /* =========================================================
-   REPORT CHECKER - APP.JS
-   Controller utama UI
-
-   UPDATE:
-   - Ticket utama = kolom D / index 3
-   - Header Excel dianggap tetap
-   - Material tetap ditampilkan
-   - Material wajib memiliki Ticket
-   - Settings button dipastikan aktif
-   - Settings tidak tergantung proses dashboard
-   - Drop zone bisa diklik
-   - Aman jika module parser lain mengalami error
-   - Search tetap berjalan
-   - Download tetap berjalan
-   - PAGINATION:
-       • Masing-masing TAB punya halaman sendiri
-       • 10 data per halaman
-       • Sesuai / Tidak Sesuai / Material /
-         Material Error terpisah
-       • Download tetap SEMUA data
+   REPORT CHECKER
+   APP.JS
+   TAHAP 1
+   ---------------------------------------------------------
+   Fungsi:
+   - Inisialisasi aplikasi
+   - Upload Excel
+   - Drag & Drop
+   - Pilih file
+   - Hapus file
+   - Status file
+   - Tombol proses
+   - Reset aplikasi
 ========================================================= */
 
 (function () {
@@ -27,27 +20,34 @@
 
 
     /* =====================================================
-       STATE
+       APPLICATION STATE
     ===================================================== */
 
-    const state = {
+    const AppState = {
 
-        /*
-         * Tab yang sedang aktif
-         */
-        activeTab: "valid",
+        selectedFile: null,
 
-        /*
-         * Search global
-         */
-        search: "",
+        workbook: null,
 
-        /*
-         * Halaman masing-masing tab.
-         *
-         * Tidak digabung.
-         */
-        pages: {
+        rawRows: [],
+
+        processed: false,
+
+        processing: false,
+
+        results: {
+
+            valid: [],
+
+            invalid: [],
+
+            material: [],
+
+            materialError: []
+
+        },
+
+        pagination: {
 
             valid: 1,
 
@@ -55,2247 +55,178 @@
 
             material: 1,
 
-            "material-error": 1
+            materialError: 1
 
-        },
-
-        /*
-         * Jumlah data yang ditampilkan
-         * dalam satu halaman.
-         */
-        pageSize: 10,
-
-        initialized: false
+        }
 
     };
 
 
     /* =====================================================
-       KONSTANTA EXCEL
+       DOM ELEMENTS
     ===================================================== */
 
-    /*
-     * Excel:
-     *
-     * A = 0
-     * B = 1
-     * C = 2
-     * D = 3
-     *
-     * Ticket / TT Number = kolom D
-     */
-
-    const TT_NUMBER_COLUMN_INDEX = 3;
+    const DOM = {};
 
 
-    /*
-     * CIR default AF
-     */
+    function cacheDom() {
 
-    const DEFAULT_CIR_COLUMN_INDEX = 31;
+        DOM.systemStatus =
+            document.getElementById("systemStatus");
+
+        DOM.dropZone =
+            document.getElementById("dropZone");
+
+        DOM.excelFile =
+            document.getElementById("excelFile");
+
+        DOM.selectedFile =
+            document.getElementById("selectedFile");
+
+        DOM.fileName =
+            document.getElementById("fileName");
+
+        DOM.fileSize =
+            document.getElementById("fileSize");
+
+        DOM.removeFileBtn =
+            document.getElementById("removeFileBtn");
+
+        DOM.processBtn =
+            document.getElementById("processBtn");
+
+        DOM.processingStatus =
+            document.getElementById("processingStatus");
+
+        DOM.processingText =
+            document.getElementById("processingText");
+
+        DOM.dashboardSection =
+            document.getElementById("dashboardSection");
+
+        DOM.resetBtn =
+            document.getElementById("resetBtn");
+
+        DOM.settingsPanel =
+            document.getElementById("settingsPanel");
+
+        DOM.toggleSettingsBtn =
+            document.getElementById("toggleSettingsBtn");
+
+        DOM.saveSettingsBtn =
+            document.getElementById("saveSettingsBtn");
+
+        DOM.resetSettingsBtn =
+            document.getElementById("resetSettingsBtn");
+
+        DOM.settingsSavedMessage =
+            document.getElementById("settingsSavedMessage");
+
+    }
 
 
     /* =====================================================
-       DOM HELPER
+       UTILITY
     ===================================================== */
 
-    function $(selector) {
+    function formatFileSize(bytes) {
 
-        return document.querySelector(
-            selector
-        );
+        if (!Number.isFinite(bytes) || bytes <= 0) {
+            return "0 KB";
+        }
 
-    }
+        const units = [
+            "Bytes",
+            "KB",
+            "MB",
+            "GB"
+        ];
 
-
-    function $$(selector) {
-
-        return Array.from(
-            document.querySelectorAll(
-                selector
-            )
-        );
-
-    }
-
-
-    function escapeHtml(value) {
-
-        return String(
-            value ?? ""
-        )
-
-            .replace(
-                /&/g,
-                "&amp;"
-            )
-
-            .replace(
-                /</g,
-                "&lt;"
-            )
-
-            .replace(
-                />/g,
-                "&gt;"
-            )
-
-            .replace(
-                /"/g,
-                "&quot;"
-            )
-
-            .replace(
-                /'/g,
-                "&#039;"
+        const index =
+            Math.floor(
+                Math.log(bytes) /
+                Math.log(1024)
             );
 
-    }
+        const safeIndex =
+            Math.min(index, units.length - 1);
 
+        const size =
+            bytes /
+            Math.pow(1024, safeIndex);
 
-    function number(value) {
-
-        return new Intl.NumberFormat(
-            "id-ID"
-        ).format(
-            Number(value) || 0
+        return (
+            size.toFixed(
+                safeIndex === 0 ? 0 : 2
+            ) +
+            " " +
+            units[safeIndex]
         );
 
     }
 
-
-    function setText(
-        selector,
-        value
-    ) {
-
-        const element =
-            $(selector);
-
-
-        if (element) {
-
-            element.textContent =
-                value ?? "";
-
-        }
-
-    }
-
-
-    function show(
-        element,
-        visible
-    ) {
-
-        if (!element) {
-
-            return;
-
-        }
-
-
-        element.classList.toggle(
-            "hidden",
-            !visible
-        );
-
-    }
-
-
-    /* =====================================================
-       DATA DARI EXCEL.JS
-    ===================================================== */
-
-    function getData() {
-
-        try {
-
-            if (
-
-                window.ReportCheckerExcel &&
-
-                typeof window.ReportCheckerExcel
-                    .getState === "function"
-
-            ) {
-
-                return (
-                    window.ReportCheckerExcel
-                        .getState() ||
-                    {}
-                );
-
-            }
-
-        } catch (error) {
-
-            console.error(
-                "Gagal membaca state Excel:",
-                error
-            );
-
-        }
-
-
-        return {
-
-            rows: [],
-
-            validationResults: [],
-
-            sesuai: [],
-
-            valid: [],
-
-            tidakSesuai: [],
-
-            invalid: [],
-
-            materials: [],
-
-            material: [],
-
-            materialError: [],
-
-            materialNotFound: [],
-
-            summary: {
-
-                total: 0,
-
-                sesuai: 0,
-
-                tidakSesuai: 0,
-
-                invalid: 0,
-
-                material: 0,
-
-                materialError: 0
-
-            }
-
-        };
-
-    }
-
-
-    /* =====================================================
-       SYSTEM STATUS
-    ===================================================== */
 
     function setSystemStatus(
         text,
-        type = "ready"
+        type = "offline"
     ) {
 
-        const element =
-            $("#systemStatus");
-
-
-        if (!element) {
-
+        if (!DOM.systemStatus) {
             return;
-
         }
 
+        DOM.systemStatus.textContent = text;
 
-        element.textContent =
-            text;
-
-
-        element.className =
+        DOM.systemStatus.className =
             "status-badge " + type;
 
     }
 
 
-    /* =====================================================
-       PROCESSING
-    ===================================================== */
-
-    function processing(
-        visible,
-        text = "Membaca data Excel..."
+    function setProcessing(
+        active,
+        message = "Membaca data Excel..."
     ) {
 
-        const box =
-            $("#processingStatus");
+        AppState.processing = active;
 
+        if (DOM.processingStatus) {
 
-        const message =
-            $("#processingText");
-
-
-        if (box) {
-
-            box.classList.toggle(
+            DOM.processingStatus.classList.toggle(
                 "hidden",
-                !visible
+                !active
             );
 
         }
 
+        if (DOM.processingText) {
 
-        if (message) {
+            DOM.processingText.textContent =
+                message;
 
-            message.textContent =
-                text;
+        }
+
+        if (DOM.processBtn) {
+
+            DOM.processBtn.disabled =
+                active ||
+                !AppState.selectedFile;
+
+        }
+
+        if (DOM.removeFileBtn) {
+
+            DOM.removeFileBtn.disabled =
+                active;
 
         }
 
     }
 
-
-    /* =====================================================
-       SETTINGS
-       
-       PENTING:
-       Fungsi ini dipasang paling awal.
-       Jadi kalau module lain error,
-       tombol settings tetap bisa bekerja.
-    ===================================================== */
-
-    function setupSettings() {
-
-        const toggle =
-            $("#toggleSettingsBtn");
-
-
-        const panel =
-            $("#settingsPanel");
-
-
-        const save =
-            $("#saveSettingsBtn");
-
-
-        const reset =
-            $("#resetSettingsBtn");
-
-
-        console.log(
-            "Settings:",
-            {
-                toggle: !!toggle,
-                panel: !!panel,
-                save: !!save,
-                reset: !!reset
-            }
-        );
-
-
-        /*
-         * BUTTON BUKA / TUTUP
-         */
-
-        if (
-            toggle &&
-            panel &&
-            !toggle.dataset.bound
-        ) {
-
-            toggle.dataset.bound =
-                "true";
-
-
-            toggle.addEventListener(
-                "click",
-                function (event) {
-
-                    event.preventDefault();
-
-                    event.stopPropagation();
-
-
-                    const isHidden =
-                        panel.classList.contains(
-                            "hidden"
-                        );
-
-
-                    if (isHidden) {
-
-                        panel.classList.remove(
-                            "hidden"
-                        );
-
-
-                        toggle.textContent =
-                            "Tutup Pengaturan";
-
-                    } else {
-
-                        panel.classList.add(
-                            "hidden"
-                        );
-
-
-                        toggle.textContent =
-                            "Buka Pengaturan";
-
-                    }
-
-                }
-            );
-
-        }
-
-
-        /*
-         * SIMPAN SETTINGS
-         */
-
-        if (
-            save &&
-            !save.dataset.bound
-        ) {
-
-            save.dataset.bound =
-                "true";
-
-
-            save.addEventListener(
-                "click",
-                function (event) {
-
-                    event.preventDefault();
-
-                    saveParserSettings();
-
-                }
-            );
-
-        }
-
-
-        /*
-         * RESET SETTINGS
-         */
-
-        if (
-            reset &&
-            !reset.dataset.bound
-        ) {
-
-            reset.dataset.bound =
-                "true";
-
-
-            reset.addEventListener(
-                "click",
-                function (event) {
-
-                    event.preventDefault();
-
-                    resetParserSettings();
-
-                }
-            );
-
-        }
-
-
-        loadParserSettings();
-
-    }
-
-
-    function saveParserSettings() {
-
-        try {
-
-            /*
-             * Jika settings.js tersedia,
-             * gunakan settings.js.
-             */
-
-            if (
-
-                window.ReportCheckerSettings &&
-
-                typeof window.ReportCheckerSettings
-                    .saveFromUI === "function"
-
-            ) {
-
-                window.ReportCheckerSettings
-                    .saveFromUI();
-
-            } else {
-
-                saveSettingsFallback();
-
-            }
-
-
-            const message =
-                $("#settingsSavedMessage");
-
-
-            if (message) {
-
-                message.classList.remove(
-                    "hidden"
-                );
-
-
-                setTimeout(
-                    function () {
-
-                        message.classList.add(
-                            "hidden"
-                        );
-
-                    },
-                    2000
-                );
-
-            }
-
-
-        } catch (error) {
-
-            console.error(
-                "Gagal menyimpan settings:",
-                error
-            );
-
-
-            alert(
-                "Pengaturan gagal disimpan."
-            );
-
-        }
-
-    }
-
-
-    function saveSettingsFallback() {
-
-        const settings = {
-
-            materialStartPhrases:
-                readTextarea(
-                    "#materialStartPhrases"
-                ),
-
-            materialEndPhrases:
-                readTextarea(
-                    "#materialEndPhrases"
-                ),
-
-            releasePhrases:
-                readTextarea(
-                    "#releasePhrases"
-                ),
-
-            notFoundPhrases:
-                readTextarea(
-                    "#notFoundPhrases"
-                ),
-
-            validationType:
-                $("#validationType")?.value ||
-                "release-after-receive",
-
-            maxReleaseMinutes:
-                Number(
-                    $("#maxReleaseMinutes")
-                        ?.value ||
-                    0
-                )
-
-        };
-
-
-        localStorage.setItem(
-            "reportCheckerSettings",
-            JSON.stringify(
-                settings
-            )
-        );
-
-    }
-
-
-    function loadParserSettings() {
-
-        try {
-
-            /*
-             * Utamakan settings.js
-             */
-
-            if (
-
-                window.ReportCheckerSettings &&
-
-                typeof window.ReportCheckerSettings
-                    .loadToUI === "function"
-
-            ) {
-
-                window.ReportCheckerSettings
-                    .loadToUI();
-
-                return;
-
-            }
-
-
-            /*
-             * Fallback localStorage
-             */
-
-            const raw =
-                localStorage.getItem(
-                    "reportCheckerSettings"
-                );
-
-
-            if (!raw) {
-
-                return;
-
-            }
-
-
-            const settings =
-                JSON.parse(raw);
-
-
-            writeTextarea(
-                "#materialStartPhrases",
-                settings.materialStartPhrases
-            );
-
-
-            writeTextarea(
-                "#materialEndPhrases",
-                settings.materialEndPhrases
-            );
-
-
-            writeTextarea(
-                "#releasePhrases",
-                settings.releasePhrases
-            );
-
-
-            writeTextarea(
-                "#releasePhrases",
-                settings.releasePhrases
-            );
-
-
-            writeTextarea(
-                "#notFoundPhrases",
-                settings.notFoundPhrases
-            );
-
-
-            if (
-                $("#validationType") &&
-                settings.validationType
-            ) {
-
-                $("#validationType").value =
-                    settings.validationType;
-
-            }
-
-
-            if (
-                $("#maxReleaseMinutes") &&
-                settings.maxReleaseMinutes !==
-                    undefined
-            ) {
-
-                $("#maxReleaseMinutes").value =
-                    settings.maxReleaseMinutes;
-
-            }
-
-        } catch (error) {
-
-            console.warn(
-                "Gagal membaca settings:",
-                error
-            );
-
-        }
-
-    }
-
-
-    function resetParserSettings() {
-
-        try {
-
-            if (
-
-                window.ReportCheckerSettings &&
-
-                typeof window.ReportCheckerSettings
-                    .reset === "function"
-
-            ) {
-
-                window.ReportCheckerSettings
-                    .reset();
-
-                loadParserSettings();
-
-                return;
-
-            }
-
-
-            localStorage.removeItem(
-                "reportCheckerSettings"
-            );
-
-
-            location.reload();
-
-        } catch (error) {
-
-            console.error(
-                "Gagal reset settings:",
-                error
-            );
-
-        }
-
-    }
-
-
-    function readTextarea(
-        selector
-    ) {
-
-        const element =
-            $(selector);
-
-
-        if (!element) {
-
-            return [];
-
-        }
-
-
-        return element.value
-
-            .split("\n")
-
-            .map(
-                value =>
-                    value.trim()
-            )
-
-            .filter(Boolean);
-
-    }
-
-
-    function writeTextarea(
-        selector,
-        values
-    ) {
-
-        const element =
-            $(selector);
-
-
-        if (!element) {
-
-            return;
-
-        }
-
-
-        if (
-            Array.isArray(values)
-        ) {
-
-            element.value =
-                values.join("\n");
-
-        }
-
-    }
-
-
-    /* =====================================================
-       FILE INPUT
-    ===================================================== */
-
-    function setupFileInput() {
-
-        const input =
-            $("#excelFile");
-
-
-        if (!input) {
-
-            return;
-
-        }
-
-
-        if (input.dataset.bound) {
-
-            return;
-
-        }
-
-
-        input.dataset.bound =
-            "true";
-
-
-        input.addEventListener(
-            "change",
-            function () {
-
-                const file =
-                    input.files?.[0];
-
-
-                if (!file) {
-
-                    clearSelectedFile();
-
-                    return;
-
-                }
-
-
-                if (!isExcelFile(file)) {
-
-                    alert(
-                        "File harus Excel (.xlsx, .xls, atau .xlsm)."
-                    );
-
-
-                    clearSelectedFile();
-
-                    return;
-
-                }
-
-
-                setSelectedFile(
-                    file
-                );
-
-            }
-        );
-
-    }
-
-
-    function setSelectedFile(
-        file
-    ) {
-
-        const selected =
-            $("#selectedFile");
-
-
-        const fileName =
-            $("#fileName");
-
-
-        const fileSize =
-            $("#fileSize");
-
-
-        const processBtn =
-            $("#processBtn");
-
-
-        if (fileName) {
-
-            fileName.textContent =
-                file.name;
-
-        }
-
-
-        if (fileSize) {
-
-            fileSize.textContent =
-                formatFileSize(
-                    file.size
-                );
-
-        }
-
-
-        if (selected) {
-
-            selected.classList.remove(
-                "hidden"
-            );
-
-        }
-
-
-        if (processBtn) {
-
-            processBtn.disabled =
-                false;
-
-        }
-
-    }
-
-
-    function clearSelectedFile() {
-
-        const selected =
-            $("#selectedFile");
-
-
-        const fileName =
-            $("#fileName");
-
-
-        const fileSize =
-            $("#fileSize");
-
-
-        const processBtn =
-            $("#processBtn");
-
-
-        const input =
-            $("#excelFile");
-
-
-        if (input) {
-
-            input.value =
-                "";
-
-        }
-
-
-        if (fileName) {
-
-            fileName.textContent =
-                "-";
-
-        }
-
-
-        if (fileSize) {
-
-            fileSize.textContent =
-                "-";
-
-        }
-
-
-        if (selected) {
-
-            selected.classList.add(
-                "hidden"
-            );
-
-        }
-
-
-        if (processBtn) {
-
-            processBtn.disabled =
-                true;
-
-        }
-
-    }
-
-
-    function formatFileSize(
-        bytes
-    ) {
-
-        if (!bytes) {
-
-            return "0 KB";
-
-        }
-
-
-        const units = [
-
-            "B",
-
-            "KB",
-
-            "MB",
-
-            "GB"
-
-        ];
-
-
-        let size =
-            bytes;
-
-
-        let index =
-            0;
-
-
-        while (
-            size >= 1024 &&
-            index <
-                units.length - 1
-        ) {
-
-            size /= 1024;
-
-            index++;
-
-        }
-
-
-        return (
-            size.toFixed(
-                index === 0
-                    ? 0
-                    : 2
-            )
-            +
-            " "
-            +
-            units[index]
-        );
-
-    }
-
-
-    function isExcelFile(
-        file
-    ) {
-
-        const name =
-            String(
-                file?.name || ""
-            ).toLowerCase();
-
-
-        return (
-
-            name.endsWith(".xlsx") ||
-
-            name.endsWith(".xls") ||
-
-            name.endsWith(".xlsm")
-
-        );
-
-    }
-
-
-    /* =====================================================
-       DROP ZONE
-       
-       FIX:
-       HTML sebelumnya hanya punya tabindex.
-       Sekarang click -> input.click().
-    ===================================================== */
-
-    function setupDropZone() {
-
-        const zone =
-            $("#dropZone");
-
-
-        const input =
-            $("#excelFile");
-
-
-        if (!zone || !input) {
-
-            return;
-
-        }
-
-
-        if (zone.dataset.bound) {
-
-            return;
-
-        }
-
-
-        zone.dataset.bound =
-            "true";
-
-
-        /*
-         * KLIK DROP ZONE
-         */
-
-        zone.addEventListener(
-            "click",
-            function (event) {
-
-                /*
-                 * Jangan trigger dua kali
-                 * jika user klik input langsung.
-                 */
-
-                if (
-                    event.target ===
-                    input
-                ) {
-
-                    return;
-
-                }
-
-
-                input.click();
-
-            }
-        );
-
-
-        /*
-         * KEYBOARD
-         */
-
-        zone.addEventListener(
-            "keydown",
-            function (event) {
-
-                if (
-                    event.key === "Enter" ||
-                    event.key === " "
-                ) {
-
-                    event.preventDefault();
-
-                    input.click();
-
-                }
-
-            }
-        );
-
-
-        /*
-         * DRAG OVER
-         */
-
-        zone.addEventListener(
-            "dragover",
-            function (event) {
-
-                event.preventDefault();
-
-
-                zone.classList.add(
-                    "dragging"
-                );
-
-            }
-        );
-
-
-        /*
-         * DRAG LEAVE
-         */
-
-        zone.addEventListener(
-            "dragleave",
-            function () {
-
-                zone.classList.remove(
-                    "dragging"
-                );
-
-            }
-        );
-
-
-        /*
-         * DROP
-         */
-
-        zone.addEventListener(
-            "drop",
-            function (event) {
-
-                event.preventDefault();
-
-
-                zone.classList.remove(
-                    "dragging"
-                );
-
-
-                const file =
-                    event.dataTransfer
-                        ?.files?.[0];
-
-
-                if (!file) {
-
-                    return;
-
-                }
-
-
-                if (!isExcelFile(file)) {
-
-                    alert(
-                        "File harus Excel (.xlsx, .xls, atau .xlsm)."
-                    );
-
-                    return;
-
-                }
-
-
-                try {
-
-                    const dataTransfer =
-                        new DataTransfer();
-
-
-                    dataTransfer.items.add(
-                        file
-                    );
-
-
-                    input.files =
-                        dataTransfer.files;
-
-                } catch (error) {
-
-                    console.warn(
-                        "DataTransfer tidak tersedia:",
-                        error
-                    );
-
-                }
-
-
-                setSelectedFile(
-                    file
-                );
-
-            }
-        );
-
-    }
-
-
-    /* =====================================================
-       REMOVE FILE
-    ===================================================== */
-
-    function setupRemoveFile() {
-
-        const button =
-            $("#removeFileBtn");
-
-
-        if (!button) {
-
-            return;
-
-        }
-
-
-        if (button.dataset.bound) {
-
-            return;
-
-        }
-
-
-        button.dataset.bound =
-            "true";
-
-
-        button.addEventListener(
-            "click",
-            function () {
-
-                clearSelectedFile();
-
-                resetApplicationData();
-
-
-                show(
-                    $("#dashboardSection"),
-                    false
-                );
-
-
-                setSystemStatus(
-                    "Ready",
-                    "offline"
-                );
-
-            }
-        );
-
-    }
-
-
-    /* =====================================================
-       PROCESS BUTTON
-    ===================================================== */
-
-    function setupProcessButton() {
-
-        const button =
-            $("#processBtn");
-
-
-        const input =
-            $("#excelFile");
-
-
-        if (!button || !input) {
-
-            return;
-
-        }
-
-
-        if (button.dataset.bound) {
-
-            return;
-
-        }
-
-
-        button.dataset.bound =
-            "true";
-
-
-        button.addEventListener(
-            "click",
-            async function () {
-
-                const file =
-                    input.files?.[0];
-
-
-                if (!file) {
-
-                    alert(
-                        "Silakan pilih file Excel terlebih dahulu."
-                    );
-
-                    return;
-
-                }
-
-
-                await processExcel(
-                    file
-                );
-
-            }
-        );
-
-    }
-
-
-    /* =====================================================
-       PROCESS EXCEL
-    ===================================================== */
-
-    async function processExcel(
-        file
-    ) {
-
-        const button =
-            $("#processBtn");
-
-
-        try {
-
-            if (!file) {
-
-                throw new Error(
-                    "File Excel tidak ditemukan."
-                );
-
-            }
-
-
-            if (!isExcelFile(file)) {
-
-                throw new Error(
-                    "File harus Excel (.xlsx, .xls, atau .xlsm)."
-                );
-
-            }
-
-
-            if (!window.ReportCheckerExcel) {
-
-                throw new Error(
-                    "excel.js belum berhasil dimuat."
-                );
-
-            }
-
-
-            if (
-                typeof window.ReportCheckerExcel
-                    .load !==
-                "function"
-            ) {
-
-                throw new Error(
-                    "Fungsi load() belum tersedia di excel.js."
-                );
-
-            }
-
-
-            if (button) {
-
-                button.disabled =
-                    true;
-
-            }
-
-
-            processing(
-                true,
-                "Membaca workbook Excel..."
-            );
-
-
-            setSystemStatus(
-                "Processing",
-                "processing"
-            );
-
-
-            await yieldToBrowser();
-
-
-            const result =
-                await window.ReportCheckerExcel
-                    .load(
-                        file
-                    );
-
-
-            /*
-             * Setelah file baru diproses,
-             * semua tab kembali ke halaman 1.
-             */
-
-            resetPagination();
-
-
-            state.search =
-                "";
-
-
-            show(
-                $("#dashboardSection"),
-                true
-            );
-
-
-            updateDashboard();
-
-
-            setSystemStatus(
-                "Ready",
-                "online"
-            );
-
-
-            processing(
-                false
-            );
-
-
-            setText(
-                "#resultSummary",
-                buildSummaryText(
-                    result
-                )
-            );
-
-
-        } catch (error) {
-
-            console.error(
-                "Report Checker Error:",
-                error
-            );
-
-
-            processing(
-                false
-            );
-
-
-            setSystemStatus(
-                "Error",
-                "offline"
-            );
-
-
-            alert(
-                error?.message ||
-                "Gagal memproses file Excel."
-            );
-
-        } finally {
-
-            if (button) {
-
-                button.disabled =
-                    false;
-
-            }
-
-        }
-
-    }
-
-
-    function yieldToBrowser() {
-
-        return new Promise(
-            function (resolve) {
-
-                setTimeout(
-                    resolve,
-                    0
-                );
-
-            }
-        );
-
-    }
-
-
-    function buildSummaryText(
-        result
-    ) {
-
-        const summary =
-            result?.summary ||
-            getData().summary ||
-            {};
-
-
-        return (
-
-            "Total " +
-
-            number(
-                summary.total || 0
-            ) +
-
-            " data • " +
-
-            "Sesuai " +
-
-            number(
-                summary.sesuai || 0
-            ) +
-
-            " • " +
-
-            "Tidak Sesuai " +
-
-            number(
-                summary.tidakSesuai || 0
-            ) +
-
-            " • " +
-
-            "Material " +
-
-            number(
-                summary.material || 0
-            )
-
-        );
-
-    }
-
-
-    /* =====================================================
-       DASHBOARD
-    ===================================================== */
-
-    function updateDashboard() {
-
-        let data;
-
-
-        try {
-
-            data =
-                getData();
-
-        } catch (error) {
-
-            console.error(
-                "Dashboard data error:",
-                error
-            );
-
-            return;
-
-        }
-
-
-        const summary =
-            data.summary || {};
-
-
-        const total =
-            summary.total ??
-            data.validationResults?.length ??
-            data.rows?.length ??
-            0;
-
-
-        const sesuai =
-            summary.sesuai ??
-            data.sesuai?.length ??
-            data.valid?.length ??
-            0;
-
-
-        const tidakSesuai =
-            summary.tidakSesuai ??
-            data.tidakSesuai?.length ??
-            data.invalid?.length ??
-            0;
-
-
-        const material =
-            summary.material ??
-            data.materials?.length ??
-            data.material?.length ??
-            0;
-
-
-        const materialError =
-            summary.materialError ??
-            data.materialError?.length ??
-            data.materialNotFound?.length ??
-            0;
-
-
-        setText(
-            "#totalCount",
-            number(total)
-        );
-
-
-        setText(
-            "#validCount",
-            number(sesuai)
-        );
-
-
-        setText(
-            "#invalidCount",
-            number(tidakSesuai)
-        );
-
-
-        setText(
-            "#materialCount",
-            number(material)
-        );
-
-
-        setText(
-            "#materialErrorCount",
-            number(materialError)
-        );
-
-
-        setText(
-            "#validTabCount",
-            number(sesuai)
-        );
-
-
-        setText(
-            "#invalidTabCount",
-            number(tidakSesuai)
-        );
-
-
-        setText(
-            "#materialTabCount",
-            number(material)
-        );
-
-
-        setText(
-            "#materialErrorTabCount",
-            number(materialError)
-        );
-
-
-        /*
-         * Render semua tabel.
-         *
-         * Pagination masing-masing tabel
-         * tetap terpisah.
-         */
-
-        renderValidTable();
-
-        renderInvalidTable();
-
-        renderMaterialTable();
-
-        renderMaterialErrorTable();
-
-
-        updateDownloadButtons();
-
-    }
-
-
-    /* =====================================================
-       GET DATA
-    ===================================================== */
-
-    function getValidRows() {
-
-        const data =
-            getData();
-
-
-        return (
-
-            data.sesuai ||
-
-            data.valid ||
-
-            []
-
-        );
-
-    }
-
-
-    function getInvalidRows() {
-
-        const data =
-            getData();
-
-
-        return (
-
-            data.tidakSesuai ||
-
-            data.invalid ||
-
-            []
-
-        );
-
-    }
-
-
-    function getMaterialRows() {
-
-        const data =
-            getData();
-
-
-        return (
-
-            data.materials ||
-
-            data.material ||
-
-            []
-
-        );
-
-    }
-
-
-    function getMaterialErrorRows() {
-
-        const data =
-            getData();
-
-
-        return (
-
-            data.materialError ||
-
-            data.materialNotFound ||
-
-            []
-
-        );
-
-    }
-
-
-    /* =====================================================
-       GET VALUE
-    ===================================================== */
-
-    function getValue(
-        row,
-        keys
-    ) {
-
-        if (!row) {
-
-            return "";
-
-        }
-
-
-        for (
-            const key of keys
-        ) {
-
-            if (
-
-                row[key] !== undefined &&
-
-                row[key] !== null &&
-
-                String(
-                    row[key]
-                ).trim() !== ""
-
-            ) {
-
-                return row[key];
-
-            }
-
-        }
-
-
-        return "";
-
-    }
-
-
-    /* =====================================================
-       TICKET DARI ARRAY
-       
-       FIX UTAMA:
-       Ticket selalu kolom D = index 3
-    ===================================================== */
-
-    function getTTNumberFromArray(
-        row
-    ) {
-
-        if (!Array.isArray(row)) {
-
-            return "";
-
-        }
-
-
-        const value =
-            row[
-                TT_NUMBER_COLUMN_INDEX
-            ];
-
-
-        if (
-            value === undefined ||
-            value === null
-        ) {
-
-            return "";
-
-        }
-
-
-        return String(
-            value
-        ).trim();
-
-    }
-
-
-    /* =====================================================
-       TICKET DARI OBJECT
-    ===================================================== */
-
-    function getTTNumberFromObject(
-        row
-    ) {
-
-        if (
-
-            !row ||
-
-            typeof row !== "object" ||
-
-            Array.isArray(row)
-
-        ) {
-
-            return "";
-
-        }
-
-
-        const possibleKeys = [
-
-            "ttNumber",
-
-            "TT Number",
-
-            "TT_Number",
-
-            "tt_number",
-
-            "TTNumber",
-
-            "TTNUMBER",
-
-            "ttnumber",
-
-            "TT No",
-
-            "TT No.",
-
-            "TT_NO",
-
-            "nomorTT",
-
-            "Nomor TT",
-
-            "noTT",
-
-            "No TT",
-
-            "No. TT"
-
-        ];
-
-
-        for (
-            const key of possibleKeys
-        ) {
-
-            if (
-
-                Object.prototype
-                    .hasOwnProperty.call(
-                        row,
-                        key
-                    )
-
-            ) {
-
-                const value =
-                    row[key];
-
-
-                if (
-
-                    value !== undefined &&
-
-                    value !== null &&
-
-                    String(
-                        value
-                    ).trim() !== ""
-
-                ) {
-
-                    return String(
-                        value
-                    ).trim();
-
-                }
-
-            }
-
-        }
-
-
-        /*
-         * Case insensitive
-         */
-
-        for (
-            const key of Object.keys(row)
-        ) {
-
-            const normalizedKey =
-                String(key)
-                    .toLowerCase()
-                    .replace(
-                        /[\s_-]+/g,
-                        ""
-                    );
-
-
-            if (
-                normalizedKey ===
-                "ttnumber"
-            ) {
-
-                const value =
-                    row[key];
-
-
-                if (
-
-                    value !== undefined &&
-
-                    value !== null &&
-
-                    String(
-                        value
-                    ).trim() !== ""
-
-                ) {
-
-                    return String(
-                        value
-                    ).trim();
-
-                }
-
-            }
-
-        }
-
-
-        return "";
-
-    }
-
-
-    /* =====================================================
-       GET TICKET
-       
-       URUTAN:
-       1. Array langsung -> D
-       2. Object TT Number
-       3. originalRow -> D
-       4. source -> D
-       5. rowData -> D
-       6. data -> D
-       7. rawRow -> D
-       8. excelRow -> D
-       9. sourceRow -> D
-       10. originalData -> D
-       
-       TIDAK menggunakan:
-       - Customer Ticket
-       - Ref Ticket
-    ===================================================== */
-
-    function getTicketNumber(
-        row
-    ) {
-
-        if (!row) {
-
-            return "-";
-
-        }
-
-
-        /*
-         * Array langsung
-         */
-
-        if (Array.isArray(row)) {
-
-            return (
-
-                getTTNumberFromArray(
-                    row
-                ) ||
-
-                "-"
-
-            );
-
-        }
-
-
-        /*
-         * Object langsung
-         */
-
-        let ticket =
-            getTTNumberFromObject(
-                row
-            );
-
-
-        if (ticket) {
-
-            return ticket;
-
-        }
-
-
-        /*
-         * Field sumber yang mungkin menyimpan
-         * baris Excel asli.
-         */
-
-        const sourceFields = [
-
-            "originalRow",
-
-            "source",
-
-            "rowData",
-
-            "data",
-
-            "rawRow",
-
-            "excelRow",
-
-            "sourceRow",
-
-            "originalData"
-
-        ];
-
-
-        for (
-            const field of sourceFields
-        ) {
-
-            const candidate =
-                row[field];
-
-
-            /*
-             * Kalau array:
-             * ambil kolom D.
-             */
-
-            if (
-                Array.isArray(candidate)
-            ) {
-
-                ticket =
-                    getTTNumberFromArray(
-                        candidate
-                    );
-
-
-                if (ticket) {
-
-                    return ticket;
-
-                }
-
-            }
-
-
-            /*
-             * Kalau object:
-             * cari TT Number.
-             */
-
-            if (
-
-                candidate &&
-
-                typeof candidate ===
-                    "object"
-
-            ) {
-
-                ticket =
-                    getTTNumberFromObject(
-                        candidate
-                    );
-
-
-                if (ticket) {
-
-                    return ticket;
-
-                }
-
-            }
-
-        }
-
-
-        /*
-         * Metadata
-         */
-
-        const metadata =
-            row.metadata ||
-            row.meta;
-
-
-        ticket =
-            getTTNumberFromObject(
-                metadata
-            );
-
-
-        if (ticket) {
-
-            return ticket;
-
-        }
-
-
-        return "-";
-
-    }
-
-
-    /* =====================================================
-       PAGINATION
-       
-       Setiap TAB mempunyai pagination sendiri.
-       
-       valid
-       invalid
-       material
-       material-error
-       
-       Jumlah tampilan = 10 data.
-    ===================================================== */
 
     function resetPagination() {
 
-        state.pages = {
+        AppState.pagination = {
 
             valid: 1,
 
@@ -2303,2506 +234,62 @@
 
             material: 1,
 
-            "material-error": 1
+            materialError: 1
 
         };
 
     }
 
 
-    function getPageKey() {
+    function resetResults() {
 
-        const allowed = [
+        AppState.workbook = null;
 
-            "valid",
+        AppState.rawRows = [];
 
-            "invalid",
+        AppState.processed = false;
 
-            "material",
+        AppState.results = {
 
-            "material-error"
+            valid: [],
 
-        ];
+            invalid: [],
 
+            material: [],
 
-        if (
-            allowed.includes(
-                state.activeTab
-            )
-        ) {
-
-            return state.activeTab;
-
-        }
-
-
-        return "valid";
-
-    }
-
-
-    function paginateRows(
-        rows,
-        tabKey
-    ) {
-
-        if (!Array.isArray(rows)) {
-
-            return {
-
-                rows: [],
-
-                page: 1,
-
-                totalPages: 1,
-
-                totalRows: 0,
-
-                start: 0,
-
-                end: 0
-
-            };
-
-        }
-
-
-        const totalRows =
-            rows.length;
-
-
-        const pageSize =
-            state.pageSize;
-
-
-        const totalPages =
-            Math.max(
-                1,
-                Math.ceil(
-                    totalRows /
-                    pageSize
-                )
-            );
-
-
-        let page =
-            Number(
-                state.pages[
-                    tabKey
-                ] || 1
-            );
-
-
-        /*
-         * Kalau halaman melebihi
-         * halaman terakhir.
-         */
-
-        if (
-            page > totalPages
-        ) {
-
-            page =
-                totalPages;
-
-
-            state.pages[
-                tabKey
-            ] =
-                page;
-
-        }
-
-
-        if (page < 1) {
-
-            page = 1;
-
-
-            state.pages[
-                tabKey
-            ] =
-                1;
-
-        }
-
-
-        const start =
-            (
-                page - 1
-            ) *
-            pageSize;
-
-
-        const end =
-            Math.min(
-                start +
-                    pageSize,
-                totalRows
-            );
-
-
-        return {
-
-            rows:
-                rows.slice(
-                    start,
-                    end
-                ),
-
-            page,
-
-            totalPages,
-
-            totalRows,
-
-            start,
-
-            end
+            materialError: []
 
         };
+
+        resetPagination();
 
     }
 
 
     /* =====================================================
-       RENDER PAGINATION
+       FILE VALIDATION
     ===================================================== */
 
-    function renderPagination(
-        containerSelector,
-        rows,
-        tabKey
-    ) {
+    function isExcelFile(file) {
 
-        const container =
-            $(
-                containerSelector
-            );
-
-
-        if (!container) {
-
-            return;
-
+        if (!file) {
+            return false;
         }
 
-
-        const pagination =
-            paginateRows(
-                rows,
-                tabKey
-            );
-
-
-        container.innerHTML =
-            "";
-
-
-        /*
-         * Jika data <= 10,
-         * pagination tidak ditampilkan.
-         */
-
-        if (
-            pagination.totalRows <=
-            state.pageSize
-        ) {
-
-            return;
-
-        }
-
-
-        const wrapper =
-            document.createElement(
-                "div"
-            );
-
-
-        wrapper.className =
-            "pagination";
-
-
-        /*
-         * BUTTON SEBELUMNYA
-         */
-
-        const prev =
-            document.createElement(
-                "button"
-            );
-
-
-        prev.type =
-            "button";
-
-
-        prev.className =
-            "pagination-btn";
-
-
-        prev.textContent =
-            "‹ Sebelumnya";
-
-
-        prev.disabled =
-            pagination.page <= 1;
-
-
-        prev.addEventListener(
-            "click",
-            function () {
-
-                if (
-                    pagination.page <= 1
-                ) {
-
-                    return;
-
-                }
-
-
-                state.pages[
-                    tabKey
-                ] =
-                    pagination.page - 1;
-
-
-                renderCurrentTab();
-
-            }
-        );
-
-
-        wrapper.appendChild(
-            prev
-        );
-
-
-        /*
-         * INFO HALAMAN
-         */
-
-        const pageInfo =
-            document.createElement(
-                "span"
-            );
-
-
-        pageInfo.className =
-            "pagination-info";
-
-
-        const from =
-            pagination.totalRows === 0
-                ? 0
-                : pagination.start + 1;
-
-
-        const to =
-            pagination.end;
-
-
-        pageInfo.textContent =
-            "Halaman " +
-            pagination.page +
-            " dari " +
-            pagination.totalPages +
-            " • " +
-            from +
-            "-" +
-            to +
-            " dari " +
-            pagination.totalRows;
-
-
-        wrapper.appendChild(
-            pageInfo
-        );
-
-
-        /*
-         * BUTTON BERIKUTNYA
-         */
-
-        const next =
-            document.createElement(
-                "button"
-            );
-
-
-        next.type =
-            "button";
-
-
-        next.className =
-            "pagination-btn";
-
-
-        next.textContent =
-            "Berikutnya ›";
-
-
-        next.disabled =
-            pagination.page >=
-            pagination.totalPages;
-
-
-        next.addEventListener(
-            "click",
-            function () {
-
-                if (
-                    pagination.page >=
-                    pagination.totalPages
-                ) {
-
-                    return;
-
-                }
-
-
-                state.pages[
-                    tabKey
-                ] =
-                    pagination.page + 1;
-
-
-                renderCurrentTab();
-
-            }
-        );
-
-
-        wrapper.appendChild(
-            next
-        );
-
-
-        container.appendChild(
-            wrapper
+        const fileName =
+            String(file.name || "")
+                .toLowerCase();
+
+        return (
+            fileName.endsWith(".xlsx") ||
+            fileName.endsWith(".xls") ||
+            fileName.endsWith(".xlsm")
         );
 
     }
 
 
-    /* =====================================================
-       RENDER CURRENT TAB
-    ===================================================== */
-
-    function renderCurrentTab() {
-
-        const tab =
-            state.activeTab;
-
-
-        if (
-            tab === "valid"
-        ) {
-
-            renderValidTable();
-
-            return;
-
-        }
-
-
-        if (
-            tab === "invalid"
-        ) {
-
-            renderInvalidTable();
-
-            return;
-
-        }
-
-
-        if (
-            tab === "material"
-        ) {
-
-            renderMaterialTable();
-
-            return;
-
-        }
-
-
-        if (
-            tab === "material-error"
-        ) {
-
-            renderMaterialErrorTable();
-
-        }
-
-    }
-
-
-    /*
-     * =====================================================
-     *
-     * SAMPAI SINI ADALAH TAHAP 1
-     *
-     * TAHAP 2 AKAN MELANJUTKAN:
-     *
-     * - renderValidTable()
-     * - renderInvalidTable()
-     * - renderMaterialTable()
-     * - renderMaterialErrorTable()
-     * - Search
-     * - Tabs
-     * - Download
-     * - Fallback export
-     * - Reset
-     * - Init
-     * - Public API
-     *
-     * =====================================================
-     */
-/* =========================================================
-   REPORT CHECKER - APP.JS
-   TAHAP 2
-   PAGINATION + RENDER TABLE + SEARCH + TABS + DOWNLOAD
-========================================================= */
-
-
-/* =====================================================
-   PAGINATION
-===================================================== */
-
-/*
- * Setiap TAB mempunyai halaman sendiri.
- *
- * Valid          -> halaman sendiri
- * Invalid        -> halaman sendiri
- * Material       -> halaman sendiri
- * Material Error -> halaman sendiri
- *
- * Jadi pindah halaman di Material tidak mengubah
- * halaman pada Sesuai / Tidak Sesuai.
- */
-
-const paginationState = {
-
-    valid: 1,
-
-    invalid: 1,
-
-    material: 1,
-
-    "material-error": 1
-
-};
-
-
-/*
- * Jumlah data per halaman.
- *
- * Bisa diganti:
- *
- * 10
- * 25
- * 50
- * 100
- */
-
-const PAGINATION_PAGE_SIZE = 10;
-
-
-/* =====================================================
-   GET CURRENT PAGE
-===================================================== */
-
-function getCurrentPage(type) {
-
-    const page =
-        Number(
-            paginationState[type]
-        ) || 1;
-
-
-    return Math.max(
-        1,
-        page
-    );
-
-}
-
-
-/* =====================================================
-   SET CURRENT PAGE
-===================================================== */
-
-function setCurrentPage(
-    type,
-    page
-) {
-
-    const value =
-        Number(page) || 1;
-
-
-    paginationState[type] =
-        Math.max(
-            1,
-            value
-        );
-
-}
-
-
-/* =====================================================
-   RESET PAGINATION
-===================================================== */
-
-function resetPagination() {
-
-    paginationState.valid =
-        1;
-
-    paginationState.invalid =
-        1;
-
-    paginationState.material =
-        1;
-
-    paginationState["material-error"] =
-        1;
-
-}
-
-
-/* =====================================================
-   PAGINATE ROWS
-===================================================== */
-
-function paginateRows(
-    rows,
-    type
-) {
-
-    if (!Array.isArray(rows)) {
-
-        return {
-
-            rows: [],
-
-            page: 1,
-
-            totalPages: 1,
-
-            totalRows: 0,
-
-            start: 0,
-
-            end: 0
-
-        };
-
-    }
-
-
-    const totalRows =
-        rows.length;
-
-
-    const totalPages =
-        Math.max(
-            1,
-            Math.ceil(
-                totalRows /
-                PAGINATION_PAGE_SIZE
-            )
-        );
-
-
-    let page =
-        getCurrentPage(type);
-
-
-    /*
-     * Kalau halaman sekarang melebihi
-     * jumlah halaman setelah search,
-     * otomatis kembali ke halaman terakhir.
-     */
-
-    if (
-        page > totalPages
-    ) {
-
-        page =
-            totalPages;
-
-
-        setCurrentPage(
-            type,
-            page
-        );
-
-    }
-
-
-    const start =
-        (
-            page - 1
-        ) *
-        PAGINATION_PAGE_SIZE;
-
-
-    const end =
-        Math.min(
-            start +
-            PAGINATION_PAGE_SIZE,
-            totalRows
-        );
-
-
-    return {
-
-        rows:
-            rows.slice(
-                start,
-                end
-            ),
-
-        page,
-
-        totalPages,
-
-        totalRows,
-
-        start,
-
-        end
-
-    };
-
-}
-
-
-/* =====================================================
-   PAGINATION HTML
-===================================================== */
-
-function createPagination(
-    type,
-    pagination
-) {
-
-    const {
-
-        page,
-
-        totalPages,
-
-        totalRows,
-
-        start,
-
-        end
-
-    } = pagination;
-
-
-    /*
-     * Tidak perlu pagination kalau data kosong.
-     */
-
-    if (!totalRows) {
-
-        return "";
-
-    }
-
-
-    /*
-     * Kalau cuma 1 halaman,
-     * tetap tampilkan informasi jumlah data.
-     */
-
-    let html = `
-
-        <div class="pagination-container">
-
-            <div class="pagination-info">
-
-                Menampilkan
-
-                <strong>
-                    ${start + 1}
-                </strong>
-
-                -
-
-                <strong>
-                    ${end}
-                </strong>
-
-                dari
-
-                <strong>
-                    ${totalRows}
-                </strong>
-
-                data
-
-            </div>
-
-            <div class="pagination-controls">
-
-    `;
-
-
-    /*
-     * Tombol PREVIOUS
-     */
-
-    html += `
-
-        <button
-            type="button"
-            class="pagination-btn"
-            data-pagination-type="${escapeHtml(type)}"
-            data-pagination-page="${page - 1}"
-            ${page <= 1 ? "disabled" : ""}
-        >
-            ‹
-        </button>
-
-    `;
-
-
-    /*
-     * Nomor halaman.
-     *
-     * Contoh:
-     *
-     * 1 2 3 4 5
-     *
-     * Kalau halaman banyak:
-     *
-     * 1 ... 8 9 10 ... 20
-     */
-
-    const pageNumbers =
-        buildPageNumbers(
-            page,
-            totalPages
-        );
-
-
-    pageNumbers.forEach(
-        function (item) {
-
-            if (
-                item === "..."
-            ) {
-
-                html += `
-
-                    <span class="pagination-dots">
-                        ...
-                    </span>
-
-                `;
-
-                return;
-
-            }
-
-
-            const active =
-                item === page;
-
-
-            html += `
-
-                <button
-                    type="button"
-                    class="pagination-btn ${active ? "active" : ""}"
-                    data-pagination-type="${escapeHtml(type)}"
-                    data-pagination-page="${item}"
-                >
-                    ${item}
-                </button>
-
-            `;
-
-        }
-    );
-
-
-    /*
-     * Tombol NEXT
-     */
-
-    html += `
-
-        <button
-            type="button"
-            class="pagination-btn"
-            data-pagination-type="${escapeHtml(type)}"
-            data-pagination-page="${page + 1}"
-            ${page >= totalPages ? "disabled" : ""}
-        >
-            ›
-        </button>
-
-    `;
-
-
-    html += `
-
-            </div>
-
-        </div>
-
-    `;
-
-
-    return html;
-
-}
-
-
-/* =====================================================
-   BUILD PAGE NUMBERS
-===================================================== */
-
-function buildPageNumbers(
-    currentPage,
-    totalPages
-) {
-
-    /*
-     * Kalau halaman sedikit,
-     * tampilkan semuanya.
-     */
-
-    if (
-        totalPages <= 7
-    ) {
-
-        return Array.from(
-            {
-                length:
-                    totalPages
-            },
-            function (_, index) {
-
-                return index + 1;
-
-            }
-        );
-
-    }
-
-
-    const pages = [];
-
-
-    /*
-     * Halaman pertama.
-     */
-
-    pages.push(1);
-
-
-    /*
-     * Kondisi halaman awal.
-     */
-
-    if (
-        currentPage <= 4
-    ) {
-
-        pages.push(2);
-        pages.push(3);
-        pages.push(4);
-        pages.push(5);
-        pages.push("...");
-        pages.push(totalPages);
-
-
-        return pages;
-
-    }
-
-
-    /*
-     * Kondisi halaman akhir.
-     */
-
-    if (
-        currentPage >=
-        totalPages - 3
-    ) {
-
-        pages.push("...");
-
-        pages.push(
-            totalPages - 4
-        );
-
-        pages.push(
-            totalPages - 3
-        );
-
-        pages.push(
-            totalPages - 2
-        );
-
-        pages.push(
-            totalPages - 1
-        );
-
-        pages.push(
-            totalPages
-        );
-
-
-        return pages;
-
-    }
-
-
-    /*
-     * Kondisi tengah.
-     */
-
-    pages.push("...");
-
-    pages.push(
-        currentPage - 1
-    );
-
-    pages.push(
-        currentPage
-    );
-
-    pages.push(
-        currentPage + 1
-    );
-
-    pages.push("...");
-
-    pages.push(
-        totalPages
-    );
-
-
-    return pages;
-
-}
-
-
-/* =====================================================
-   PAGINATION EVENT
-===================================================== */
-
-function setupPaginationEvents() {
-
-    document
-        .querySelectorAll(
-            "[data-pagination-type]"
-        )
-        .forEach(
-            function (button) {
-
-                if (
-                    button.dataset.paginationBound
-                ) {
-
-                    return;
-
-                }
-
-
-                button.dataset.paginationBound =
-                    "true";
-
-
-                button.addEventListener(
-                    "click",
-                    function () {
-
-                        if (
-                            button.disabled
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        const type =
-                            button.getAttribute(
-                                "data-pagination-type"
-                            );
-
-
-                        const page =
-                            Number(
-                                button.getAttribute(
-                                    "data-pagination-page"
-                                )
-                            );
-
-
-                        if (
-                            !type ||
-                            !page
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        setCurrentPage(
-                            type,
-                            page
-                        );
-
-
-                        /*
-                         * Hanya render TAB
-                         * yang berubah.
-                         *
-                         * Tidak mengubah
-                         * tab lainnya.
-                         */
-
-                        renderSingleTab(
-                            type
-                        );
-
-
-                        /*
-                         * Scroll sedikit ke tabel.
-                         */
-
-                        const table =
-                            getTableElement(
-                                type
-                            );
-
-
-                        if (table) {
-
-                            table.scrollIntoView(
-                                {
-                                    behavior:
-                                        "smooth",
-                                    block:
-                                        "start"
-                                }
-                            );
-
-                        }
-
-                    }
-                );
-
-            }
-        );
-
-}
-
-
-/* =====================================================
-   GET TABLE ELEMENT
-===================================================== */
-
-function getTableElement(type) {
-
-    const map = {
-
-        valid:
-            "#validTable",
-
-        invalid:
-            "#invalidTable",
-
-        material:
-            "#materialTable",
-
-        "material-error":
-            "#materialErrorTable"
-
-    };
-
-
-    return $(
-        map[type] || ""
-    );
-
-}
-
-
-/* =====================================================
-   GET PAGINATION CONTAINER
-===================================================== */
-
-function getPaginationContainer(
-    type
-) {
-
-    const table =
-        getTableElement(type);
-
-
-    if (!table) {
-
-        return null;
-
-    }
-
-
-    /*
-     * Pagination ditempatkan setelah
-     * table-wrapper.
-     */
-
-    const wrapper =
-        table.closest(
-            ".table-wrapper"
-        );
-
-
-    if (!wrapper) {
-
-        return null;
-
-    }
-
-
-    let pagination =
-        wrapper.querySelector(
-            ".pagination-container"
-        );
-
-
-    if (!pagination) {
-
-        pagination =
-            document.createElement(
-                "div"
-            );
-
-
-        pagination.className =
-            "pagination-container";
-
-
-        wrapper.appendChild(
-            pagination
-        );
-
-    }
-
-
-    return pagination;
-
-}
-
-
-/* =====================================================
-   RENDER PAGINATION
-===================================================== */
-
-function renderPagination(
-    type,
-    pagination
-) {
-
-    const container =
-        getPaginationContainer(
-            type
-        );
-
-
-    if (!container) {
-
-        return;
-
-    }
-
-
-    container.outerHTML =
-        createPagination(
-            type,
-            pagination
-        );
-
-
-    /*
-     * Setelah HTML pagination dibuat,
-     * pasang event tombol.
-     */
-
-    setupPaginationEvents();
-
-}
-
-
-/* =====================================================
-   RENDER SINGLE TAB
-===================================================== */
-
-function renderSingleTab(
-    type
-) {
-
-    if (
-        type === "valid"
-    ) {
-
-        renderValidTable();
-
-        return;
-
-    }
-
-
-    if (
-        type === "invalid"
-    ) {
-
-        renderInvalidTable();
-
-        return;
-
-    }
-
-
-    if (
-        type === "material"
-    ) {
-
-        renderMaterialTable();
-
-        return;
-
-    }
-
-
-    if (
-        type === "material-error"
-    ) {
-
-        renderMaterialErrorTable();
-
-        return;
-
-    }
-
-}
-
-
-/* =====================================================
-   UPDATED VALID TABLE
-===================================================== */
-
-function renderValidTable() {
-
-    const tbody =
-        $("#validTableBody");
-
-    const empty =
-        $("#validEmpty");
-
-
-    if (!tbody) {
-
-        return;
-
-    }
-
-
-    const filtered =
-        filterRows(
-            getValidRows()
-        );
-
-
-    const pagination =
-        paginateRows(
-            filtered,
-            "valid"
-        );
-
-
-    tbody.innerHTML =
-        "";
-
-
-    if (
-        !pagination.rows.length
-    ) {
-
-        show(
-            empty,
-            true
-        );
-
-
-        renderPagination(
-            "valid",
-            pagination
-        );
-
-
-        return;
-
-    }
-
-
-    show(
-        empty,
-        false
-    );
-
-
-    pagination.rows.forEach(
-        function (row) {
-
-            const ticket =
-                getTicketNumber(row);
-
-
-            const original =
-                row?.originalRow ||
-                row?.source ||
-                row?.rowData ||
-                row?.data ||
-                {};
-
-
-            const receive =
-                getValue(
-                    row,
-                    [
-                        "receiveDateFormatted",
-                        "receiveDate",
-                        "datetimeReceive",
-                        "Datetime Receive",
-                        "datetime_receive"
-                    ]
-                ) ||
-
-                getValue(
-                    original,
-                    [
-                        "Datetime Receive",
-                        "datetimeReceive",
-                        "DatetimeReceive"
-                    ]
-                );
-
-
-            const release =
-                getValue(
-                    row,
-                    [
-                        "releaseDateTime",
-                        "release",
-                        "ttRelease",
-                        "TT Release",
-                        "releaseDateText"
-                    ]
-                );
-
-
-            const reason =
-                getValue(
-                    row,
-                    [
-                        "reason",
-                        "message",
-                        "keterangan",
-                        "note"
-                    ]
-                ) ||
-                "Tanggal Release sesuai.";
-
-
-            tbody.insertAdjacentHTML(
-                "beforeend",
-                `
-                <tr>
-
-                    <td>
-                        ${escapeHtml(ticket)}
-                    </td>
-
-                    <td>
-                        ${escapeHtml(receive || "-")}
-                    </td>
-
-                    <td>
-                        ${escapeHtml(release || "-")}
-                    </td>
-
-                    <td>
-                        <span class="badge badge-success">
-                            SESUAI
-                        </span>
-                    </td>
-
-                    <td>
-                        ${escapeHtml(reason)}
-                    </td>
-
-                </tr>
-                `
-            );
-
-        }
-    );
-
-
-    renderPagination(
-        "valid",
-        pagination
-    );
-
-}
-
-
-/* =====================================================
-   UPDATED INVALID TABLE
-===================================================== */
-
-function renderInvalidTable() {
-
-    const tbody =
-        $("#invalidTableBody");
-
-    const empty =
-        $("#invalidEmpty");
-
-
-    if (!tbody) {
-
-        return;
-
-    }
-
-
-    const filtered =
-        filterRows(
-            getInvalidRows()
-        );
-
-
-    const pagination =
-        paginateRows(
-            filtered,
-            "invalid"
-        );
-
-
-    tbody.innerHTML =
-        "";
-
-
-    if (
-        !pagination.rows.length
-    ) {
-
-        show(
-            empty,
-            true
-        );
-
-
-        renderPagination(
-            "invalid",
-            pagination
-        );
-
-
-        return;
-
-    }
-
-
-    show(
-        empty,
-        false
-    );
-
-
-    pagination.rows.forEach(
-        function (row) {
-
-            const ticket =
-                getTicketNumber(row);
-
-
-            const original =
-                row?.originalRow ||
-                row?.source ||
-                row?.rowData ||
-                row?.data ||
-                {};
-
-
-            const receive =
-                getValue(
-                    row,
-                    [
-                        "receiveDateFormatted",
-                        "receiveDate",
-                        "datetimeReceive",
-                        "Datetime Receive",
-                        "datetime_receive"
-                    ]
-                ) ||
-
-                getValue(
-                    original,
-                    [
-                        "Datetime Receive",
-                        "datetimeReceive",
-                        "DatetimeReceive"
-                    ]
-                );
-
-
-            const release =
-                getValue(
-                    row,
-                    [
-                        "releaseDateTime",
-                        "release",
-                        "ttRelease",
-                        "TT Release",
-                        "releaseDateText"
-                    ]
-                );
-
-
-            const reason =
-                getValue(
-                    row,
-                    [
-                        "reason",
-                        "message",
-                        "keterangan",
-                        "note"
-                    ]
-                ) ||
-                "Tanggal Release tidak sesuai.";
-
-
-            tbody.insertAdjacentHTML(
-                "beforeend",
-                `
-                <tr>
-
-                    <td>
-                        ${escapeHtml(ticket)}
-                    </td>
-
-                    <td>
-                        ${escapeHtml(receive || "-")}
-                    </td>
-
-                    <td>
-                        ${escapeHtml(release || "-")}
-                    </td>
-
-                    <td>
-                        <span class="badge badge-danger">
-                            TIDAK SESUAI
-                        </span>
-                    </td>
-
-                    <td>
-                        ${escapeHtml(reason)}
-                    </td>
-
-                </tr>
-                `
-            );
-
-        }
-    );
-
-
-    renderPagination(
-        "invalid",
-        pagination
-    );
-
-}
-
-
-/* =====================================================
-   UPDATED MATERIAL TABLE
-===================================================== */
-
-function renderMaterialTable() {
-
-    const tbody =
-        $("#materialTableBody");
-
-    const empty =
-        $("#materialEmpty");
-
-
-    if (!tbody) {
-
-        return;
-
-    }
-
-
-    const filtered =
-        filterRows(
-            getMaterialRows()
-        );
-
-
-    const pagination =
-        paginateRows(
-            filtered,
-            "material"
-        );
-
-
-    tbody.innerHTML =
-        "";
-
-
-    if (
-        !pagination.rows.length
-    ) {
-
-        show(
-            empty,
-            true
-        );
-
-
-        renderPagination(
-            "material",
-            pagination
-        );
-
-
-        return;
-
-    }
-
-
-    show(
-        empty,
-        false
-    );
-
-
-    pagination.rows.forEach(
-        function (row) {
-
-            const ticket =
-                getTicketNumber(row);
-
-
-            const material =
-                getValue(
-                    row,
-                    [
-                        "material",
-                        "Material",
-                        "name",
-                        "Name",
-                        "materialName",
-                        "Material Name"
-                    ]
-                );
-
-
-            const qty =
-                getValue(
-                    row,
-                    [
-                        "quantity",
-                        "qty",
-                        "Qty",
-                        "Quantity",
-                        "jumlah",
-                        "Jumlah"
-                    ]
-                );
-
-
-            const unit =
-                getValue(
-                    row,
-                    [
-                        "unit",
-                        "satuan",
-                        "Unit",
-                        "Satuan"
-                    ]
-                );
-
-
-            const code =
-                getValue(
-                    row,
-                    [
-                        "code",
-                        "kode",
-                        "Kode",
-                        "materialCode",
-                        "Material Code"
-                    ]
-                );
-
-
-            tbody.insertAdjacentHTML(
-                "beforeend",
-                `
-                <tr>
-
-                    <td>
-                        ${escapeHtml(ticket)}
-                    </td>
-
-                    <td>
-                        ${escapeHtml(material || "-")}
-                    </td>
-
-                    <td>
-                        ${escapeHtml(qty || "-")}
-                    </td>
-
-                    <td>
-                        ${escapeHtml(unit || "-")}
-                    </td>
-
-                    <td>
-                        ${escapeHtml(code || "-")}
-                    </td>
-
-                </tr>
-                `
-            );
-
-        }
-    );
-
-
-    renderPagination(
-        "material",
-        pagination
-    );
-
-}
-
-
-/* =====================================================
-   UPDATED MATERIAL ERROR TABLE
-===================================================== */
-
-function renderMaterialErrorTable() {
-
-    const tbody =
-        $("#materialErrorTableBody");
-
-    const empty =
-        $("#materialErrorEmpty");
-
-
-    if (!tbody) {
-
-        return;
-
-    }
-
-
-    const filtered =
-        filterRows(
-            getMaterialErrorRows()
-        );
-
-
-    const pagination =
-        paginateRows(
-            filtered,
-            "material-error"
-        );
-
-
-    tbody.innerHTML =
-        "";
-
-
-    if (
-        !pagination.rows.length
-    ) {
-
-        show(
-            empty,
-            true
-        );
-
-
-        renderPagination(
-            "material-error",
-            pagination
-        );
-
-
-        return;
-
-    }
-
-
-    show(
-        empty,
-        false
-    );
-
-
-    pagination.rows.forEach(
-        function (row) {
-
-            const ticket =
-                getTicketNumber(row);
-
-
-            const material =
-                getValue(
-                    row,
-                    [
-                        "material",
-                        "Material",
-                        "raw",
-                        "originalMaterial",
-                        "name",
-                        "materialName"
-                    ]
-                );
-
-
-            const qty =
-                getValue(
-                    row,
-                    [
-                        "quantity",
-                        "qty",
-                        "Qty",
-                        "Quantity"
-                    ]
-                );
-
-
-            const unit =
-                getValue(
-                    row,
-                    [
-                        "unit",
-                        "satuan",
-                        "Unit",
-                        "Satuan"
-                    ]
-                );
-
-
-            const code =
-                getValue(
-                    row,
-                    [
-                        "code",
-                        "kode",
-                        "Kode",
-                        "materialCode"
-                    ]
-                );
-
-
-            const error =
-                getValue(
-                    row,
-                    [
-                        "error",
-                        "reason",
-                        "message",
-                        "keterangan",
-                        "note"
-                    ]
-                ) ||
-                "Material gagal diproses.";
-
-
-            tbody.insertAdjacentHTML(
-                "beforeend",
-                `
-                <tr>
-
-                    <td>
-                        ${escapeHtml(ticket)}
-                    </td>
-
-                    <td>
-                        ${escapeHtml(material || "-")}
-                    </td>
-
-                    <td>
-                        ${escapeHtml(qty || "-")}
-                    </td>
-
-                    <td>
-                        ${escapeHtml(unit || "-")}
-                    </td>
-
-                    <td>
-                        ${escapeHtml(code || "-")}
-                    </td>
-
-                    <td>
-                        ${escapeHtml(error)}
-                    </td>
-
-                </tr>
-                `
-            );
-
-        }
-    );
-
-
-    renderPagination(
-        "material-error",
-        pagination
-    );
-
-}
-
-
-/* =====================================================
-   UPDATED SEARCH
-===================================================== */
-
-function filterRows(rows) {
-
-    if (!Array.isArray(rows)) {
-
-        return [];
-
-    }
-
-
-    const query =
-        String(
-            state.search || ""
-        )
-        .trim()
-        .toLowerCase();
-
-
-    if (!query) {
-
-        return rows;
-
-    }
-
-
-    return rows.filter(
-        function (row) {
-
-            if (!row) {
-
-                return false;
-
-            }
-
-
-            /*
-             * Search Ticket.
-             */
-
-            const ticket =
-                getTicketNumber(row);
-
-
-            if (
-                String(ticket)
-                    .toLowerCase()
-                    .includes(query)
-            ) {
-
-                return true;
-
-            }
-
-
-            /*
-             * Search semua field.
-             */
-
-            return Object
-                .values(row)
-                .some(
-                    function (value) {
-
-                        /*
-                         * Kalau array/object,
-                         * ubah menjadi string aman.
-                         */
-
-                        let text;
-
-
-                        try {
-
-                            if (
-                                typeof value ===
-                                "object"
-                            ) {
-
-                                text =
-                                    JSON.stringify(
-                                        value
-                                    );
-
-                            } else {
-
-                                text =
-                                    String(
-                                        value ??
-                                        ""
-                                    );
-
-                            }
-
-                        } catch (error) {
-
-                            text =
-                                String(
-                                    value ??
-                                    ""
-                                );
-
-                        }
-
-
-                        return text
-                            .toLowerCase()
-                            .includes(query);
-
-                    }
-                );
-
-        }
-    );
-
-}
-
-
-/* =====================================================
-   UPDATED SEARCH SETUP
-===================================================== */
-
-function setupSearch() {
-
-    const inputs =
-        $$(
-            "#searchInput, #globalSearch, [data-search]"
-        );
-
-
-    inputs.forEach(
-        function (input) {
-
-            if (
-                input.dataset.bound
-            ) {
-
-                return;
-
-            }
-
-
-            input.dataset.bound =
-                "true";
-
-
-            input.addEventListener(
-                "input",
-                function () {
-
-                    state.search =
-                        String(
-                            input.value ||
-                            ""
-                        );
-
-
-                    /*
-                     * Search baru -> semua
-                     * kategori kembali ke
-                     * halaman 1.
-                     */
-
-                    resetPagination();
-
-
-                    /*
-                     * Render semua TAB
-                     * dengan hasil search.
-                     */
-
-                    renderValidTable();
-
-                    renderInvalidTable();
-
-                    renderMaterialTable();
-
-                    renderMaterialErrorTable();
-
-                }
-            );
-
-        }
-    );
-
-}
-
-
-/* =====================================================
-   UPDATED TAB SETUP
-===================================================== */
-
-function setupTabs() {
-
-    $$("[data-tab]")
-        .forEach(
-            function (button) {
-
-                if (
-                    button.dataset.bound
-                ) {
-
-                    return;
-
-                }
-
-
-                button.dataset.bound =
-                    "true";
-
-
-                button.addEventListener(
-                    "click",
-                    function (event) {
-
-                        event.preventDefault();
-
-
-                        const tab =
-                            button.getAttribute(
-                                "data-tab"
-                            );
-
-
-                        if (!tab) {
-
-                            return;
-
-                        }
-
-
-                        state.activeTab =
-                            tab;
-
-
-                        updateTabs();
-
-
-                        /*
-                         * Render ulang TAB yang
-                         * sedang dibuka saja.
-                         */
-
-                        renderSingleTab(
-                            tab
-                        );
-
-                    }
-                );
-
-            }
-        );
-
-}
-
-
-/* =====================================================
-   UPDATED UPDATE TABS
-===================================================== */
-
-function updateTabs() {
-
-    $$(".tab-button")
-        .forEach(
-            function (button) {
-
-                const active =
-                    button.getAttribute(
-                        "data-tab"
-                    ) ===
-                    state.activeTab;
-
-
-                button.classList.toggle(
-                    "active",
-                    active
-                );
-
-            }
-        );
-
-
-    $$(".tab-content")
-        .forEach(
-            function (content) {
-
-                const id =
-                    content.id || "";
-
-
-                const tabName =
-                    id.replace(
-                        "tab-",
-                        ""
-                    );
-
-
-                content.classList.toggle(
-                    "active",
-                    tabName ===
-                    state.activeTab
-                );
-
-            }
-        );
-
-}
-
-
-/* =====================================================
-   UPDATED RESET
-===================================================== */
-
-function setupReset() {
-
-    const button =
-        $("#resetBtn");
-
-
-    if (!button) {
-
-        return;
-
-    }
-
-
-    if (
-        button.dataset.resetBound
-    ) {
-
-        return;
-
-    }
-
-
-    button.dataset.resetBound =
-        "true";
-
-
-    button.addEventListener(
-        "click",
-        function () {
-
-            resetApplicationData();
-
-            clearSelectedFile();
-
-
-            show(
-                $("#dashboardSection"),
-                false
-            );
-
-
-            state.activeTab =
-                "valid";
-
-
-            state.search =
-                "";
-
-
-            resetPagination();
-
-
-            /*
-             * Bersihkan search input.
-             */
-
-            $$(
-                "#searchInput, #globalSearch, [data-search]"
-            )
-            .forEach(
-                function (input) {
-
-                    input.value =
-                        "";
-
-                }
-            );
-
-
-            updateTabs();
-
-
-            setSystemStatus(
-                "Ready",
-                "offline"
-            );
-
-        }
-    );
-
-}
-
-
-/* =====================================================
-   UPDATED RESET APPLICATION DATA
-===================================================== */
-
-function resetApplicationData() {
-
-    try {
-
-        if (
-
-            window.ReportCheckerExcel &&
-
-            typeof window.ReportCheckerExcel
-                .reset === "function"
-
-        ) {
-
-            window.ReportCheckerExcel.reset();
-
-        }
-
-    } catch (error) {
-
-        console.error(
-            "Excel reset error:",
-            error
-        );
-
-    }
-
-
-    resetPagination();
-
-
-    clearTables();
-
-
-    try {
-
-        updateDashboard();
-
-    } catch (error) {
-
-        console.error(
-            "Dashboard reset error:",
-            error
-        );
-
-    }
-
-}
-
-
-/* =====================================================
-   CLEAR TABLES
-===================================================== */
-
-function clearTables() {
-
-    const ids = [
-
-        "#validTableBody",
-
-        "#invalidTableBody",
-
-        "#materialTableBody",
-
-        "#materialErrorTableBody"
-
-    ];
-
-
-    ids.forEach(
-        function (selector) {
-
-            const element =
-                $(selector);
-
-
-            if (element) {
-
-                element.innerHTML =
-                    "";
-
-            }
-
-        }
-    );
-
-
-    /*
-     * Hapus pagination lama.
-     */
-
-    $$(".pagination-container")
-        .forEach(
-            function (element) {
-
-                element.remove();
-
-            }
-        );
-
-}
-
-
-/* =====================================================
-   UPDATED PROCESS EXCEL
-===================================================== */
-
-async function processExcel(file) {
-
-    const button =
-        $("#processBtn");
-
-
-    try {
+    function validateFile(file) {
 
         if (!file) {
 
@@ -4812,1058 +299,2850 @@ async function processExcel(file) {
 
         }
 
-
         if (!isExcelFile(file)) {
 
             throw new Error(
-                "File harus Excel (.xlsx, .xls, atau .xlsm)."
+                "Format file tidak didukung. " +
+                "Gunakan .xlsx, .xls, atau .xlsm."
             );
 
         }
 
+        return true;
 
-        if (!window.ReportCheckerExcel) {
-
-            throw new Error(
-                "excel.js belum berhasil dimuat."
-            );
-
-        }
+    }
 
 
-        if (
-            typeof window.ReportCheckerExcel.load !==
-            "function"
-        ) {
+    /* =====================================================
+       SELECT FILE
+    ===================================================== */
 
-            throw new Error(
-                "Fungsi load() belum tersedia di excel.js."
-            );
+    function selectFile(file) {
 
-        }
+        try {
 
+            validateFile(file);
 
-        if (button) {
+        } catch (error) {
 
-            button.disabled =
-                true;
+            showError(error.message);
+
+            return;
 
         }
 
+        AppState.selectedFile = file;
 
-        processing(
-            true,
-            "Membaca workbook Excel..."
-        );
+        resetResults();
 
+        updateSelectedFile();
 
         setSystemStatus(
-            "Processing",
-            "processing"
-        );
-
-
-        await yieldToBrowser();
-
-
-        const result =
-            await window.ReportCheckerExcel.load(
-                file
-            );
-
-
-        /*
-         * Setelah file baru diproses,
-         * semua pagination kembali
-         * ke halaman 1.
-         */
-
-        resetPagination();
-
-
-        state.page =
-            1;
-
-
-        state.search =
-            "";
-
-
-        /*
-         * Bersihkan search.
-         */
-
-        $$(
-            "#searchInput, #globalSearch, [data-search]"
-        )
-        .forEach(
-            function (input) {
-
-                input.value =
-                    "";
-
-            }
-        );
-
-
-        show(
-            $("#dashboardSection"),
-            true
-        );
-
-
-        updateDashboard();
-
-
-        setSystemStatus(
-            "Ready",
+            "File siap",
             "online"
         );
 
+    }
 
-        processing(
-            false
+
+    function updateSelectedFile() {
+
+        if (!DOM.selectedFile) {
+            return;
+        }
+
+        if (!AppState.selectedFile) {
+
+            DOM.selectedFile.classList.add(
+                "hidden"
+            );
+
+            if (DOM.fileName) {
+                DOM.fileName.textContent = "-";
+            }
+
+            if (DOM.fileSize) {
+                DOM.fileSize.textContent = "-";
+            }
+
+            if (DOM.processBtn) {
+                DOM.processBtn.disabled = true;
+            }
+
+            return;
+
+        }
+
+        DOM.selectedFile.classList.remove(
+            "hidden"
         );
 
+        if (DOM.fileName) {
 
-        setText(
-            "#resultSummary",
-            buildSummaryText(result)
+            DOM.fileName.textContent =
+                AppState.selectedFile.name;
+
+        }
+
+        if (DOM.fileSize) {
+
+            DOM.fileSize.textContent =
+                formatFileSize(
+                    AppState.selectedFile.size
+                );
+
+        }
+
+        if (DOM.processBtn) {
+
+            DOM.processBtn.disabled = false;
+
+        }
+
+    }
+
+
+    /* =====================================================
+       REMOVE FILE
+    ===================================================== */
+
+    function removeFile() {
+
+        if (AppState.processing) {
+            return;
+        }
+
+        AppState.selectedFile = null;
+
+        resetResults();
+
+        if (DOM.excelFile) {
+
+            DOM.excelFile.value = "";
+
+        }
+
+        updateSelectedFile();
+
+        hideDashboard();
+
+        setSystemStatus(
+            "Ready",
+            "offline"
         );
 
+    }
 
-    } catch (error) {
+
+    /* =====================================================
+       DRAG & DROP
+    ===================================================== */
+
+    function preventDefaults(event) {
+
+        event.preventDefault();
+
+        event.stopPropagation();
+
+    }
+
+
+    function handleDragEnter(event) {
+
+        preventDefaults(event);
+
+        if (!DOM.dropZone) {
+            return;
+        }
+
+        DOM.dropZone.classList.add(
+            "dragover"
+        );
+
+    }
+
+
+    function handleDragLeave(event) {
+
+        preventDefaults(event);
+
+        if (!DOM.dropZone) {
+            return;
+        }
+
+        DOM.dropZone.classList.remove(
+            "dragover"
+        );
+
+    }
+
+
+    function handleDrop(event) {
+
+        preventDefaults(event);
+
+        if (!DOM.dropZone) {
+            return;
+        }
+
+        DOM.dropZone.classList.remove(
+            "dragover"
+        );
+
+        if (
+            !event.dataTransfer ||
+            !event.dataTransfer.files ||
+            !event.dataTransfer.files.length
+        ) {
+            return;
+        }
+
+        const file =
+            event.dataTransfer.files[0];
+
+        selectFile(file);
+
+    }
+
+
+    /* =====================================================
+       FILE INPUT
+    ===================================================== */
+
+    function handleFileInput(event) {
+
+        const files =
+            event.target &&
+            event.target.files;
+
+        if (!files || !files.length) {
+            return;
+        }
+
+        selectFile(files[0]);
+
+    }
+
+
+    function openFilePicker() {
+
+        if (AppState.processing) {
+            return;
+        }
+
+        if (!DOM.excelFile) {
+            return;
+        }
+
+        DOM.excelFile.click();
+
+    }
+
+
+    /* =====================================================
+       KEYBOARD SUPPORT
+    ===================================================== */
+
+    function handleDropZoneKeydown(event) {
+
+        if (!DOM.dropZone) {
+            return;
+        }
+
+        if (
+            event.key === "Enter" ||
+            event.key === " "
+        ) {
+
+            event.preventDefault();
+
+            openFilePicker();
+
+        }
+
+    }
+
+
+    /* =====================================================
+       DASHBOARD
+    ===================================================== */
+
+    function showDashboard() {
+
+        if (!DOM.dashboardSection) {
+            return;
+        }
+
+        DOM.dashboardSection.classList.remove(
+            "hidden"
+        );
+
+    }
+
+
+    function hideDashboard() {
+
+        if (!DOM.dashboardSection) {
+            return;
+        }
+
+        DOM.dashboardSection.classList.add(
+            "hidden"
+        );
+
+    }
+
+
+    /* =====================================================
+       ERROR HANDLER
+    ===================================================== */
+
+    function showError(message) {
+
+        const text =
+            message ||
+            "Terjadi kesalahan.";
 
         console.error(
-            "Report Checker Error:",
-            error
+            "ReportChecker:",
+            text
         );
-
-
-        processing(
-            false
-        );
-
 
         setSystemStatus(
             "Error",
             "offline"
         );
 
+        if (DOM.processingStatus) {
 
-        alert(
-            error?.message ||
-            "Gagal memproses file Excel."
-        );
+            DOM.processingStatus.classList.remove(
+                "hidden"
+            );
 
-    } finally {
+        }
 
-        if (button) {
+        if (DOM.processingText) {
 
-            button.disabled =
-                false;
+            DOM.processingText.textContent =
+                text;
 
         }
 
     }
 
-}
 
+    /* =====================================================
+       LOAD EXCEL
+       -----------------------------------------------------
+       Bagian ini hanya membaca workbook.
+       Parsing detail dilanjutkan pada TAHAP 2.
+    ===================================================== */
 
-/* =====================================================
-   UPDATE DASHBOARD
-===================================================== */
+    async function readExcelFile(file) {
 
-function updateDashboard() {
+        if (typeof XLSX === "undefined") {
 
-    let data;
-
-
-    try {
-
-        data =
-            getData();
-
-    } catch (error) {
-
-        console.error(
-            "Dashboard data error:",
-            error
-        );
-
-        return;
-
-    }
-
-
-    const summary =
-        data.summary ||
-        {};
-
-
-    const total =
-        summary.total ??
-        data.validationResults?.length ??
-        data.rows?.length ??
-        0;
-
-
-    const sesuai =
-        summary.sesuai ??
-        data.sesuai?.length ??
-        data.valid?.length ??
-        0;
-
-
-    const tidakSesuai =
-        summary.tidakSesuai ??
-        data.tidakSesuai?.length ??
-        data.invalid?.length ??
-        0;
-
-
-    const material =
-        summary.material ??
-        data.materials?.length ??
-        data.material?.length ??
-        0;
-
-
-    const materialError =
-        summary.materialError ??
-        data.materialError?.length ??
-        data.materialNotFound?.length ??
-        0;
-
-
-    setText(
-        "#totalCount",
-        number(total)
-    );
-
-
-    setText(
-        "#validCount",
-        number(sesuai)
-    );
-
-
-    setText(
-        "#invalidCount",
-        number(tidakSesuai)
-    );
-
-
-    setText(
-        "#materialCount",
-        number(material)
-    );
-
-
-    setText(
-        "#materialErrorCount",
-        number(materialError)
-    );
-
-
-    setText(
-        "#validTabCount",
-        number(sesuai)
-    );
-
-
-    setText(
-        "#invalidTabCount",
-        number(tidakSesuai)
-    );
-
-
-    setText(
-        "#materialTabCount",
-        number(material)
-    );
-
-
-    setText(
-        "#materialErrorTabCount",
-        number(materialError)
-    );
-
-
-    /*
-     * Setiap kategori dirender sendiri.
-     *
-     * Contoh:
-     *
-     * Sesuai 176
-     * -> 18 halaman
-     *
-     * Tidak Sesuai 16
-     * -> 2 halaman
-     *
-     * Material 21
-     * -> 3 halaman
-     *
-     * Material Error 172
-     * -> 18 halaman
-     */
-
-    renderValidTable();
-
-    renderInvalidTable();
-
-    renderMaterialTable();
-
-    renderMaterialErrorTable();
-
-
-    updateDownloadButtons();
-
-}
-
-
-/* =====================================================
-   DOWNLOAD
-===================================================== */
-
-function setupDownloads() {
-
-    bindDownload(
-        "#downloadValidBtn",
-        "valid"
-    );
-
-
-    bindDownload(
-        "#downloadInvalidBtn",
-        "invalid"
-    );
-
-
-    bindDownload(
-        "#downloadMaterialBtn",
-        "material"
-    );
-
-
-    bindDownload(
-        "#downloadMaterialErrorBtn",
-        "material-error"
-    );
-
-}
-
-
-/* =====================================================
-   BIND DOWNLOAD
-===================================================== */
-
-function bindDownload(
-    selector,
-    type
-) {
-
-    const button =
-        $(selector);
-
-
-    if (!button) {
-
-        return;
-
-    }
-
-
-    if (
-        button.dataset.downloadBound
-    ) {
-
-        return;
-
-    }
-
-
-    button.dataset.downloadBound =
-        "true";
-
-
-    button.addEventListener(
-        "click",
-        function () {
-
-            downloadResult(type);
+            throw new Error(
+                "Library SheetJS belum tersedia. " +
+                "Pastikan xlsx.full.min.js berhasil dimuat."
+            );
 
         }
-    );
 
-}
+        validateFile(file);
 
+        const arrayBuffer =
+            await file.arrayBuffer();
 
-/* =====================================================
-   DOWNLOAD RESULT
-===================================================== */
+        if (!arrayBuffer || !arrayBuffer.byteLength) {
 
-function downloadResult(type) {
+            throw new Error(
+                "File Excel kosong atau tidak dapat dibaca."
+            );
 
-    if (
-        !window.ReportCheckerExcel
-    ) {
+        }
 
-        alert(
-            "excel.js belum tersedia."
-        );
+        const workbook =
+            XLSX.read(
+                arrayBuffer,
+                {
+                    type: "array",
+                    cellDates: true,
+                    cellNF: true,
+                    cellText: true
+                }
+            );
 
-        return;
+        if (
+            !workbook ||
+            !workbook.SheetNames ||
+            !workbook.SheetNames.length
+        ) {
+
+            throw new Error(
+                "Workbook Excel tidak memiliki sheet."
+            );
+
+        }
+
+        AppState.workbook = workbook;
+
+        return workbook;
 
     }
 
 
-    const excel =
-        window.ReportCheckerExcel;
+    /* =====================================================
+       CONVERT SHEET TO JSON
+    ===================================================== */
+
+    function sheetToRows(sheet) {
+
+        if (!sheet) {
+            return [];
+        }
+
+        return XLSX.utils.sheet_to_json(
+            sheet,
+            {
+                header: 1,
+                defval: "",
+                raw: false,
+                blankrows: false
+            }
+        );
+
+    }
 
 
-    try {
+    /* =====================================================
+       BASIC EXCEL PROCESS
+       -----------------------------------------------------
+       Untuk sementara membaca sheet pertama.
+       Parser/validator/export akan dilanjutkan di tahap 2.
+    ===================================================== */
+
+    async function processExcel() {
+
+        if (AppState.processing) {
+            return;
+        }
+
+        if (!AppState.selectedFile) {
+
+            showError(
+                "Silakan pilih file Excel terlebih dahulu."
+            );
+
+            return;
+
+        }
+
+        setProcessing(
+            true,
+            "Membaca data Excel..."
+        );
+
+        setSystemStatus(
+            "Processing",
+            "online"
+        );
+
+        hideDashboard();
+
+        try {
+
+            const workbook =
+                await readExcelFile(
+                    AppState.selectedFile
+                );
+
+            setProcessing(
+                true,
+                "Membaca sheet Excel..."
+            );
+
+            const firstSheetName =
+                workbook.SheetNames[0];
+
+            const firstSheet =
+                workbook.Sheets[firstSheetName];
+
+            const rows =
+                sheetToRows(firstSheet);
+
+            AppState.rawRows = rows;
+
+            if (!rows.length) {
+
+                throw new Error(
+                    "Sheet Excel tidak memiliki data."
+                );
+
+            }
+
+            console.log(
+                "ReportChecker Excel loaded:",
+                {
+                    file:
+                        AppState.selectedFile.name,
+
+                    sheet:
+                        firstSheetName,
+
+                    rows:
+                        rows.length,
+
+                    sheets:
+                        workbook.SheetNames
+                }
+            );
+
+            setProcessing(
+                false
+            );
+
+            AppState.processed = true;
+
+            setSystemStatus(
+                "Excel terbaca",
+                "online"
+            );
+
+            /*
+             * TAHAP 2 akan melanjutkan:
+             *
+             * - parsing Ticket
+             * - parsing TT Release
+             * - validasi tanggal
+             * - parsing Material
+             * - Material Error
+             * - render tabel
+             * - pagination
+             * - download Excel
+             */
+
+            showDashboard();
+
+            updateBasicDashboard();
+
+        } catch (error) {
+
+            console.error(
+                "Gagal memproses Excel:",
+                error
+            );
+
+            setProcessing(
+                false
+            );
+
+            showError(
+                error &&
+                error.message
+                    ? error.message
+                    : "Gagal membaca file Excel."
+            );
+
+        }
+
+    }
+
+
+    /* =====================================================
+       BASIC DASHBOARD UPDATE
+    ===================================================== */
+
+    function updateBasicDashboard() {
+
+        const totalCount =
+            document.getElementById(
+                "totalCount"
+            );
+
+        const validCount =
+            document.getElementById(
+                "validCount"
+            );
+
+        const invalidCount =
+            document.getElementById(
+                "invalidCount"
+            );
+
+        const materialCount =
+            document.getElementById(
+                "materialCount"
+            );
+
+        const materialErrorCount =
+            document.getElementById(
+                "materialErrorCount"
+            );
+
+        const validTabCount =
+            document.getElementById(
+                "validTabCount"
+            );
+
+        const invalidTabCount =
+            document.getElementById(
+                "invalidTabCount"
+            );
+
+        const materialTabCount =
+            document.getElementById(
+                "materialTabCount"
+            );
+
+        const materialErrorTabCount =
+            document.getElementById(
+                "materialErrorTabCount"
+            );
 
         /*
-         * PENTING:
+         * Jangan menganggap semua row sebagai
+         * hasil validasi final.
          *
-         * Pagination HANYA untuk tampilan.
-         *
-         * Download TIDAK mengambil
-         * 10 data yang sedang tampil.
-         *
-         * Download tetap mengambil
-         * SEMUA data kategori.
+         * Tahap 2 akan mengganti angka ini
+         * berdasarkan hasil parser.
          */
 
-
-        if (
-            typeof excel.exportResult ===
-            "function"
-        ) {
-
-            excel.exportResult(
-                type
+        const total =
+            Math.max(
+                0,
+                AppState.rawRows.length - 1
             );
 
+        if (totalCount) {
+            totalCount.textContent = total;
+        }
+
+        if (validCount) {
+            validCount.textContent =
+                AppState.results.valid.length;
+        }
+
+        if (invalidCount) {
+            invalidCount.textContent =
+                AppState.results.invalid.length;
+        }
+
+        if (materialCount) {
+            materialCount.textContent =
+                AppState.results.material.length;
+        }
+
+        if (materialErrorCount) {
+            materialErrorCount.textContent =
+                AppState.results.materialError.length;
+        }
+
+        if (validTabCount) {
+            validTabCount.textContent =
+                AppState.results.valid.length;
+        }
+
+        if (invalidTabCount) {
+            invalidTabCount.textContent =
+                AppState.results.invalid.length;
+        }
+
+        if (materialTabCount) {
+            materialTabCount.textContent =
+                AppState.results.material.length;
+        }
+
+        if (materialErrorTabCount) {
+            materialErrorTabCount.textContent =
+                AppState.results.materialError.length;
+        }
+
+    }
+
+
+    /* =====================================================
+       RESET APPLICATION
+    ===================================================== */
+
+    function resetApplication() {
+
+        if (AppState.processing) {
             return;
+        }
+
+        AppState.selectedFile = null;
+
+        resetResults();
+
+        if (DOM.excelFile) {
+
+            DOM.excelFile.value = "";
 
         }
 
+        updateSelectedFile();
 
-        if (
-            typeof excel.exportExcel ===
-            "function"
-        ) {
+        hideDashboard();
 
-            excel.exportExcel(
-                type
-            );
+        setProcessing(
+            false
+        );
 
-            return;
+        setSystemStatus(
+            "Ready",
+            "offline"
+        );
+
+        if (DOM.processingText) {
+
+            DOM.processingText.textContent =
+                "Membaca data Excel...";
 
         }
 
+        window.scrollTo({
+            top: 0,
+            behavior: "smooth"
+        });
 
-        fallbackExport(
-            type
+    }
+
+
+    /* =====================================================
+       SETTINGS TOGGLE
+    ===================================================== */
+
+    function toggleSettings() {
+
+        if (!DOM.settingsPanel) {
+            return;
+        }
+
+        const isHidden =
+            DOM.settingsPanel.classList.contains(
+                "hidden"
+            );
+
+        DOM.settingsPanel.classList.toggle(
+            "hidden",
+            !isHidden
         );
 
-    } catch (error) {
+        if (DOM.toggleSettingsBtn) {
 
-        console.error(
-            error
-        );
+            DOM.toggleSettingsBtn.textContent =
+                isHidden
+                    ? "Tutup Pengaturan"
+                    : "Buka Pengaturan";
 
-
-        alert(
-            error?.message ||
-            "Gagal membuat file Excel."
-        );
-
-    }
-
-}
-
-
-/* =====================================================
-   FALLBACK EXPORT
-===================================================== */
-
-function fallbackExport(type) {
-
-    if (
-        typeof XLSX ===
-        "undefined"
-    ) {
-
-        throw new Error(
-            "Library XLSX belum dimuat."
-        );
+        }
 
     }
 
 
-    let rows = [];
+    /* =====================================================
+       SETTINGS
+       -----------------------------------------------------
+       Jika settings.js menyediakan fungsi sendiri,
+       bagian ini tidak mengambil alih.
+    ===================================================== */
 
-    let filename =
-        "Report_Checker.xlsx";
+    function saveSettings() {
 
+        if (
+            typeof window.ReportCheckerSettings !==
+            "undefined"
+        ) {
 
-    if (
-        type === "valid"
-    ) {
+            if (
+                typeof window.ReportCheckerSettings.save ===
+                "function"
+            ) {
 
-        rows =
-            getValidRows();
+                try {
 
-        filename =
-            "Sesuai.xlsx";
+                    window.ReportCheckerSettings.save();
 
-    }
+                    showSettingsSaved();
 
+                    return;
 
-    else if (
-        type === "invalid"
-    ) {
+                } catch (error) {
 
-        rows =
-            getInvalidRows();
-
-        filename =
-            "Tidak_Sesuai.xlsx";
-
-    }
-
-
-    else if (
-        type === "material"
-    ) {
-
-        rows =
-            getMaterialRows();
-
-        filename =
-            "Material.xlsx";
-
-    }
-
-
-    else if (
-        type === "material-error"
-    ) {
-
-        rows =
-            getMaterialErrorRows();
-
-        filename =
-            "Material_Error.xlsx";
-
-    }
-
-
-    /*
-     * Pastikan DOWNLOAD tidak terkena pagination.
-     *
-     * Kita sengaja menggunakan rows asli,
-     * bukan paginateRows().
-     */
-
-    const cleanRows =
-        rows.map(
-            function (row) {
-
-                const output =
-                    {};
-
-
-                /*
-                 * MATERIAL
-                 */
-
-                if (
-                    type === "material" ||
-                    type === "material-error"
-                ) {
-
-                    output["Ticket"] =
-                        getTicketNumber(
-                            row
-                        );
-
-
-                    output["Material"] =
-                        getValue(
-                            row,
-                            [
-                                "material",
-                                "Material",
-                                "name",
-                                "Name",
-                                "materialName"
-                            ]
-                        );
-
-
-                    output["Qty"] =
-                        getValue(
-                            row,
-                            [
-                                "qty",
-                                "Qty",
-                                "quantity",
-                                "Quantity"
-                            ]
-                        );
-
-
-                    output["Satuan"] =
-                        getValue(
-                            row,
-                            [
-                                "satuan",
-                                "Satuan",
-                                "unit",
-                                "Unit"
-                            ]
-                        );
-
-
-                    output["Kode"] =
-                        getValue(
-                            row,
-                            [
-                                "kode",
-                                "Kode",
-                                "code",
-                                "Code",
-                                "materialCode"
-                            ]
-                        );
-
-
-                    if (
-                        type ===
-                        "material-error"
-                    ) {
-
-                        output["Error"] =
-                            getValue(
-                                row,
-                                [
-                                    "error",
-                                    "reason",
-                                    "message",
-                                    "keterangan",
-                                    "note"
-                                ]
-                            ) ||
-                            "Material gagal diproses.";
-
-                    }
-
-
-                    return output;
+                    console.error(
+                        "Settings save error:",
+                        error
+                    );
 
                 }
 
+            }
 
-                /*
-                 * VALID / INVALID
-                 */
+        }
 
-                Object.keys(
-                    row || {}
+        /*
+         * Fallback sederhana.
+         */
+
+        const settings = {
+
+            materialStartPhrases:
+                getInputValue(
+                    "materialStartPhrases"
+                ),
+
+            materialEndPhrases:
+                getInputValue(
+                    "materialEndPhrases"
+                ),
+
+            releasePhrases:
+                getInputValue(
+                    "releasePhrases"
+                ),
+
+            notFoundPhrases:
+                getInputValue(
+                    "notFoundPhrases"
+                ),
+
+            validationType:
+                getInputValue(
+                    "validationType"
+                ),
+
+            maxReleaseMinutes:
+                getInputValue(
+                    "maxReleaseMinutes"
                 )
-                .forEach(
-                    function (key) {
-
-                        if (
-                            key ===
-                            "originalRow" ||
-
-                            key ===
-                            "source" ||
-
-                            key ===
-                            "rowData" ||
-
-                            key ===
-                            "data"
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        output[key] =
-                            row[key];
-
-                    }
-                );
-
-
-                /*
-                 * Pastikan Ticket tetap ada.
-                 */
-
-                output["Ticket"] =
-                    getTicketNumber(
-                        row
-                    );
-
-
-                return output;
-
-            }
-        );
-
-
-    const worksheet =
-        XLSX.utils.json_to_sheet(
-            cleanRows
-        );
-
-
-    const workbook =
-        XLSX.utils.book_new();
-
-
-    XLSX.utils.book_append_sheet(
-        workbook,
-        worksheet,
-        "Data"
-    );
-
-
-    /*
-     * Download SEMUA data.
-     */
-
-    XLSX.writeFile(
-        workbook,
-        filename
-    );
-
-}
-
-
-/* =====================================================
-   DOWNLOAD BUTTON STATE
-===================================================== */
-
-function updateDownloadButtons() {
-
-    setButtonState(
-        "#downloadValidBtn",
-        getValidRows().length > 0
-    );
-
-
-    setButtonState(
-        "#downloadInvalidBtn",
-        getInvalidRows().length > 0
-    );
-
-
-    setButtonState(
-        "#downloadMaterialBtn",
-        getMaterialRows().length > 0
-    );
-
-
-    setButtonState(
-        "#downloadMaterialErrorBtn",
-        getMaterialErrorRows().length > 0
-    );
-
-}
-
-
-/* =====================================================
-   BUTTON STATE
-===================================================== */
-
-function setButtonState(
-    selector,
-    enabled
-) {
-
-    const button =
-        $(selector);
-
-
-    if (!button) {
-
-        return;
-
-    }
-
-
-    button.disabled =
-        !enabled;
-
-}
-
-
-/* =====================================================
-   EXTRA CSS PAGINATION
-   Dibuat lewat JS supaya tidak wajib
-   mengubah style.css terlebih dahulu.
-===================================================== */
-
-function injectPaginationStyle() {
-
-    if (
-        document.getElementById(
-            "reportCheckerPaginationStyle"
-        )
-    ) {
-
-        return;
-
-    }
-
-
-    const style =
-        document.createElement(
-            "style"
-        );
-
-
-    style.id =
-        "reportCheckerPaginationStyle";
-
-
-    style.textContent = `
-
-        .pagination-container {
-
-            display: flex;
-
-            justify-content: space-between;
-
-            align-items: center;
-
-            gap: 16px;
-
-            padding: 16px 4px;
-
-            margin-top: 12px;
-
-            border-top: 1px solid #e5e7eb;
-
-            flex-wrap: wrap;
-
-        }
-
-
-        .pagination-info {
-
-            color: #6b7280;
-
-            font-size: 13px;
-
-        }
-
-
-        .pagination-info strong {
-
-            color: #111827;
-
-        }
-
-
-        .pagination-controls {
-
-            display: flex;
-
-            align-items: center;
-
-            gap: 5px;
-
-        }
-
-
-        .pagination-btn {
-
-            min-width: 34px;
-
-            height: 34px;
-
-            padding: 0 9px;
-
-            border: 1px solid #d1d5db;
-
-            border-radius: 7px;
-
-            background: #ffffff;
-
-            color: #374151;
-
-            cursor: pointer;
-
-            font-size: 13px;
-
-            transition:
-                background .15s ease,
-                color .15s ease,
-                border-color .15s ease;
-
-        }
-
-
-        .pagination-btn:hover:not(:disabled) {
-
-            background: #f3f4f6;
-
-            border-color: #9ca3af;
-
-        }
-
-
-        .pagination-btn.active {
-
-            background: #2563eb;
-
-            color: #ffffff;
-
-            border-color: #2563eb;
-
-        }
-
-
-        .pagination-btn:disabled {
-
-            opacity: .45;
-
-            cursor: not-allowed;
-
-        }
-
-
-        .pagination-dots {
-
-            min-width: 24px;
-
-            text-align: center;
-
-            color: #9ca3af;
-
-        }
-
-
-        @media (max-width: 640px) {
-
-            .pagination-container {
-
-                align-items: flex-start;
-
-                flex-direction: column;
-
-            }
-
-
-            .pagination-controls {
-
-                width: 100%;
-
-                overflow-x: auto;
-
-                padding-bottom: 3px;
-
-            }
-
-        }
-
-    `;
-
-
-    document.head.appendChild(
-        style
-    );
-
-}
-
-
-/* =====================================================
-   INIT PAGINATION
-===================================================== */
-
-function initPagination() {
-
-    injectPaginationStyle();
-
-    setupPaginationEvents();
-
-}
-
-
-/* =====================================================
-   START PAGINATION
-===================================================== */
-
-try {
-
-    initPagination();
-
-} catch (error) {
-
-    console.error(
-        "Pagination initialization error:",
-        error
-    );
-
-}
-
-
-/* =====================================================
-   PUBLIC API TAMBAHAN
-===================================================== */
-
-if (
-    window.ReportCheckerApp
-) {
-
-    window.ReportCheckerApp
-        .pagination = {
-
-            getState:
-                function () {
-
-                    return {
-                        ...paginationState
-                    };
-
-                },
-
-            setPage:
-                function (
-                    type,
-                    page
-                ) {
-
-                    setCurrentPage(
-                        type,
-                        page
-                    );
-
-
-                    renderSingleTab(
-                        type
-                    );
-
-                },
-
-            reset:
-                resetPagination
 
         };
 
-}
+        try {
+
+            localStorage.setItem(
+                "reportCheckerSettings",
+                JSON.stringify(settings)
+            );
+
+            showSettingsSaved();
+
+        } catch (error) {
+
+            console.error(
+                "Tidak dapat menyimpan settings:",
+                error
+            );
+
+        }
+
+    }
 
 
-/* =====================================================
-   END TAHAP 2
-===================================================== */
+    function getInputValue(id) {
+
+        const element =
+            document.getElementById(id);
+
+        return element
+            ? element.value
+            : "";
+
+    }
+
+
+    function showSettingsSaved() {
+
+        if (!DOM.settingsSavedMessage) {
+            return;
+        }
+
+        DOM.settingsSavedMessage.classList.remove(
+            "hidden"
+        );
+
+        window.clearTimeout(
+            showSettingsSaved.timer
+        );
+
+        showSettingsSaved.timer =
+            window.setTimeout(
+                function () {
+
+                    DOM.settingsSavedMessage.classList.add(
+                        "hidden"
+                    );
+
+                },
+                2500
+            );
+
+    }
+
+
+    function resetSettings() {
+
+        if (
+            typeof window.ReportCheckerSettings !==
+            "undefined"
+        ) {
+
+            if (
+                typeof window.ReportCheckerSettings.reset ===
+                "function"
+            ) {
+
+                try {
+
+                    window.ReportCheckerSettings.reset();
+
+                    return;
+
+                } catch (error) {
+
+                    console.error(
+                        "Settings reset error:",
+                        error
+                    );
+
+                }
+
+            }
+
+        }
+
+        try {
+
+            localStorage.removeItem(
+                "reportCheckerSettings"
+            );
+
+        } catch (error) {
+
+            console.error(
+                "Settings reset error:",
+                error
+            );
+
+        }
+
+        window.location.reload();
+
+    }
+
+
+    /* =====================================================
+       EVENT BINDING
+    ===================================================== */
+
+    function bindEvents() {
+
+        /*
+         * Drop Zone
+         */
+
+        if (DOM.dropZone) {
+
+            DOM.dropZone.addEventListener(
+                "click",
+                openFilePicker
+            );
+
+            DOM.dropZone.addEventListener(
+                "keydown",
+                handleDropZoneKeydown
+            );
+
+            DOM.dropZone.addEventListener(
+                "dragenter",
+                handleDragEnter
+            );
+
+            DOM.dropZone.addEventListener(
+                "dragover",
+                handleDragEnter
+            );
+
+            DOM.dropZone.addEventListener(
+                "dragleave",
+                handleDragLeave
+            );
+
+            DOM.dropZone.addEventListener(
+                "drop",
+                handleDrop
+            );
+
+        }
+
+
+        /*
+         * File Input
+         */
+
+        if (DOM.excelFile) {
+
+            DOM.excelFile.addEventListener(
+                "change",
+                handleFileInput
+            );
+
+        }
+
+
+        /*
+         * Remove File
+         */
+
+        if (DOM.removeFileBtn) {
+
+            DOM.removeFileBtn.addEventListener(
+                "click",
+                removeFile
+            );
+
+        }
+
+
+        /*
+         * Process Excel
+         */
+
+        if (DOM.processBtn) {
+
+            DOM.processBtn.addEventListener(
+                "click",
+                processExcel
+            );
+
+        }
+
+
+        /*
+         * Reset
+         */
+
+        if (DOM.resetBtn) {
+
+            DOM.resetBtn.addEventListener(
+                "click",
+                resetApplication
+            );
+
+        }
+
+
+        /*
+         * Settings
+         */
+
+        if (DOM.toggleSettingsBtn) {
+
+            DOM.toggleSettingsBtn.addEventListener(
+                "click",
+                toggleSettings
+            );
+
+        }
+
+        if (DOM.saveSettingsBtn) {
+
+            DOM.saveSettingsBtn.addEventListener(
+                "click",
+                saveSettings
+            );
+
+        }
+
+        if (DOM.resetSettingsBtn) {
+
+            DOM.resetSettingsBtn.addEventListener(
+                "click",
+                resetSettings
+            );
+
+        }
+
+    }
+
+
+    /* =====================================================
+       INITIALIZATION
+    ===================================================== */
+
+    function init() {
+
+        cacheDom();
+
+        bindEvents();
+
+        setProcessing(
+            false
+        );
+
+        updateSelectedFile();
+
+        setSystemStatus(
+            "Ready",
+            "offline"
+        );
+
+        console.log(
+            "ReportChecker App tahap 1 loaded."
+        );
+
+    }
+
+
+    /* =====================================================
+       PUBLIC API
+       -----------------------------------------------------
+       Dipasang ke window supaya tahap 2 bisa
+       melanjutkan fungsi tanpa membuat listener
+       upload baru.
+    ===================================================== */
+
+    window.ReportCheckerApp = {
+
+        state: AppState,
+
+        dom: DOM,
+
+        selectFile: selectFile,
+
+        removeFile: removeFile,
+
+        processExcel: processExcel,
+
+        reset: resetApplication,
+
+        readExcelFile: readExcelFile,
+
+        updateDashboard: updateBasicDashboard
+
+    };
+
+
+    /* =====================================================
+       START
+    ===================================================== */
+
+    if (
+        document.readyState === "loading"
+    ) {
+
+        document.addEventListener(
+            "DOMContentLoaded",
+            init
+        );
+
+    } else {
+
+        init();
+
+    }
+
+
+})();
+
+
+/* =========================================================
+   REPORT CHECKER
+   app.js - TAHAP 2
+   Dashboard, Pagination, Tabs, Export & Reset
+========================================================= */
+
+(function () {
+    "use strict";
+
+    /* =====================================================
+       STATE
+    ====================================================== */
+
+    const state = {
+        currentTab: "valid",
+
+        pageSize: 50,
+
+        pages: {
+            valid: 1,
+            invalid: 1,
+            material: 1,
+            materialError: 1
+        },
+
+        data: {
+            valid: [],
+            invalid: [],
+            material: [],
+            materialError: []
+        },
+
+        originalRows: [],
+        processed: false
+    };
+
+
+    /* =====================================================
+       DOM HELPER
+    ====================================================== */
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+
+    function safeArray(value) {
+        return Array.isArray(value) ? value : [];
+    }
+
+
+    function escapeHtml(value) {
+        if (value === null || value === undefined) {
+            return "";
+        }
+
+        return String(value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+
+    function formatValue(value) {
+        if (value === null || value === undefined) {
+            return "-";
+        }
+
+        if (value instanceof Date) {
+            return value.toLocaleString("id-ID");
+        }
+
+        return String(value);
+    }
+
+
+    /* =====================================================
+       STATUS
+    ====================================================== */
+
+    function setSystemStatus(text, type) {
+        const el = $("systemStatus");
+
+        if (!el) {
+            return;
+        }
+
+        el.textContent = text;
+
+        el.classList.remove(
+            "offline",
+            "online",
+            "error",
+            "processing"
+        );
+
+        if (type) {
+            el.classList.add(type);
+        }
+    }
+
+
+    function setProcessing(show, text) {
+        const status = $("processingStatus");
+        const processingText = $("processingText");
+
+        if (!status) {
+            return;
+        }
+
+        if (show) {
+            status.classList.remove("hidden");
+
+            if (processingText && text) {
+                processingText.textContent = text;
+            }
+        } else {
+            status.classList.add("hidden");
+        }
+    }
+
+
+    /* =====================================================
+       FILE INFORMATION
+    ====================================================== */
+
+    function showSelectedFile(file) {
+        const selectedFile = $("selectedFile");
+        const fileName = $("fileName");
+        const fileSize = $("fileSize");
+
+        if (!selectedFile || !fileName || !fileSize) {
+            return;
+        }
+
+        fileName.textContent = file.name;
+
+        fileSize.textContent = formatFileSize(file.size);
+
+        selectedFile.classList.remove("hidden");
+    }
+
+
+    function hideSelectedFile() {
+        const selectedFile = $("selectedFile");
+        const fileName = $("fileName");
+        const fileSize = $("fileSize");
+
+        if (selectedFile) {
+            selectedFile.classList.add("hidden");
+        }
+
+        if (fileName) {
+            fileName.textContent = "-";
+        }
+
+        if (fileSize) {
+            fileSize.textContent = "-";
+        }
+    }
+
+
+    function formatFileSize(bytes) {
+        if (!Number.isFinite(bytes) || bytes <= 0) {
+            return "0 KB";
+        }
+
+        if (bytes < 1024 * 1024) {
+            return `${Math.round(bytes / 1024)} KB`;
+        }
+
+        return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    }
+
+
+    /* =====================================================
+       TABLE PAGINATION
+    ====================================================== */
+
+    function getPageItems(items, page) {
+        const list = safeArray(items);
+
+        const start =
+            (page - 1) * state.pageSize;
+
+        const end =
+            start + state.pageSize;
+
+        return list.slice(start, end);
+    }
+
+
+    function getTotalPages(items) {
+        const list = safeArray(items);
+
+        if (list.length === 0) {
+            return 1;
+        }
+
+        return Math.max(
+            1,
+            Math.ceil(list.length / state.pageSize)
+        );
+    }
+
+
+    function updatePagination(type) {
+        const items = safeArray(state.data[type]);
+
+        const totalPages =
+            getTotalPages(items);
+
+        let currentPage =
+            Number(state.pages[type]) || 1;
+
+        if (currentPage > totalPages) {
+            currentPage = totalPages;
+        }
+
+        if (currentPage < 1) {
+            currentPage = 1;
+        }
+
+        state.pages[type] = currentPage;
+
+        const pageNumber =
+            $(`${type}PageNumber`);
+
+        const pageTotal =
+            $(`${type}PageTotal`);
+
+        const prevBtn =
+            $(`${type}PrevBtn`);
+
+        const nextBtn =
+            $(`${type}NextBtn`);
+
+        if (pageNumber) {
+            pageNumber.textContent = currentPage;
+        }
+
+        if (pageTotal) {
+            pageTotal.textContent = totalPages;
+        }
+
+        if (prevBtn) {
+            prevBtn.disabled =
+                currentPage <= 1 ||
+                items.length === 0;
+        }
+
+        if (nextBtn) {
+            nextBtn.disabled =
+                currentPage >= totalPages ||
+                items.length === 0;
+        }
+    }
+
+
+    function goToPage(type, direction) {
+        const totalPages =
+            getTotalPages(state.data[type]);
+
+        let page =
+            Number(state.pages[type]) || 1;
+
+        page += direction;
+
+        page = Math.max(
+            1,
+            Math.min(page, totalPages)
+        );
+
+        state.pages[type] = page;
+
+        renderTable(type);
+    }
+
+
+    /* =====================================================
+       NORMALIZE RESULT
+    ====================================================== */
+
+    function normalizeResultItem(item) {
+        if (!item || typeof item !== "object") {
+            return {
+                ticket: "",
+                datetimeReceive: "",
+                ttRelease: "",
+                status: "",
+                keterangan: ""
+            };
+        }
+
+        return {
+            ticket:
+                item.ticket ??
+                item.Ticket ??
+                item["Ticket"] ??
+                "",
+
+            datetimeReceive:
+                item.datetimeReceive ??
+                item.datetime_receive ??
+                item.receive ??
+                item["Datetime Receive"] ??
+                "",
+
+            ttRelease:
+                item.ttRelease ??
+                item.tt_release ??
+                item.release ??
+                item["TT Release"] ??
+                "",
+
+            status:
+                item.status ??
+                item.Status ??
+                "",
+
+            keterangan:
+                item.keterangan ??
+                item.keteranganValidasi ??
+                item.message ??
+                item.error ??
+                item["Keterangan"] ??
+                ""
+        };
+    }
+
+
+    function normalizeMaterialItem(item) {
+        if (!item || typeof item !== "object") {
+            return {
+                ticket: "",
+                material: "",
+                qty: "",
+                satuan: "",
+                kode: "",
+                error: ""
+            };
+        }
+
+        return {
+            ticket:
+                item.ticket ??
+                item.Ticket ??
+                "",
+
+            material:
+                item.material ??
+                item.Material ??
+                item.namaMaterial ??
+                "",
+
+            qty:
+                item.qty ??
+                item.Qty ??
+                item.quantity ??
+                "",
+
+            satuan:
+                item.satuan ??
+                item.Satuan ??
+                item.unit ??
+                "",
+
+            kode:
+                item.kode ??
+                item.Kode ??
+                item.code ??
+                "",
+
+            error:
+                item.error ??
+                item.Error ??
+                item.message ??
+                ""
+        };
+    }
+
+
+    /* =====================================================
+       RENDER VALID / INVALID
+    ====================================================== */
+
+    function renderValidationTable(type) {
+        const body =
+            $(`${type}TableBody`);
+
+        const empty =
+            $(`${type}Empty`);
+
+        if (!body) {
+            return;
+        }
+
+        const items =
+            safeArray(state.data[type]);
+
+        const pageItems =
+            getPageItems(
+                items,
+                state.pages[type]
+            );
+
+        body.innerHTML = "";
+
+        if (items.length === 0) {
+            if (empty) {
+                empty.classList.remove("hidden");
+            }
+
+            updatePagination(type);
+            return;
+        }
+
+        if (empty) {
+            empty.classList.add("hidden");
+        }
+
+        pageItems.forEach((rawItem) => {
+            const item =
+                normalizeResultItem(rawItem);
+
+            const row =
+                document.createElement("tr");
+
+            let statusClass = "info";
+
+            const statusText =
+                String(item.status || "").toLowerCase();
+
+            if (
+                statusText.includes("valid") ||
+                statusText.includes("sesuai") ||
+                statusText.includes("ok")
+            ) {
+                statusClass = "success";
+            }
+
+            if (
+                statusText.includes("invalid") ||
+                statusText.includes("tidak") ||
+                statusText.includes("error")
+            ) {
+                statusClass = "danger";
+            }
+
+            row.innerHTML = `
+                <td class="ticket-cell">
+                    ${escapeHtml(formatValue(item.ticket))}
+                </td>
+
+                <td>
+                    ${escapeHtml(formatValue(item.datetimeReceive))}
+                </td>
+
+                <td>
+                    ${escapeHtml(formatValue(item.ttRelease))}
+                </td>
+
+                <td>
+                    <span class="status-label ${statusClass}">
+                        ${escapeHtml(formatValue(item.status))}
+                    </span>
+                </td>
+
+                <td>
+                    ${escapeHtml(formatValue(item.keterangan))}
+                </td>
+            `;
+
+            body.appendChild(row);
+        });
+
+        updatePagination(type);
+    }
+
+
+    /* =====================================================
+       RENDER MATERIAL
+    ====================================================== */
+
+    function renderMaterialTable(type) {
+        const body =
+            $(`${type}TableBody`);
+
+        const empty =
+            $(`${type}Empty`);
+
+        if (!body) {
+            return;
+        }
+
+        const items =
+            safeArray(state.data[type]);
+
+        const pageItems =
+            getPageItems(
+                items,
+                state.pages[type]
+            );
+
+        body.innerHTML = "";
+
+        if (items.length === 0) {
+            if (empty) {
+                empty.classList.remove("hidden");
+            }
+
+            updatePagination(type);
+            return;
+        }
+
+        if (empty) {
+            empty.classList.add("hidden");
+        }
+
+        pageItems.forEach((rawItem) => {
+            const item =
+                normalizeMaterialItem(rawItem);
+
+            const row =
+                document.createElement("tr");
+
+            if (type === "materialError") {
+                row.innerHTML = `
+                    <td class="ticket-cell">
+                        ${escapeHtml(formatValue(item.ticket))}
+                    </td>
+
+                    <td class="material-cell">
+                        ${escapeHtml(formatValue(item.material))}
+                    </td>
+
+                    <td>
+                        ${escapeHtml(formatValue(item.qty))}
+                    </td>
+
+                    <td>
+                        ${escapeHtml(formatValue(item.satuan))}
+                    </td>
+
+                    <td>
+                        ${escapeHtml(formatValue(item.kode))}
+                    </td>
+
+                    <td>
+                        <span class="status-label danger">
+                            ${escapeHtml(formatValue(item.error))}
+                        </span>
+                    </td>
+                `;
+            } else {
+                row.innerHTML = `
+                    <td class="ticket-cell">
+                        ${escapeHtml(formatValue(item.ticket))}
+                    </td>
+
+                    <td class="material-cell">
+                        ${escapeHtml(formatValue(item.material))}
+                    </td>
+
+                    <td>
+                        ${escapeHtml(formatValue(item.qty))}
+                    </td>
+
+                    <td>
+                        ${escapeHtml(formatValue(item.satuan))}
+                    </td>
+
+                    <td>
+                        ${escapeHtml(formatValue(item.kode))}
+                    </td>
+                `;
+            }
+
+            body.appendChild(row);
+        });
+
+        updatePagination(type);
+    }
+
+
+    function renderTable(type) {
+        if (
+            type === "valid" ||
+            type === "invalid"
+        ) {
+            renderValidationTable(type);
+            return;
+        }
+
+        if (
+            type === "material" ||
+            type === "materialError"
+        ) {
+            renderMaterialTable(type);
+        }
+    }
+
+
+    /* =====================================================
+       DASHBOARD COUNTS
+    ====================================================== */
+
+    function updateDashboardCounts() {
+        const valid =
+            safeArray(state.data.valid);
+
+        const invalid =
+            safeArray(state.data.invalid);
+
+        const material =
+            safeArray(state.data.material);
+
+        const materialError =
+            safeArray(state.data.materialError);
+
+        const total =
+            valid.length + invalid.length;
+
+        const values = {
+            totalCount: total,
+            validCount: valid.length,
+            invalidCount: invalid.length,
+            materialCount: material.length,
+            materialErrorCount: materialError.length,
+
+            validTabCount: valid.length,
+            invalidTabCount: invalid.length,
+            materialTabCount: material.length,
+            materialErrorTabCount: materialError.length
+        };
+
+        Object.keys(values).forEach((id) => {
+            const el = $(id);
+
+            if (el) {
+                el.textContent =
+                    values[id].toLocaleString("id-ID");
+            }
+        });
+    }
+
+
+    /* =====================================================
+       DOWNLOAD BUTTONS
+    ====================================================== */
+
+    function updateDownloadButtons() {
+        const mapping = {
+            downloadValidBtn: "valid",
+            downloadInvalidBtn: "invalid",
+            downloadMaterialBtn: "material",
+            downloadMaterialErrorBtn: "materialError"
+        };
+
+        Object.entries(mapping).forEach(
+            ([buttonId, type]) => {
+                const button = $(buttonId);
+
+                if (!button) {
+                    return;
+                }
+
+                button.disabled =
+                    safeArray(state.data[type]).length === 0;
+            }
+        );
+    }
+
+
+    /* =====================================================
+       TABS
+    ====================================================== */
+
+    function switchTab(tabName) {
+        const allowed = [
+            "valid",
+            "invalid",
+            "material",
+            "material-error"
+        ];
+
+        if (!allowed.includes(tabName)) {
+            tabName = "valid";
+        }
+
+        state.currentTab = tabName;
+
+        document
+            .querySelectorAll(".tab-button")
+            .forEach((button) => {
+                button.classList.toggle(
+                    "active",
+                    button.dataset.tab === tabName
+                );
+            });
+
+        document
+            .querySelectorAll(".tab-content")
+            .forEach((content) => {
+                content.classList.remove("active");
+            });
+
+        const target =
+            $(`tab-${tabName}`);
+
+        if (target) {
+            target.classList.add("active");
+        }
+
+        const type =
+            tabName === "material-error"
+                ? "materialError"
+                : tabName;
+
+        renderTable(type);
+    }
+
+
+    /* =====================================================
+       RESET PAGINATION
+    ====================================================== */
+
+    function resetPagination() {
+        state.pages.valid = 1;
+        state.pages.invalid = 1;
+        state.pages.material = 1;
+        state.pages.materialError = 1;
+    }
+
+
+    /* =====================================================
+       RESULT SUMMARY
+    ====================================================== */
+
+    function updateSummary() {
+        const summary =
+            $("resultSummary");
+
+        if (!summary) {
+            return;
+        }
+
+        const total =
+            state.data.valid.length +
+            state.data.invalid.length;
+
+        const valid =
+            state.data.valid.length;
+
+        const invalid =
+            state.data.invalid.length;
+
+        summary.textContent =
+            `${total.toLocaleString("id-ID")} data diperiksa • ` +
+            `${valid.toLocaleString("id-ID")} sesuai • ` +
+            `${invalid.toLocaleString("id-ID")} tidak sesuai`;
+    }
+
+
+    /* =====================================================
+       RENDER ALL
+    ====================================================== */
+
+    function renderAll() {
+        resetPagination();
+
+        updateDashboardCounts();
+
+        updateDownloadButtons();
+
+        updateSummary();
+
+        renderTable("valid");
+        renderTable("invalid");
+        renderTable("material");
+        renderTable("materialError");
+
+        switchTab(state.currentTab);
+
+        const dashboard =
+            $("dashboardSection");
+
+        if (dashboard) {
+            dashboard.classList.remove("hidden");
+        }
+    }
+
+
+    /* =====================================================
+       EXPORT HELPER
+    ====================================================== */
+
+    function exportData(type) {
+        const data =
+            safeArray(state.data[type]);
+
+        if (data.length === 0) {
+            alert("Tidak ada data untuk di-download.");
+            return;
+        }
+
+        /*
+         * Prioritas menggunakan fungsi exporter.js
+         * apabila tersedia.
+         */
+
+        const possibleFunctions = [
+            "exportReport",
+            "exportToExcel",
+            "downloadExcel",
+            "exportExcel",
+            "downloadData"
+        ];
+
+        for (const functionName of possibleFunctions) {
+            if (
+                typeof window[functionName] === "function"
+            ) {
+                try {
+                    window[functionName](
+                        data,
+                        type
+                    );
+
+                    return;
+                } catch (error) {
+                    console.warn(
+                        `Exporter ${functionName} gagal:`,
+                        error
+                    );
+                }
+            }
+        }
+
+        /*
+         * Fallback langsung menggunakan SheetJS.
+         */
+
+        if (
+            typeof XLSX === "undefined"
+        ) {
+            alert(
+                "Library Excel belum tersedia. " +
+                "Pastikan SheetJS berhasil dimuat."
+            );
+
+            return;
+        }
+
+        const rows =
+            data.map((item) => {
+                if (
+                    type === "material" ||
+                    type === "materialError"
+                ) {
+                    const material =
+                        normalizeMaterialItem(item);
+
+                    const result = {
+                        Ticket: material.ticket,
+                        Material: material.material,
+                        Qty: material.qty,
+                        Satuan: material.satuan,
+                        Kode: material.kode
+                    };
+
+                    if (
+                        type === "materialError"
+                    ) {
+                        result.Error =
+                            material.error;
+                    }
+
+                    return result;
+                }
+
+                const validation =
+                    normalizeResultItem(item);
+
+                return {
+                    Ticket: validation.ticket,
+                    "Datetime Receive":
+                        validation.datetimeReceive,
+                    "TT Release":
+                        validation.ttRelease,
+                    Status: validation.status,
+                    Keterangan:
+                        validation.keterangan
+                };
+            });
+
+        const worksheet =
+            XLSX.utils.json_to_sheet(rows);
+
+        const workbook =
+            XLSX.utils.book_new();
+
+        XLSX.utils.book_append_sheet(
+            workbook,
+            worksheet,
+            "Data"
+        );
+
+        const fileNames = {
+            valid: "Sesuai.xlsx",
+            invalid: "Tidak Sesuai.xlsx",
+            material: "Material.xlsx",
+            materialError: "Material Error.xlsx"
+        };
+
+        XLSX.writeFile(
+            workbook,
+            fileNames[type] ||
+            "Report Checker.xlsx"
+        );
+    }
+
+
+    /* =====================================================
+       RESET APP
+    ====================================================== */
+
+    function resetApp() {
+        state.currentTab = "valid";
+
+        state.data.valid = [];
+        state.data.invalid = [];
+        state.data.material = [];
+        state.data.materialError = [];
+
+        state.originalRows = [];
+
+        state.processed = false;
+
+        resetPagination();
+
+        const dashboard =
+            $("dashboardSection");
+
+        if (dashboard) {
+            dashboard.classList.add("hidden");
+        }
+
+        const fileInput =
+            $("excelFile");
+
+        if (fileInput) {
+            fileInput.value = "";
+        }
+
+        hideSelectedFile();
+
+        const processBtn =
+            $("processBtn");
+
+        if (processBtn) {
+            processBtn.disabled = true;
+        }
+
+        setProcessing(false);
+
+        setSystemStatus(
+            "Ready",
+            "offline"
+        );
+
+        updateDashboardCounts();
+
+        updateDownloadButtons();
+
+        updateSummary();
+
+        [
+            "validTableBody",
+            "invalidTableBody",
+            "materialTableBody",
+            "materialErrorTableBody"
+        ].forEach((id) => {
+            const body = $(id);
+
+            if (body) {
+                body.innerHTML = "";
+            }
+        });
+
+        switchTab("valid");
+
+        window.scrollTo({
+            top: 0,
+            behavior: "smooth"
+        });
+    }
+
+
+    /* =====================================================
+       SET RESULT FROM PROCESSOR
+    ====================================================== */
+
+    function applyProcessingResult(result) {
+        if (!result) {
+            throw new Error(
+                "Hasil proses Excel kosong."
+            );
+        }
+
+        /*
+         * Mendukung beberapa nama property
+         * agar kompatibel dengan parser/validator
+         * tahap sebelumnya.
+         */
+
+        state.data.valid =
+            safeArray(
+                result.valid ??
+                result.validData ??
+                result.sesuai
+            );
+
+        state.data.invalid =
+            safeArray(
+                result.invalid ??
+                result.invalidData ??
+                result.tidakSesuai
+            );
+
+        state.data.material =
+            safeArray(
+                result.material ??
+                result.materials
+            );
+
+        state.data.materialError =
+            safeArray(
+                result.materialError ??
+                result.materialErrors ??
+                result.material_error
+            );
+
+        state.processed = true;
+
+        renderAll();
+
+        setSystemStatus(
+            "Selesai",
+            "online"
+        );
+
+        setProcessing(
+            false
+        );
+    }
+
+
+    /* =====================================================
+       TRY PROCESS EXCEL
+    ====================================================== */
+
+    async function processExcelFile(file) {
+        if (!file) {
+            alert(
+                "Silakan pilih file Excel terlebih dahulu."
+            );
+
+            return;
+        }
+
+        if (
+            typeof XLSX === "undefined"
+        ) {
+            alert(
+                "SheetJS belum berhasil dimuat. " +
+                "Periksa koneksi internet atau library XLSX."
+            );
+
+            return;
+        }
+
+        setProcessing(
+            true,
+            "Membaca data Excel..."
+        );
+
+        setSystemStatus(
+            "Processing",
+            "processing"
+        );
+
+        try {
+            const arrayBuffer =
+                await file.arrayBuffer();
+
+            setProcessing(
+                true,
+                "Membuka workbook Excel..."
+            );
+
+            const workbook =
+                XLSX.read(
+                    arrayBuffer,
+                    {
+                        type: "array",
+                        cellDates: true,
+                        cellNF: true,
+                        cellText: true
+                    }
+                );
+
+            if (
+                !workbook.SheetNames ||
+                workbook.SheetNames.length === 0
+            ) {
+                throw new Error(
+                    "File Excel tidak memiliki sheet."
+                );
+            }
+
+            const sheetName =
+                workbook.SheetNames[0];
+
+            const worksheet =
+                workbook.Sheets[sheetName];
+
+            if (!worksheet) {
+                throw new Error(
+                    "Worksheet Excel tidak ditemukan."
+                );
+            }
+
+            setProcessing(
+                true,
+                "Mengambil data worksheet..."
+            );
+
+            const rows =
+                XLSX.utils.sheet_to_json(
+                    worksheet,
+                    {
+                        header: 1,
+                        defval: "",
+                        raw: false
+                    }
+                );
+
+            state.originalRows = rows;
+
+            if (
+                !Array.isArray(rows) ||
+                rows.length === 0
+            ) {
+                throw new Error(
+                    "Worksheet tidak memiliki data."
+                );
+            }
+
+            setProcessing(
+                true,
+                `Menemukan ${rows.length.toLocaleString("id-ID")} baris. Memproses...`
+            );
+
+            /*
+             * Cari fungsi processor dari file lain.
+             */
+
+            const processorNames = [
+                "processExcel",
+                "processWorkbook",
+                "processRows",
+                "runReportChecker",
+                "runChecker",
+                "checkExcel",
+                "validateExcel",
+                "processReport"
+            ];
+
+            let processor = null;
+
+            for (
+                const functionName of processorNames
+            ) {
+                if (
+                    typeof window[functionName] === "function"
+                ) {
+                    processor =
+                        window[functionName];
+
+                    break;
+                }
+            }
+
+            /*
+             * Jika fungsi utama tersedia,
+             * gunakan fungsi tersebut.
+             */
+
+            if (processor) {
+                let result;
+
+                try {
+                    result =
+                        await processor(
+                            rows,
+                            file,
+                            workbook
+                        );
+                } catch (firstError) {
+                    /*
+                     * Coba format argument sederhana
+                     * untuk kompatibilitas parser lama.
+                     */
+
+                    try {
+                        result =
+                            await processor(
+                                rows
+                            );
+                    } catch (secondError) {
+                        throw firstError;
+                    }
+                }
+
+                applyProcessingResult(
+                    result
+                );
+
+                return;
+            }
+
+            /*
+             * Jika excel.js memiliki fungsi parser,
+             * coba fungsi global umum.
+             */
+
+            const parserNames = [
+                "parseExcelData",
+                "parseExcel",
+                "parseRows",
+                "analyzeRows",
+                "validateRows"
+            ];
+
+            for (
+                const functionName of parserNames
+            ) {
+                if (
+                    typeof window[functionName] === "function"
+                ) {
+                    const result =
+                        await window[functionName](
+                            rows
+                        );
+
+                    if (result) {
+                        applyProcessingResult(
+                            result
+                        );
+
+                        return;
+                    }
+                }
+            }
+
+            /*
+             * Tidak ada processor yang cocok.
+             */
+
+            throw new Error(
+                "Fungsi pemrosesan Excel tidak ditemukan. " +
+                "Pastikan excel.js, validator.js, cir-parser.js " +
+                "dan material-parser.js berhasil dimuat."
+            );
+
+        } catch (error) {
+            console.error(
+                "Report Checker processing error:",
+                error
+            );
+
+            setProcessing(
+                false
+            );
+
+            setSystemStatus(
+                "Error",
+                "error"
+            );
+
+            alert(
+                "Gagal memproses Excel.\n\n" +
+                (error && error.message
+                    ? error.message
+                    : String(error))
+            );
+        }
+    }
+
+
+    /* =====================================================
+       FILE INPUT
+    ====================================================== */
+
+    function handleFileSelected(file) {
+        if (!file) {
+            return;
+        }
+
+        const fileName =
+            String(file.name || "")
+                .toLowerCase();
+
+        const allowed =
+            fileName.endsWith(".xlsx") ||
+            fileName.endsWith(".xls") ||
+            fileName.endsWith(".xlsm");
+
+        if (!allowed) {
+            alert(
+                "Format file tidak didukung.\n" +
+                "Gunakan .xlsx, .xls, atau .xlsm."
+            );
+
+            return;
+        }
+
+        showSelectedFile(file);
+
+        const processBtn =
+            $("processBtn");
+
+        if (processBtn) {
+            processBtn.disabled = false;
+        }
+
+        window.__reportCheckerFile =
+            file;
+
+        setSystemStatus(
+            "File Ready",
+            "online"
+        );
+    }
+
+
+    /* =====================================================
+       EVENT: FILE INPUT
+    ====================================================== */
+
+    function bindFileEvents() {
+        const input =
+            $("excelFile");
+
+        const dropZone =
+            $("dropZone");
+
+        const processBtn =
+            $("processBtn");
+
+        const removeBtn =
+            $("removeFileBtn");
+
+        if (input) {
+            input.addEventListener(
+                "change",
+                (event) => {
+                    const file =
+                        event.target.files &&
+                        event.target.files[0];
+
+                    handleFileSelected(file);
+                }
+            );
+        }
+
+        if (dropZone) {
+            dropZone.addEventListener(
+                "click",
+                () => {
+                    if (input) {
+                        input.click();
+                    }
+                }
+            );
+
+            dropZone.addEventListener(
+                "keydown",
+                (event) => {
+                    if (
+                        event.key === "Enter" ||
+                        event.key === " "
+                    ) {
+                        event.preventDefault();
+
+                        if (input) {
+                            input.click();
+                        }
+                    }
+                }
+            );
+
+            [
+                "dragenter",
+                "dragover"
+            ].forEach((eventName) => {
+                dropZone.addEventListener(
+                    eventName,
+                    (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        dropZone.classList.add(
+                            "dragover"
+                        );
+                    }
+                );
+            });
+
+            [
+                "dragleave",
+                "drop"
+            ].forEach((eventName) => {
+                dropZone.addEventListener(
+                    eventName,
+                    (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        dropZone.classList.remove(
+                            "dragover"
+                        );
+                    }
+                );
+            });
+
+            dropZone.addEventListener(
+                "drop",
+                (event) => {
+                    const files =
+                        event.dataTransfer &&
+                        event.dataTransfer.files;
+
+                    if (
+                        files &&
+                        files.length > 0
+                    ) {
+                        handleFileSelected(
+                            files[0]
+                        );
+                    }
+                }
+            );
+        }
+
+        if (processBtn) {
+            processBtn.addEventListener(
+                "click",
+                async () => {
+                    const file =
+                        window.__reportCheckerFile;
+
+                    if (!file) {
+                        alert(
+                            "Silakan pilih file Excel."
+                        );
+
+                        return;
+                    }
+
+                    await processExcelFile(
+                        file
+                    );
+                }
+            );
+        }
+
+        if (removeBtn) {
+            removeBtn.addEventListener(
+                "click",
+                () => {
+                    window.__reportCheckerFile =
+                        null;
+
+                    hideSelectedFile();
+
+                    if (input) {
+                        input.value = "";
+                    }
+
+                    if (processBtn) {
+                        processBtn.disabled = true;
+                    }
+
+                    setSystemStatus(
+                        "Ready",
+                        "offline"
+                    );
+                }
+            );
+        }
+    }
+
+
+    /* =====================================================
+       EVENT: TABS
+    ====================================================== */
+
+    function bindTabEvents() {
+        document
+            .querySelectorAll(".tab-button")
+            .forEach((button) => {
+                button.addEventListener(
+                    "click",
+                    () => {
+                        switchTab(
+                            button.dataset.tab
+                        );
+                    }
+                );
+            });
+    }
+
+
+    /* =====================================================
+       EVENT: PAGINATION
+    ====================================================== */
+
+    function bindPaginationEvents() {
+        const types = [
+            "valid",
+            "invalid",
+            "material",
+            "materialError"
+        ];
+
+        types.forEach((type) => {
+            const prev =
+                $(`${type}PrevBtn`);
+
+            const next =
+                $(`${type}NextBtn`);
+
+            if (prev) {
+                prev.addEventListener(
+                    "click",
+                    () => {
+                        goToPage(
+                            type,
+                            -1
+                        );
+                    }
+                );
+            }
+
+            if (next) {
+                next.addEventListener(
+                    "click",
+                    () => {
+                        goToPage(
+                            type,
+                            1
+                        );
+                    }
+                );
+            }
+        });
+    }
+
+
+    /* =====================================================
+       EVENT: DOWNLOAD
+    ====================================================== */
+
+    function bindDownloadEvents() {
+        const mapping = {
+            downloadValidBtn: "valid",
+            downloadInvalidBtn: "invalid",
+            downloadMaterialBtn: "material",
+            downloadMaterialErrorBtn:
+                "materialError"
+        };
+
+        Object.entries(mapping)
+            .forEach(([buttonId, type]) => {
+                const button =
+                    $(buttonId);
+
+                if (!button) {
+                    return;
+                }
+
+                button.addEventListener(
+                    "click",
+                    () => {
+                        exportData(type);
+                    }
+                );
+            });
+    }
+
+
+    /* =====================================================
+       EVENT: RESET
+    ====================================================== */
+
+    function bindResetEvent() {
+        const resetBtn =
+            $("resetBtn");
+
+        if (!resetBtn) {
+            return;
+        }
+
+        resetBtn.addEventListener(
+            "click",
+            () => {
+                resetApp();
+            }
+        );
+    }
+
+
+    /* =====================================================
+       INITIALIZATION
+    ====================================================== */
+
+    function init() {
+        console.log(
+            "ReportChecker app.js tahap 2 loaded."
+        );
+
+        bindFileEvents();
+        bindTabEvents();
+        bindPaginationEvents();
+        bindDownloadEvents();
+        bindResetEvent();
+
+        updateDashboardCounts();
+
+        updateDownloadButtons();
+
+        updateSummary();
+
+        switchTab("valid");
+
+        setSystemStatus(
+            "Ready",
+            "offline"
+        );
+    }
+
+
+    /* =====================================================
+       PUBLIC API
+    ====================================================== */
+
+    window.ReportChecker = {
+        state,
+
+        init,
+
+        processExcelFile,
+
+        applyProcessingResult,
+
+        renderAll,
+
+        renderTable,
+
+        switchTab,
+
+        resetApp,
+
+        exportData,
+
+        setSystemStatus
+    };
+
+
+    /* =====================================================
+       START
+    ====================================================== */
+
+    if (
+        document.readyState === "loading"
+    ) {
+        document.addEventListener(
+            "DOMContentLoaded",
+            init
+        );
+    } else {
+        init();
+    }
+
+})();
