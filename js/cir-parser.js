@@ -7,6 +7,9 @@
    - Case insensitive
    - TT Release hanya dicari setelah CIR
    - Mendukung tanggal sebelum / sesudah TT Release
+   - Mendukung // pada tanggal
+   - Mendukung berbagai separator CIR
+   - Tidak membaca TT Onsite sebagai TT Release
    - Sistem result lama tetap dipertahankan
 ========================================================= */
 
@@ -21,6 +24,25 @@
 
     const DEFAULT_TIMEZONE = "Asia/Jakarta";
 
+    /*
+     * Maksimal jarak tanggal dari baris TT Release.
+     *
+     * Contoh valid:
+     *
+     * TT Release
+     * 18/08/2026 19:35
+     *
+     * atau:
+     *
+     * 18/08/2026 19:35 TT Release
+     *
+     * atau:
+     *
+     * 18/08/2026 19:35
+     * TT Release
+     */
+    const RELEASE_DATE_MAX_DISTANCE = 5;
+
 
     /* =====================================================
        NORMALIZE TEXT
@@ -32,8 +54,11 @@
             value === null ||
             value === undefined
         ) {
+
             return "";
+
         }
+
 
         return String(value)
             .replace(/\r\n/g, "\n")
@@ -65,12 +90,14 @@
 
         if (
             window.ReportCheckerSettings &&
-            typeof window.ReportCheckerSettings.get === "function"
+            typeof window.ReportCheckerSettings.get ===
+                "function"
         ) {
 
             return window.ReportCheckerSettings.get();
 
         }
+
 
         return {
 
@@ -79,7 +106,8 @@
                 "TT release",
                 "TT RELEASE",
                 "Ticket Release",
-                "Ticket release"
+                "Ticket release",
+                "TICKET RELEASE"
             ],
 
             notFoundPhrases: [
@@ -104,125 +132,231 @@
     function escapeRegExp(value) {
 
         return String(value)
-            .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            .replace(
+                /[.*+?^${}()|[\]\\]/g,
+                "\\$&"
+            );
 
     }
 
 
     /* =====================================================
        DATE PARSING
+       
+       Support:
+
+       21/08/2026 19:07
+       21//08/2026 19:07
+
+       18/08/2026 19:35
+       18-08-2026 19:35
+
+       2026-08-18 19:35
+
+       18/08/2026
+       2026-08-18
     ===================================================== */
 
     function parseDateTime(text) {
 
         if (!text) {
+
             return null;
+
         }
 
-        const value =
+
+        let value =
             normalizeLine(text);
 
 
-        /* DD/MM/YYYY HH:mm:ss */
+        /*
+         * Normalisasi slash ganda.
+         *
+         * 21//08/2026
+         * menjadi
+         * 21/08/2026
+         *
+         * Tetapi tidak mengubah format tanggal lain.
+         */
+
+        value =
+            value.replace(
+                /\/{2,}/g,
+                "/"
+            );
+
+
+        /* =================================================
+           DD/MM/YYYY HH:mm:ss
+        ================================================= */
 
         let match =
             value.match(
                 /(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/
             );
 
+
         if (match) {
 
             return createDate(
+
                 Number(match[3]),
+
                 Number(match[2]),
+
                 Number(match[1]),
+
                 Number(match[4]),
+
                 Number(match[5]),
+
                 Number(match[6] || 0)
+
             );
 
         }
 
 
-        /* DD-MM-YYYY HH:mm:ss */
+        /* =================================================
+           DD-MM-YYYY HH:mm:ss
+        ================================================= */
 
         match =
             value.match(
                 /(\d{1,2})-(\d{1,2})-(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/
             );
 
+
         if (match) {
 
             return createDate(
+
                 Number(match[3]),
+
                 Number(match[2]),
+
                 Number(match[1]),
+
                 Number(match[4]),
+
                 Number(match[5]),
+
                 Number(match[6] || 0)
+
             );
 
         }
 
 
-        /* YYYY-MM-DD HH:mm:ss */
+        /* =================================================
+           YYYY-MM-DD HH:mm:ss
+        ================================================= */
 
         match =
             value.match(
                 /(\d{4})-(\d{1,2})-(\d{1,2})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/
             );
 
+
         if (match) {
 
             return createDate(
+
                 Number(match[1]),
+
                 Number(match[2]),
+
                 Number(match[3]),
+
                 Number(match[4]),
+
                 Number(match[5]),
+
                 Number(match[6] || 0)
+
             );
 
         }
 
 
-        /* DD/MM/YYYY */
+        /* =================================================
+           DD/MM/YYYY
+        ================================================= */
 
         match =
             value.match(
                 /(\d{1,2})\/(\d{1,2})\/(\d{4})/
             );
 
+
         if (match) {
 
             return createDate(
+
                 Number(match[3]),
+
                 Number(match[2]),
+
                 Number(match[1]),
+
                 0,
                 0,
                 0
+
             );
 
         }
 
 
-        /* YYYY-MM-DD */
+        /* =================================================
+           DD-MM-YYYY
+        ================================================= */
+
+        match =
+            value.match(
+                /(\d{1,2})-(\d{1,2})-(\d{4})/
+            );
+
+
+        if (match) {
+
+            return createDate(
+
+                Number(match[3]),
+
+                Number(match[2]),
+                Number(match[1]),
+                0,
+                0,
+                0
+
+            );
+
+        }
+
+
+        /* =================================================
+           YYYY-MM-DD
+        ================================================= */
 
         match =
             value.match(
                 /(\d{4})-(\d{1,2})-(\d{1,2})/
             );
 
+
         if (match) {
 
             return createDate(
+
                 Number(match[1]),
                 Number(match[2]),
                 Number(match[3]),
                 0,
                 0,
                 0
+
             );
 
         }
@@ -245,6 +379,29 @@
         minute,
         second
     ) {
+
+        /*
+         * Validasi basic.
+         */
+
+        if (
+            year < 1900 ||
+            month < 1 ||
+            month > 12 ||
+            day < 1 ||
+            day > 31 ||
+            hour < 0 ||
+            hour > 23 ||
+            minute < 0 ||
+            minute > 59 ||
+            second < 0 ||
+            second > 59
+        ) {
+
+            return null;
+
+        }
+
 
         const date =
             new Date(
@@ -269,8 +426,10 @@
 
 
         /*
-         * Validasi tanggal.
-         * Contoh 31/02/2026 tidak boleh dianggap valid.
+         * Validasi tanggal sebenarnya.
+         *
+         * 31/02/2026
+         * harus dianggap invalid.
          */
 
         if (
@@ -297,7 +456,9 @@
 
         if (
             !date ||
-            Number.isNaN(date.getTime())
+            Number.isNaN(
+                date.getTime()
+            )
         ) {
 
             return "";
@@ -312,15 +473,25 @@
 
 
         return [
+
             pad(date.getDate()),
+
             pad(date.getMonth() + 1),
+
             date.getFullYear()
+
         ].join("/") +
+
         " " +
+
         [
+
             pad(date.getHours()),
+
             pad(date.getMinutes()),
+
             pad(date.getSeconds())
+
         ].join(":");
 
     }
@@ -336,7 +507,9 @@
     ) {
 
         if (!text) {
+
             return false;
+
         }
 
 
@@ -349,7 +522,9 @@
         ) {
 
             if (!phrase) {
+
                 continue;
+
             }
 
 
@@ -360,14 +535,20 @@
 
 
             if (!lowerPhrase) {
+
                 continue;
+
             }
 
 
             /*
              * "-" terlalu umum.
-             * Jangan digunakan sebagai indikator NOT YET
-             * ketika berdiri sendiri.
+             *
+             * Contoh:
+             *
+             * LINK A - LINK B
+             *
+             * jangan dianggap NOT YET.
              */
 
             if (
@@ -400,18 +581,28 @@
     /* =====================================================
        FIND CIR HEADER
        
-       Contoh yang diterima:
+       Support:
 
        CIR
+
        CIR :
+
+       ====CIR====
+
        ======CIR========
+
        ===== CIR =====
-       ===CIR===
+
        ---- CIR ----
-       CIR =================
+
+       ___CIR___
+
+       # CIR #
     ===================================================== */
 
-    function findCIRHeader(lines) {
+    function findCIRHeader(
+        lines
+    ) {
 
         for (
             let index = 0;
@@ -430,47 +621,61 @@
 
 
             if (!line) {
+
                 continue;
+
             }
 
 
             /*
-             * Buang karakter dekorasi di awal/akhir.
+             * Buang dekorasi:
+             *
+             * =
+             * -
+             * _
+             * *
+             * #
+             * :
              */
 
             const cleaned =
                 line
+
                     .replace(
                         /^[=\-_*#:\s]+/,
                         ""
                     )
+
                     .replace(
                         /[=\-_*#:\s]+$/,
                         ""
                     )
+
                     .trim();
 
 
             /*
-             * Setelah dekorasi dibuang,
-             * harus menjadi CIR atau diawali CIR.
+             * Normal:
              *
-             * Contoh:
-             * ======CIR========
-             * menjadi CIR
+             * CIR
              */
 
             if (
-                /^CIR$/i.test(cleaned)
+                /^CIR$/i.test(
+                    cleaned
+                )
             ) {
 
                 return {
 
-                    found: true,
+                    found:
+                        true,
 
-                    index: index,
+                    index:
+                        index,
 
-                    line: originalLine
+                    line:
+                        originalLine
 
                 };
 
@@ -478,23 +683,28 @@
 
 
             /*
-             * Dukungan:
+             * Contoh:
              *
              * CIR :
              * CIR =================
              */
 
             if (
-                /^CIR\b/i.test(cleaned)
+                /^CIR\b/i.test(
+                    cleaned
+                )
             ) {
 
                 return {
 
-                    found: true,
+                    found:
+                        true,
 
-                    index: index,
+                    index:
+                        index,
 
-                    line: originalLine
+                    line:
+                        originalLine
 
                 };
 
@@ -505,11 +715,14 @@
 
         return {
 
-            found: false,
+            found:
+                false,
 
-            index: -1,
+            index:
+                -1,
 
-            line: ""
+            line:
+                ""
 
         };
 
@@ -517,29 +730,30 @@
 
 
     /* =====================================================
-       FIND END OF CIR SECTION
-       
-       Kita tidak mau mengambil tanggal dari section
-       lain secara sembarangan.
-
-       CIR dianggap berjalan sampai:
-       - section jelas berikutnya
-       - atau akhir report
+       IS NEXT SECTION
     ===================================================== */
 
-    function isNextSection(line) {
+    function isNextSection(
+        line
+    ) {
 
         const value =
-            normalizeLine(line);
+            normalizeLine(
+                line
+            );
 
 
         if (!value) {
+
             return false;
+
         }
 
 
         /*
-         * Jangan anggap baris biasa sebagai section.
+         * Section berikutnya yang jelas.
+         *
+         * Jangan terlalu agresif.
          */
 
         const sectionPatterns = [
@@ -571,7 +785,9 @@
 
         return sectionPatterns.some(
             pattern =>
-                pattern.test(value)
+                pattern.test(
+                    value
+                )
         );
 
     }
@@ -579,6 +795,9 @@
 
     /* =====================================================
        GET CIR SECTION
+       
+       Penting:
+       TT Release hanya dicari setelah CIR header.
     ===================================================== */
 
     function getCIRSection(
@@ -586,7 +805,9 @@
     ) {
 
         const lines =
-            normalizeText(text)
+            normalizeText(
+                text
+            )
                 .split("\n");
 
 
@@ -600,15 +821,20 @@
 
             return {
 
-                found: false,
+                found:
+                    false,
 
-                headerIndex: -1,
+                headerIndex:
+                    -1,
 
-                endIndex: -1,
+                endIndex:
+                    -1,
 
-                lines: [],
+                lines:
+                    [],
 
-                text: ""
+                text:
+                    ""
 
             };
 
@@ -635,8 +861,59 @@
                 lines[index];
 
 
+            /*
+             * Jika ketemu section lain,
+             * CIR section selesai.
+             */
+
             if (
-                isNextSection(line)
+                isNextSection(
+                    line
+                )
+            ) {
+
+                endIndex =
+                    index;
+
+                break;
+
+            }
+
+
+            /*
+             * Jika menemukan CIR header kedua,
+             * berhenti di header tersebut.
+             *
+             * Ini penting jika report mempunyai
+             * lebih dari satu blok CIR.
+             */
+
+            const normalized =
+                normalizeLine(
+                    line
+                );
+
+
+            const cleaned =
+                normalized
+
+                    .replace(
+                        /^[=\-_*#:\s]+/,
+                        ""
+                    )
+
+                    .replace(
+                        /[=\-_*#:\s]+$/,
+                        ""
+                    )
+
+                    .trim();
+
+
+            if (
+                /^CIR$/i.test(
+                    cleaned
+                )
             ) {
 
                 endIndex =
@@ -656,7 +933,8 @@
 
         return {
 
-            found: true,
+            found:
+                true,
 
             headerIndex:
                 header.index,
@@ -678,10 +956,11 @@
     /* =====================================================
        FIND RELEASE LINE
        
+       Hanya bekerja pada CIR section.
+       
        Case insensitive.
        
-       IMPORTANT:
-       Hanya dipanggil pada SECTION CIR.
+       TT Onsite TIDAK dianggap TT Release.
     ===================================================== */
 
     function findReleaseLine(
@@ -690,11 +969,15 @@
     ) {
 
         const lines =
-            normalizeText(cirText)
+            normalizeText(
+                cirText
+            )
                 .split("\n");
 
 
-        if (!lines.length) {
+        if (
+            !lines.length
+        ) {
 
             return null;
 
@@ -718,30 +1001,56 @@
 
 
             if (!line) {
+
                 continue;
+
             }
 
 
             for (
-                const phrase of releasePhrases || []
+                const phrase of
+                    releasePhrases || []
             ) {
 
                 if (!phrase) {
+
                     continue;
+
+                }
+
+
+                const phraseText =
+                    String(
+                        phrase
+                    )
+                        .trim();
+
+
+                if (!phraseText) {
+
+                    continue;
+
                 }
 
 
                 const regex =
                     new RegExp(
                         escapeRegExp(
-                            phrase
+                            phraseText
                         ),
                         "i"
                     );
 
 
+                /*
+                 * Hanya match phrase yang memang
+                 * release.
+                 */
+
                 if (
-                    regex.test(line)
+                    regex.test(
+                        line
+                    )
                 ) {
 
                     return {
@@ -756,7 +1065,7 @@
                             index,
 
                         phrase:
-                            phrase
+                            phraseText
 
                     };
 
@@ -775,7 +1084,7 @@
     /* =====================================================
        SEARCH DATE AROUND RELEASE LINE
        
-       Mendukung:
+       Support:
 
        18/08/2026 19:35 TT release
 
@@ -785,7 +1094,12 @@
        18/08/2026 19:35
        TT release
 
-       Jarak maksimum 3 baris.
+       TT release
+
+
+       18/08/2026 19:35
+
+       Jarak maksimal 5 baris.
     ===================================================== */
 
     function searchDateAroundLine(
@@ -793,10 +1107,9 @@
         releaseIndex
     ) {
 
-        const maxDistance = 3;
-
-
-        /* 1. Baris release sendiri */
+        /*
+         * 1. Baris TT Release sendiri.
+         */
 
         let date =
             parseDateTime(
@@ -822,20 +1135,48 @@
         }
 
 
-        /* 2. Setelah TT Release */
+        /*
+         * 2. Cari setelah TT Release.
+         *
+         * Prioritas ke baris setelahnya.
+         */
 
         for (
             let offset = 1;
-            offset <= maxDistance;
+
+            offset <=
+                RELEASE_DATE_MAX_DISTANCE;
+
             offset++
         ) {
 
             const index =
-                releaseIndex + offset;
+                releaseIndex +
+                offset;
 
 
             if (
-                index >= lines.length
+                index >=
+                lines.length
+            ) {
+
+                break;
+
+            }
+
+
+            const line =
+                lines[index];
+
+
+            /*
+             * Jangan melewati section lain.
+             */
+
+            if (
+                isNextSection(
+                    line
+                )
             ) {
 
                 break;
@@ -845,7 +1186,7 @@
 
             date =
                 parseDateTime(
-                    lines[index]
+                    line
                 );
 
 
@@ -857,7 +1198,7 @@
                         date,
 
                     sourceLine:
-                        lines[index],
+                        line,
 
                     sourceIndex:
                         index
@@ -869,28 +1210,40 @@
         }
 
 
-        /* 3. Sebelum TT Release */
+        /*
+         * 3. Cari sebelum TT Release.
+         */
 
         for (
             let offset = 1;
-            offset <= maxDistance;
+
+            offset <=
+                RELEASE_DATE_MAX_DISTANCE;
+
             offset++
         ) {
 
             const index =
-                releaseIndex - offset;
+                releaseIndex -
+                offset;
 
 
-            if (index < 0) {
+            if (
+                index < 0
+            ) {
 
                 break;
 
             }
 
 
+            const line =
+                lines[index];
+
+
             date =
                 parseDateTime(
-                    lines[index]
+                    line
                 );
 
 
@@ -902,7 +1255,7 @@
                         date,
 
                     sourceLine:
-                        lines[index],
+                        line,
 
                     sourceIndex:
                         index
@@ -915,6 +1268,111 @@
 
 
         return null;
+
+    }
+
+
+    /* =====================================================
+       FIND TT RELEASE IN FULL REPORT
+       
+       Fungsi ini sengaja menggunakan CIR section.
+       
+       Tidak boleh mencari langsung dari seluruh report.
+    ===================================================== */
+
+    function findReleaseInCIR(
+        text,
+        settings
+    ) {
+
+        const cirSection =
+            getCIRSection(
+                text
+            );
+
+
+        if (
+            !cirSection.found
+        ) {
+
+            return {
+
+                cirFound:
+                    false,
+
+                releaseFound:
+                    false,
+
+                cirSection:
+                    cirSection,
+
+                releaseLine:
+                    null,
+
+                dateResult:
+                    null
+
+            };
+
+        }
+
+
+        const releaseLine =
+            findReleaseLine(
+                cirSection.text,
+                settings.releasePhrases
+            );
+
+
+        if (!releaseLine) {
+
+            return {
+
+                cirFound:
+                    true,
+
+                releaseFound:
+                    false,
+
+                cirSection:
+                    cirSection,
+
+                releaseLine:
+                    null,
+
+                dateResult:
+                    null
+
+            };
+
+        }
+
+
+        const dateResult =
+            searchDateAroundLine(
+                cirSection.lines,
+                releaseLine.index
+            );
+
+
+        return {
+
+            cirFound:
+                true,
+
+            releaseFound:
+                true,
+
+            cirSection:
+                cirSection,
+
+            releaseLine:
+                releaseLine,
+
+            dateResult:
+                dateResult
+
+        };
 
     }
 
@@ -987,22 +1445,22 @@
 
 
         /* =================================================
-           CARI SECTION CIR
+           CARI TT RELEASE DI DALAM CIR
         ================================================= */
 
-        const cirSection =
-            getCIRSection(
-                text
+        const searchResult =
+            findReleaseInCIR(
+                text,
+                settings
             );
 
 
-        /*
-         * Kalau tidak ada header CIR,
-         * JANGAN cari TT Release di seluruh report.
-         */
+        /* =================================================
+           CIR TIDAK ADA
+        ================================================= */
 
         if (
-            !cirSection.found
+            !searchResult.cirFound
         ) {
 
             result.status =
@@ -1016,22 +1474,17 @@
         }
 
 
-        /* =================================================
-           CARI TT RELEASE HANYA DI SECTION CIR
-        ================================================= */
-
-        const releaseLine =
-            findReleaseLine(
-                cirSection.text,
-                settings.releasePhrases
-            );
+        const cirSection =
+            searchResult.cirSection;
 
 
         /* =================================================
-           TT RELEASE TIDAK DITEMUKAN
+           TT RELEASE TIDAK ADA
         ================================================= */
 
-        if (!releaseLine) {
+        if (
+            !searchResult.releaseFound
+        ) {
 
             const notFound =
                 containsNotFoundPhrase(
@@ -1048,13 +1501,23 @@
 
             result.note =
                 notFound
+
                     ? "Ditemukan indikasi data belum tersedia pada section CIR."
+
                     : "Frasa TT Release tidak ditemukan pada section CIR.";
 
 
             return result;
 
         }
+
+
+        /* =================================================
+           RELEASE LINE
+        ================================================= */
+
+        const releaseLine =
+            searchResult.releaseLine;
 
 
         result.matchedPhrase =
@@ -1066,8 +1529,7 @@
 
 
         /*
-         * Index dikembalikan relatif terhadap section CIR.
-         * Tetap berguna untuk audit.
+         * Index global terhadap report.
          */
 
         result.sourceIndex =
@@ -1077,14 +1539,11 @@
 
 
         /* =================================================
-           CARI TANGGAL
+           DATE RESULT
         ================================================= */
 
         const dateResult =
-            searchDateAroundLine(
-                cirSection.lines,
-                releaseLine.index
-            );
+            searchResult.dateResult;
 
 
         if (!dateResult) {
@@ -1128,12 +1587,12 @@
         ) {
 
             result.note =
-                "Tanggal release ditemukan di sekitar baris TT Release.";
+                "TT Release ditemukan pada section CIR dan tanggal release ditemukan di sekitar baris TT Release.";
 
         } else {
 
             result.note =
-                "TT Release berhasil ditemukan.";
+                "TT Release berhasil ditemukan pada section CIR.";
 
         }
 
@@ -1152,7 +1611,9 @@
         cirField
     ) {
 
-        if (!Array.isArray(rows)) {
+        if (
+            !Array.isArray(rows)
+        ) {
 
             return [];
 
@@ -1197,7 +1658,16 @@
             formatDateTime,
 
         normalizeText:
-            normalizeText
+            normalizeText,
+
+        findCIRHeader:
+            findCIRHeader,
+
+        getCIRSection:
+            getCIRSection,
+
+        findReleaseLine:
+            findReleaseLine
 
     };
 
