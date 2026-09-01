@@ -2,24 +2,26 @@
    REPORT CHECKER
    excel.js
 
+   VERSION UPDATED
+
    Fungsi:
    - Upload Excel
    - Baca header A sampai AF
-   - Validasi data
+   - TT Number = kolom D
+   - Validasi Ticket Release
    - Baca CIR
-   - Ambil TT Release
+   - Parse Material
    - Pisahkan SESUAI / TIDAK SESUAI
-   - Ambil MATERIAL
-   - Siapkan data untuk export Excel
+   - Material menggunakan TT Number
+   - Material Error jika CIR ada tetapi material gagal ditemukan
+   - Export hasil ke Excel
 
-   REQUIREMENT:
-   SheetJS / XLSX harus sudah diload di HTML.
-
-   Contoh:
-   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-   <script src="js/material-parser.js"></script>
-   <script src="js/validator.js"></script>
-   <script src="js/excel.js"></script>
+   COMPATIBLE:
+   - index.html terbaru
+   - app.js terbaru
+   - material-parser.js terbaru
+   - validator.js
+   - SheetJS XLSX
 ========================================================= */
 
 (function () {
@@ -69,66 +71,68 @@
     ];
 
 
+    /*
+     * Excel:
+     *
+     * A = 0
+     * B = 1
+     * C = 2
+     * D = 3
+     *
+     * Jadi TT Number = index 3.
+     */
+
+    const TT_NUMBER_COLUMN_INDEX = 3;
+
+
     /* =====================================================
        STATE
     ===================================================== */
 
     const state = {
 
-        workbook:
-            null,
+        workbook: null,
 
-        sheetName:
-            "",
+        sheetName: "",
 
-        rows:
-            [],
+        rows: [],
 
-        originalRows:
-            [],
+        originalRows: [],
 
-        validationResults:
-            [],
+        validationResults: [],
 
-        sesuai:
-            [],
+        sesuai: [],
 
-        tidakSesuai:
-            [],
+        tidakSesuai: [],
 
-        invalid:
-            [],
+        invalid: [],
 
-        materials:
-            [],
+        materials: [],
 
-        materialNotFound:
-            [],
+        materialError: [],
 
-        customMaterials:
-            [],
+        materialNotFound: [],
 
-        fileName:
-            ""
+        customMaterials: [],
+
+        fileName: ""
 
     };
 
 
     /* =====================================================
-       GET XLSX
+       XLSX
     ===================================================== */
 
     function getXLSX() {
 
         if (
-            typeof XLSX !==
-            "undefined"
+            typeof XLSX !== "undefined"
         ) {
 
             return XLSX;
 
         }
-
 
         throw new Error(
             "Library XLSX belum dimuat."
@@ -141,9 +145,7 @@
        NORMALIZE HEADER
     ===================================================== */
 
-    function normalizeHeader(
-        value
-    ) {
+    function normalizeHeader(value) {
 
         return String(
             value ?? ""
@@ -196,7 +198,7 @@
 
 
     /* =====================================================
-       CHECK HEADER
+       VALIDATE HEADER
     ===================================================== */
 
     function validateHeaders(
@@ -205,17 +207,13 @@
 
         const result = {
 
-            valid:
-                true,
+            valid: true,
 
-            missing:
-                [],
+            missing: [],
 
-            found:
-                [],
+            found: [],
 
-            indexes:
-                {}
+            indexes: {}
 
         };
 
@@ -269,9 +267,7 @@
        READ FILE
     ===================================================== */
 
-    function readFile(
-        file
-    ) {
+    function readFile(file) {
 
         return new Promise(
             function (
@@ -315,14 +311,11 @@
                                 XLSX.read(
                                     data,
                                     {
-                                        type:
-                                            "array",
+                                        type: "array",
 
-                                        cellDates:
-                                            true,
+                                        cellDates: true,
 
-                                        raw:
-                                            true
+                                        raw: true
                                     }
                                 );
 
@@ -367,7 +360,7 @@
 
 
     /* =====================================================
-       GET FIRST SHEET
+       FIRST SHEET
     ===================================================== */
 
     function getFirstSheet(
@@ -379,8 +372,7 @@
             !Array.isArray(
                 workbook.SheetNames
             ) ||
-            workbook.SheetNames.length ===
-                0
+            !workbook.SheetNames.length
         ) {
 
             throw new Error(
@@ -400,6 +392,15 @@
             ];
 
 
+        if (!sheet) {
+
+            throw new Error(
+                "Sheet pertama tidak dapat dibaca."
+            );
+
+        }
+
+
         return {
 
             name:
@@ -414,38 +415,7 @@
 
 
     /* =====================================================
-       SHEET TO JSON
-    ===================================================== */
-
-    function sheetToRows(
-        sheet
-    ) {
-
-        const XLSX =
-            getXLSX();
-
-
-        return XLSX.utils.sheet_to_json(
-            sheet,
-            {
-
-                defval:
-                    "",
-
-                raw:
-                    true,
-
-                blankrows:
-                    false
-
-            }
-        );
-
-    }
-
-
-    /* =====================================================
-       CONVERT ARRAY ROW
+       SHEET TO ARRAY
     ===================================================== */
 
     function sheetToArray(
@@ -460,17 +430,41 @@
             sheet,
             {
 
-                header:
-                    1,
+                header: 1,
 
-                defval:
-                    "",
+                defval: "",
 
-                raw:
-                    true,
+                raw: true,
 
-                blankrows:
-                    false
+                blankrows: false
+
+            }
+        );
+
+    }
+
+
+    /* =====================================================
+       SHEET TO OBJECT ROWS
+    ===================================================== */
+
+    function sheetToRows(
+        sheet
+    ) {
+
+        const XLSX =
+            getXLSX();
+
+
+        return XLSX.utils.sheet_to_json(
+            sheet,
+            {
+
+                defval: "",
+
+                raw: true,
+
+                blankrows: false
 
             }
         );
@@ -502,31 +496,31 @@
 
 
         /*
-         * Simpan kolom lain juga jika ada.
+         * Simpan field tambahan.
          */
 
         if (row) {
 
-            for (
-                const key
-                of Object.keys(row)
-            ) {
+            Object.keys(row)
+                .forEach(
+                    function (key) {
 
-                if (
-                    !Object.prototype
-                        .hasOwnProperty
-                        .call(
-                            output,
-                            key
-                        )
-                ) {
+                        if (
+                            !Object.prototype
+                                .hasOwnProperty
+                                .call(
+                                    output,
+                                    key
+                                )
+                        ) {
 
-                    output[key] =
-                        row[key];
+                            output[key] =
+                                row[key];
 
-                }
+                        }
 
-            }
+                    }
+                );
 
         }
 
@@ -537,46 +531,90 @@
 
 
     /* =====================================================
-       GET TICKET
+       GET TT NUMBER
        
-       Prioritas:
-       1. Customer Ticket
-       2. TT Number
-       3. Ticket
-       4. Ref Ticket
+       PRIORITAS MUTLAK:
+       1. TT Number
+       2. fallback index D jika row array
+       
+       TIDAK menggunakan:
+       - Customer Ticket
+       - Ref Ticket
     ===================================================== */
 
-    function getTicket(
+    function getTTNumber(
         row
     ) {
 
-        const candidates = [
+        if (!row) {
 
-            row?.["Customer Ticket"],
+            return "";
 
-            row?.["TT Number"],
+        }
 
-            row?.["Ticket"],
 
-            row?.["Ref Ticket"]
+        /*
+         * Jika array:
+         * kolom D = index 3
+         */
+
+        if (
+            Array.isArray(row)
+        ) {
+
+            return cleanValue(
+                row[
+                    TT_NUMBER_COLUMN_INDEX
+                ]
+            );
+
+        }
+
+
+        /*
+         * Object hasil SheetJS.
+         */
+
+        const fields = [
+
+            "TT Number",
+
+            "TT number",
+
+            "TT_NUMBER",
+
+            "tt_number",
+
+            "TTNumber",
+
+            "ttNumber"
 
         ];
 
 
         for (
-            const value
-            of candidates
+            const field
+            of fields
         ) {
 
-            const ticket =
-                String(
-                    value ?? ""
-                ).trim();
+            if (
+                row[field] !==
+                undefined &&
+                row[field] !==
+                null
+            ) {
+
+                const value =
+                    cleanValue(
+                        row[field]
+                    );
 
 
-            if (ticket) {
+                if (value) {
 
-                return ticket;
+                    return value;
+
+                }
 
             }
 
@@ -584,6 +622,293 @@
 
 
         return "";
+
+    }
+
+
+    /* =====================================================
+       GET TICKET
+       
+       Alias supaya kompatibel dengan kode lama.
+       
+       Sekarang Ticket = TT Number.
+    ===================================================== */
+
+    function getTicket(
+        row
+    ) {
+
+        return getTTNumber(
+            row
+        );
+
+    }
+
+
+    /* =====================================================
+       CLEAN VALUE
+    ===================================================== */
+
+    function cleanValue(
+        value
+    ) {
+
+        if (
+            value === null ||
+            value === undefined
+        ) {
+
+            return "";
+
+        }
+
+
+        return String(value)
+            .replace(/\u00A0/g, " ")
+            .trim();
+
+    }
+
+
+    /* =====================================================
+       GET CIR
+    ===================================================== */
+
+    function getCIR(
+        row
+    ) {
+
+        if (!row) {
+
+            return "";
+
+        }
+
+
+        if (
+            Array.isArray(row)
+        ) {
+
+            /*
+             * CIR = kolom AF
+             * index 31
+             */
+
+            return cleanValue(
+                row[31]
+            );
+
+        }
+
+
+        return cleanValue(
+            row["CIR"]
+        );
+
+    }
+
+
+    /* =====================================================
+       MATERIAL PARSER CHECK
+    ===================================================== */
+
+    function getMaterialParser() {
+
+        if (
+            !window.ReportCheckerMaterial
+        ) {
+
+            throw new Error(
+                "material-parser.js belum berhasil dimuat."
+            );
+
+        }
+
+
+        return window.ReportCheckerMaterial;
+
+    }
+
+
+    /* =====================================================
+       PARSE MATERIAL
+       
+       Parser baru:
+       
+       parse(cirText)
+       
+       BUKAN:
+       
+       parse(cirText, ticket)
+    ===================================================== */
+
+    function parseMaterials(
+        ttNumber,
+        cirText
+    ) {
+
+        const parser =
+            getMaterialParser();
+
+
+        if (!cirText) {
+
+            return {
+
+                found: false,
+
+                status:
+                    ttNumber
+                        ? "NO MATERIAL"
+                        : "NO TICKET",
+
+                ticket:
+                    ttNumber,
+
+                materials: [],
+
+                note:
+                    ttNumber
+                        ? "CIR tidak berisi material."
+                        : "TT Number tidak ditemukan."
+
+            };
+
+        }
+
+
+        const parsed =
+            parser.parse(
+                cirText
+            );
+
+
+        const materials =
+            Array.isArray(parsed)
+                ? parsed
+                : [];
+
+
+        /*
+         * Tambahkan TT Number ke setiap material.
+         *
+         * Material parser sendiri sudah support
+         * Ticket, tetapi excel.js tetap memaksa
+         * ticket berasal dari TT Number kolom D.
+         */
+
+        const rows =
+            materials.map(
+                function (item) {
+
+                    return {
+
+                        ticket:
+                            ttNumber,
+
+                        material:
+                            item.material ||
+                            "",
+
+                        quantity:
+                            item.qty ??
+                            item.quantity ??
+                            1,
+
+                        unit:
+                            item.satuan ||
+                            item.unit ||
+                            "",
+
+                        code:
+                            item.kode ||
+                            item.code ||
+                            "",
+
+                        score:
+                            item.score ??
+                            0,
+
+                        raw:
+                            item.sourceLine ||
+                            item.raw ||
+                            ""
+
+                    };
+
+                }
+            );
+
+
+        return {
+
+            found:
+                rows.length > 0,
+
+            status:
+                rows.length > 0
+                    ? "FOUND"
+                    : "NO MATERIAL",
+
+            ticket:
+                ttNumber,
+
+            materials:
+                rows,
+
+            note:
+                rows.length
+                    ? ""
+                    : "Tidak ditemukan material resmi di dalam CIR."
+
+        };
+
+    }
+
+
+    /* =====================================================
+       BUILD NO MATERIAL
+    ===================================================== */
+
+    function createNoMaterial(
+        ticket,
+        note
+    ) {
+
+        return {
+
+            ticket:
+                ticket || "",
+
+            material:
+                "",
+
+            originalMaterial:
+                "",
+
+            quantity:
+                "",
+
+            unit:
+                "",
+
+            code:
+                "",
+
+            type:
+                "NOT FOUND",
+
+            matchedAlias:
+                "",
+
+            raw:
+                "",
+
+            reason:
+                note ||
+                "Material tidak ditemukan."
+
+        };
 
     }
 
@@ -603,30 +928,37 @@
             );
 
 
-        const ticket =
-            getTicket(
+        /*
+         * TICKET = TT NUMBER KOLOM D
+         */
+
+        const ttNumber =
+            getTTNumber(
                 normalized
             );
 
 
-        /*
-         * Pastikan Customer Ticket terisi
-         * jika Ticket hanya berada di TT Number.
-         */
+        const cir =
+            getCIR(
+                normalized
+            );
+
+
+        /* ---------------------------------------------
+           VALIDATION
+        --------------------------------------------- */
 
         if (
-            !String(
-                normalized[
-                    "Customer Ticket"
-                ] || ""
-            ).trim() &&
-            ticket
+            !window.ReportCheckerValidator ||
+            typeof window
+                .ReportCheckerValidator
+                .validate !==
+                "function"
         ) {
 
-            normalized[
-                "Customer Ticket"
-            ] =
-                ticket;
+            throw new Error(
+                "validator.js belum berhasil dimuat."
+            );
 
         }
 
@@ -643,58 +975,32 @@
             index;
 
 
+        /*
+         * Jangan gunakan Customer Ticket
+         * sebagai ticket hasil.
+         */
+
         validation.ticket =
-            ticket;
+            ttNumber;
+
+
+        validation.ttNumber =
+            ttNumber;
 
 
         validation.originalRow =
             normalized;
 
 
-        /*
-         * Material parser
-         */
+        /* ---------------------------------------------
+           MATERIAL
+        --------------------------------------------- */
 
-        let materialResult = {
-
-            found:
-                false,
-
-            status:
-                "NO TICKET",
-
-            ticket:
-                ticket,
-
-            materials:
-                [],
-
-            customMaterials:
-                [],
-
-            rawLines:
-                [],
-
-            note:
-                ""
-
-        };
-
-
-        if (
-            ticket &&
-            window.ReportCheckerMaterial
-        ) {
-
-            materialResult =
-                window
-                    .ReportCheckerMaterial
-                    .parse(
-                        normalized["CIR"],
-                        ticket
-                    );
-
-        }
+        const materialResult =
+            parseMaterials(
+                ttNumber,
+                cir
+            );
 
 
         validation.materialResult =
@@ -702,6 +1008,139 @@
 
 
         return validation;
+
+    }
+
+
+    /* =====================================================
+       FLATTEN MATERIAL
+       
+       Pengganti API lama:
+       ReportCheckerMaterial.flatten()
+       
+       Tidak lagi bergantung kepada flatten()
+       dari material-parser.js.
+    ===================================================== */
+
+    function flattenMaterialResults(
+        materialResults
+    ) {
+
+        const output = [];
+
+
+        for (
+            const result
+            of materialResults || []
+        ) {
+
+            if (!result) {
+
+                continue;
+
+            }
+
+
+            const ticket =
+                cleanValue(
+                    result.ticket
+                );
+
+
+            const materials =
+                Array.isArray(
+                    result.materials
+                )
+                    ? result.materials
+                    : [];
+
+
+            for (
+                const item
+                of materials
+            ) {
+
+                if (!item) {
+
+                    continue;
+
+                }
+
+
+                /*
+                 * Ticket selalu TT Number.
+                 */
+
+                const materialRow = {
+
+                    ticket:
+                        ticket,
+
+                    material:
+                        item.material ||
+                        "",
+
+                    originalMaterial:
+                        item.originalMaterial ||
+                        item.material ||
+                        "",
+
+                    quantity:
+                        item.quantity ??
+                        item.qty ??
+                        1,
+
+                    unit:
+                        item.unit ||
+                        item.satuan ||
+                        "",
+
+                    code:
+                        item.code ||
+                        item.kode ||
+                        "",
+
+                    type:
+                        item.type ||
+                        "OFFICIAL",
+
+                    matchedAlias:
+                        item.matchedAlias ||
+                        "",
+
+                    score:
+                        item.score ??
+                        0,
+
+                    raw:
+                        item.raw ||
+                        item.sourceLine ||
+                        ""
+
+                };
+
+
+                /*
+                 * Jangan masukkan material tanpa ticket.
+                 */
+
+                if (!ticket) {
+
+                    continue;
+
+                }
+
+
+                output.push(
+                    materialRow
+                );
+
+            }
+
+        }
+
+
+        return output;
 
     }
 
@@ -715,9 +1154,7 @@
         fileName
     ) {
 
-        if (
-            !workbook
-        ) {
+        if (!workbook) {
 
             throw new Error(
                 "Workbook kosong."
@@ -764,7 +1201,8 @@
         ) {
 
             throw new Error(
-                "Header Excel tidak lengkap. Kolom yang belum ditemukan: " +
+                "Header Excel tidak lengkap.\n\n" +
+                "Kolom yang belum ditemukan:\n" +
                 headerValidation.missing.join(
                     ", "
                 )
@@ -779,11 +1217,26 @@
             );
 
 
+        if (
+            !rows.length
+        ) {
+
+            throw new Error(
+                "Tidak ada data setelah header."
+            );
+
+        }
+
+
         const normalizedRows =
             rows.map(
                 normalizeRow
             );
 
+
+        /*
+         * PROCESS VALIDATION + MATERIAL
+         */
 
         const validationResults =
             normalizedRows.map(
@@ -801,6 +1254,25 @@
             );
 
 
+        /* ---------------------------------------------
+           SPLIT VALIDATION
+        --------------------------------------------- */
+
+        if (
+            !window.ReportCheckerValidator ||
+            typeof window
+                .ReportCheckerValidator
+                .split !==
+                "function"
+        ) {
+
+            throw new Error(
+                "validator.js belum memiliki fungsi split()."
+            );
+
+        }
+
+
         const split =
             window
                 .ReportCheckerValidator
@@ -809,41 +1281,92 @@
                 );
 
 
-        /*
-         * MATERIAL
-         */
+        /* ---------------------------------------------
+           MATERIAL
+        --------------------------------------------- */
 
         const materialResults =
             validationResults.map(
-                function (
-                    item
-                ) {
+                function (item) {
 
-                    return item
-                        .materialResult;
+                    return item.materialResult;
 
                 }
             );
 
 
         const materialRows =
-            window
-                .ReportCheckerMaterial
-                .flatten(
-                    materialResults
+            flattenMaterialResults(
+                materialResults
+            );
+
+
+        /* ---------------------------------------------
+           MATERIAL ERROR / NOT FOUND
+        --------------------------------------------- */
+
+        const materialError =
+            [];
+
+
+        for (
+            const item
+            of validationResults
+        ) {
+
+            const ttNumber =
+                cleanValue(
+                    item?.ttNumber ||
+                    item?.ticket
                 );
 
 
-        /*
-         * CUSTOM MATERIAL
-         */
+            if (!ttNumber) {
+
+                continue;
+
+            }
+
+
+            const materialResult =
+                item?.materialResult;
+
+
+            if (
+                !materialResult ||
+                !materialResult.found
+            ) {
+
+                materialError.push(
+                    createNoMaterial(
+                        ttNumber,
+                        materialResult?.note
+                    )
+                );
+
+            }
+
+        }
+
+
+        /* ---------------------------------------------
+           CUSTOM MATERIAL
+           
+           Parser versi sekarang hanya memakai
+           MATERIAL_MASTER resmi.
+
+           Tetap disediakan agar kompatibel.
+        --------------------------------------------- */
 
         const customMaterials =
             materialRows.filter(
                 function (item) {
 
                     return (
-                        item.type ===
+                        String(
+                            item.type ||
+                            ""
+                        ).toUpperCase() ===
                         "CUSTOM"
                     );
 
@@ -851,57 +1374,9 @@
             );
 
 
-        /*
-         * TICKET TANPA MATERIAL
-         */
-
-        const materialNotFound =
-            validationResults
-                .map(
-                    function (
-                        item
-                    ) {
-
-                        if (
-                            !item.ticket
-                        ) {
-
-                            return null;
-
-                        }
-
-
-                        const materialResult =
-                            item.materialResult;
-
-
-                        if (
-                            !materialResult ||
-                            !materialResult.found
-                        ) {
-
-                            return (
-                                window
-                                    .ReportCheckerMaterial
-                                    .createNoMaterial(
-                                        item.ticket,
-                                        materialResult?.note
-                                    )
-                            );
-
-                        }
-
-
-                        return null;
-
-                    }
-                )
-                .filter(Boolean);
-
-
-        /*
-         * SAVE STATE
-         */
+        /* ---------------------------------------------
+           SAVE STATE
+        --------------------------------------------- */
 
         state.workbook =
             workbook;
@@ -924,23 +1399,39 @@
 
 
         state.sesuai =
-            split.sesuai;
+            Array.isArray(
+                split.sesuai
+            )
+                ? split.sesuai
+                : [];
 
 
         state.tidakSesuai =
-            split.tidakSesuai;
+            Array.isArray(
+                split.tidakSesuai
+            )
+                ? split.tidakSesuai
+                : [];
 
 
         state.invalid =
-            split.invalid;
+            Array.isArray(
+                split.invalid
+            )
+                ? split.invalid
+                : [];
 
 
         state.materials =
             materialRows;
 
 
+        state.materialError =
+            materialError;
+
+
         state.materialNotFound =
-            materialNotFound;
+            materialError;
 
 
         state.customMaterials =
@@ -951,6 +1442,10 @@
             fileName ||
             "report.xlsx";
 
+
+        /* ---------------------------------------------
+           RESULT
+        --------------------------------------------- */
 
         return {
 
@@ -966,23 +1461,29 @@
             validation:
                 validationResults,
 
+            validationResults:
+                validationResults,
+
             sesuai:
-                split.sesuai,
+                state.sesuai,
 
             tidakSesuai:
-                split.tidakSesuai,
+                state.tidakSesuai,
 
             invalid:
-                split.invalid,
+                state.invalid,
 
             materials:
-                materialRows,
+                state.materials,
+
+            materialError:
+                state.materialError,
 
             materialNotFound:
-                materialNotFound,
+                state.materialNotFound,
 
             customMaterials:
-                customMaterials,
+                state.customMaterials,
 
             summary: {
 
@@ -990,22 +1491,25 @@
                     validationResults.length,
 
                 sesuai:
-                    split.sesuai.length,
+                    state.sesuai.length,
 
                 tidakSesuai:
-                    split.tidakSesuai.length,
+                    state.tidakSesuai.length,
 
                 invalid:
-                    split.invalid.length,
+                    state.invalid.length,
 
                 material:
-                    materialRows.length,
+                    state.materials.length,
+
+                materialError:
+                    state.materialError.length,
 
                 materialNotFound:
-                    materialNotFound.length,
+                    state.materialNotFound.length,
 
                 customMaterial:
-                    customMaterials.length
+                    state.customMaterials.length
 
             }
 
@@ -1050,46 +1554,28 @@
             getXLSX();
 
 
-        let data;
+        const data = [
 
+            headers,
 
-        if (
-            Array.isArray(
-                headers
+            ...(rows || []).map(
+                function (row) {
+
+                    return headers.map(
+                        function (header) {
+
+                            return (
+                                row?.[header] ??
+                                ""
+                            );
+
+                        }
+                    );
+
+                }
             )
-        ) {
 
-            data = [
-
-                headers,
-
-                ...rows.map(
-                    function (row) {
-
-                        return headers.map(
-                            function (header) {
-
-                                return (
-                                    row?.[header] ??
-                                    ""
-                                );
-
-                            }
-                        );
-
-                    }
-                )
-
-            ];
-
-        }
-
-        else {
-
-            data =
-                rows;
-
-        }
+        ];
 
 
         return XLSX.utils.aoa_to_sheet(
@@ -1133,12 +1619,14 @@
 
             for (
                 const row
-                of rows
+                of rows || []
             ) {
 
                 const value =
                     String(
-                        row?.[headers[i]] ??
+                        row?.[
+                            headers[i]
+                        ] ??
                         ""
                     );
 
@@ -1232,6 +1720,63 @@
 
 
     /* =====================================================
+       VALIDATION EXPORT ROW
+    ===================================================== */
+
+    function makeValidationExportRows(
+        source
+    ) {
+
+        return (
+            source || []
+        ).map(
+            function (item) {
+
+                return {
+
+                    ...(
+                        item?.originalRow ||
+                        {}
+                    ),
+
+                    "TT Release":
+                        item?.releaseDateTime ||
+                        "",
+
+                    "Validation Status":
+                        item?.status ||
+                        "",
+
+                    "Validation Note":
+                        item?.reason ||
+                        ""
+
+                };
+
+            }
+        );
+
+    }
+
+
+    function validationHeaders() {
+
+        return [
+
+            ...EXPECTED_HEADERS,
+
+            "TT Release",
+
+            "Validation Status",
+
+            "Validation Note"
+
+        ];
+
+    }
+
+
+    /* =====================================================
        EXPORT SESUAI
     ===================================================== */
 
@@ -1240,44 +1785,16 @@
     ) {
 
         const rows =
-            state.sesuai.map(
-                function (item) {
-
-                    const row = {
-
-                        ...item.originalRow,
-
-                        "TT Release":
-                            item.releaseDateTime,
-
-                        "Validation Status":
-                            item.status,
-
-                        "Validation Note":
-                            item.reason
-
-                    };
-
-
-                    return row;
-
-                }
+            makeValidationExportRows(
+                state.sesuai
             );
 
 
         downloadWorkbook(
             rows,
-            [
-                ...EXPECTED_HEADERS,
-
-                "TT Release",
-                "Validation Status",
-                "Validation Note"
-
-            ],
+            validationHeaders(),
             fileName ||
             "hasil_sesuai.xlsx",
-
             "SESUAI"
         );
 
@@ -1293,41 +1810,16 @@
     ) {
 
         const rows =
-            state.tidakSesuai.map(
-                function (item) {
-
-                    return {
-
-                        ...item.originalRow,
-
-                        "TT Release":
-                            item.releaseDateTime,
-
-                        "Validation Status":
-                            item.status,
-
-                        "Validation Note":
-                            item.reason
-
-                    };
-
-                }
+            makeValidationExportRows(
+                state.tidakSesuai
             );
 
 
         downloadWorkbook(
             rows,
-            [
-                ...EXPECTED_HEADERS,
-
-                "TT Release",
-                "Validation Status",
-                "Validation Note"
-
-            ],
+            validationHeaders(),
             fileName ||
             "hasil_tidak_sesuai.xlsx",
-
             "TIDAK SESUAI"
         );
 
@@ -1343,41 +1835,16 @@
     ) {
 
         const rows =
-            state.invalid.map(
-                function (item) {
-
-                    return {
-
-                        ...item.originalRow,
-
-                        "TT Release":
-                            item.releaseDateTime,
-
-                        "Validation Status":
-                            item.status,
-
-                        "Validation Note":
-                            item.reason
-
-                    };
-
-                }
+            makeValidationExportRows(
+                state.invalid
             );
 
 
         downloadWorkbook(
             rows,
-            [
-                ...EXPECTED_HEADERS,
-
-                "TT Release",
-                "Validation Status",
-                "Validation Note"
-
-            ],
+            validationHeaders(),
             fileName ||
             "hasil_invalid.xlsx",
-
             "INVALID"
         );
 
@@ -1385,17 +1852,99 @@
 
 
     /* =====================================================
+       MATERIAL EXPORT ROW
+    ===================================================== */
+
+    function makeMaterialExportRows() {
+
+        return state.materials
+            .filter(
+                function (item) {
+
+                    return (
+                        item &&
+                        cleanValue(
+                            item.ticket
+                        )
+                    );
+
+                }
+            )
+            .map(
+                function (item) {
+
+                    return {
+
+                        "Ticket":
+                            item.ticket,
+
+                        "Material":
+                            item.material,
+
+                        "Original Material":
+                            item.originalMaterial ||
+                            item.material,
+
+                        "Quantity":
+                            item.quantity,
+
+                        "Unit":
+                            item.unit,
+
+                        "Code":
+                            item.code,
+
+                        "Type":
+                            item.type,
+
+                        "Matched Alias":
+                            item.matchedAlias,
+
+                        "Score":
+                            item.score,
+
+                        "Raw":
+                            item.raw
+
+                    };
+
+                }
+            );
+
+    }
+
+
+    function materialHeaders() {
+
+        return [
+
+            "Ticket",
+
+            "Material",
+
+            "Original Material",
+
+            "Quantity",
+
+            "Unit",
+
+            "Code",
+
+            "Type",
+
+            "Matched Alias",
+
+            "Score",
+
+            "Raw"
+
+        ];
+
+    }
+
+
+    /* =====================================================
        EXPORT MATERIAL
-       
-       Format:
-       Ticket
-       Material
-       Original Material
-       Quantity
-       Unit
-       Code
-       Type
-       Matched Alias
     ===================================================== */
 
     function exportMaterial(
@@ -1403,79 +1952,14 @@
     ) {
 
         const rows =
-            state.materials
-                .filter(
-                    function (item) {
-
-                        /*
-                         * TICKET WAJIB ADA
-                         */
-
-                        return (
-                            item &&
-                            item.ticket &&
-                            String(
-                                item.ticket
-                            ).trim()
-                        );
-
-                    }
-                )
-                .map(
-                    function (item) {
-
-                        return {
-
-                            "Ticket":
-                                item.ticket,
-
-                            "Material":
-                                item.material,
-
-                            "Original Material":
-                                item.originalMaterial,
-
-                            "Quantity":
-                                item.quantity,
-
-                            "Unit":
-                                item.unit,
-
-                            "Code":
-                                item.code,
-
-                            "Type":
-                                item.type,
-
-                            "Matched Alias":
-                                item.matchedAlias,
-
-                            "Raw":
-                                item.raw
-
-                        };
-
-                    }
-                );
+            makeMaterialExportRows();
 
 
         downloadWorkbook(
             rows,
-            [
-                "Ticket",
-                "Material",
-                "Original Material",
-                "Quantity",
-                "Unit",
-                "Code",
-                "Type",
-                "Matched Alias",
-                "Raw"
-
-            ],
+            materialHeaders(),
             fileName ||
             "hasil_material.xlsx",
-
             "MATERIAL"
         );
 
@@ -1483,21 +1967,23 @@
 
 
     /* =====================================================
-       EXPORT MATERIAL NOT FOUND
+       EXPORT MATERIAL ERROR
     ===================================================== */
 
-    function exportMaterialNotFound(
+    function exportMaterialError(
         fileName
     ) {
 
         const rows =
-            state.materialNotFound
+            state.materialError
                 .filter(
                     function (item) {
 
                         return (
                             item &&
-                            item.ticket
+                            cleanValue(
+                                item.ticket
+                            )
                         );
 
                     }
@@ -1514,13 +2000,32 @@
                 "unit",
                 "code",
                 "type",
+                "matchedAlias",
+                "raw",
                 "reason"
 
             ],
             fileName ||
-            "material_not_found.xlsx",
+            "material_error.xlsx",
+            "MATERIAL ERROR"
+        );
 
-            "NOT FOUND"
+    }
+
+
+    /* =====================================================
+       EXPORT MATERIAL NOT FOUND
+       
+       Alias lama.
+    ===================================================== */
+
+    function exportMaterialNotFound(
+        fileName
+    ) {
+
+        exportMaterialError(
+            fileName ||
+            "material_not_found.xlsx"
         );
 
     }
@@ -1541,7 +2046,9 @@
 
                         return (
                             item &&
-                            item.ticket
+                            cleanValue(
+                                item.ticket
+                            )
                         );
 
                     }
@@ -1575,6 +2082,9 @@
                             "Matched Alias":
                                 item.matchedAlias,
 
+                            "Score":
+                                item.score,
+
                             "Raw":
                                 item.raw
 
@@ -1586,21 +2096,9 @@
 
         downloadWorkbook(
             rows,
-            [
-                "Ticket",
-                "Material",
-                "Original Material",
-                "Quantity",
-                "Unit",
-                "Code",
-                "Type",
-                "Matched Alias",
-                "Raw"
-
-            ],
+            materialHeaders(),
             fileName ||
             "material_custom.xlsx",
-
             "CUSTOM"
         );
 
@@ -1608,15 +2106,7 @@
 
 
     /* =====================================================
-       EXPORT ALL RESULTS
-       
-       Satu file dengan beberapa sheet:
-       - SESUAI
-       - TIDAK SESUAI
-       - INVALID
-       - MATERIAL
-       - MATERIAL NOT FOUND
-       - CUSTOM MATERIAL
+       EXPORT ALL
     ===================================================== */
 
     function exportAll(
@@ -1631,421 +2121,188 @@
             XLSX.utils.book_new();
 
 
-        /* ---------------------------------------------
-           SESUAI
-        --------------------------------------------- */
+        /*
+         * HELPER APPEND
+         */
+
+        function appendSheet(
+            rows,
+            headers,
+            name
+        ) {
+
+            const sheet =
+                createWorksheet(
+                    rows,
+                    headers
+                );
+
+
+            autoWidth(
+                sheet,
+                rows,
+                headers
+            );
+
+
+            XLSX.utils.book_append_sheet(
+                workbook,
+                sheet,
+                name.substring(
+                    0,
+                    31
+                )
+            );
+
+        }
+
+
+        /*
+         * SESUAI
+         */
 
         const sesuaiRows =
-            state.sesuai.map(
-                function (item) {
-
-                    return {
-
-                        ...item.originalRow,
-
-                        "TT Release":
-                            item.releaseDateTime,
-
-                        "Validation Status":
-                            item.status,
-
-                        "Validation Note":
-                            item.reason
-
-                    };
-
-                }
+            makeValidationExportRows(
+                state.sesuai
             );
 
 
-        const sesuaiSheet =
-            createWorksheet(
-                sesuaiRows,
-                [
-                    ...EXPECTED_HEADERS,
-
-                    "TT Release",
-                    "Validation Status",
-                    "Validation Note"
-
-                ]
-            );
-
-
-        autoWidth(
-            sesuaiSheet,
+        appendSheet(
             sesuaiRows,
-            [
-                ...EXPECTED_HEADERS,
-
-                "TT Release",
-                "Validation Status",
-                "Validation Note"
-
-            ]
-        );
-
-
-        XLSX.utils.book_append_sheet(
-            workbook,
-            sesuaiSheet,
+            validationHeaders(),
             "SESUAI"
         );
 
 
-        /* ---------------------------------------------
-           TIDAK SESUAI
-        --------------------------------------------- */
+        /*
+         * TIDAK SESUAI
+         */
 
         const tidakRows =
-            state.tidakSesuai.map(
-                function (item) {
-
-                    return {
-
-                        ...item.originalRow,
-
-                        "TT Release":
-                            item.releaseDateTime,
-
-                        "Validation Status":
-                            item.status,
-
-                        "Validation Note":
-                            item.reason
-
-                    };
-
-                }
+            makeValidationExportRows(
+                state.tidakSesuai
             );
 
 
-        const tidakSheet =
-            createWorksheet(
-                tidakRows,
-                [
-                    ...EXPECTED_HEADERS,
-
-                    "TT Release",
-                    "Validation Status",
-                    "Validation Note"
-
-                ]
-            );
-
-
-        autoWidth(
-            tidakSheet,
+        appendSheet(
             tidakRows,
-            [
-                ...EXPECTED_HEADERS,
-
-                "TT Release",
-                "Validation Status",
-                "Validation Note"
-
-            ]
-        );
-
-
-        XLSX.utils.book_append_sheet(
-            workbook,
-            tidakSheet,
+            validationHeaders(),
             "TIDAK SESUAI"
         );
 
 
-        /* ---------------------------------------------
-           INVALID
-        --------------------------------------------- */
+        /*
+         * INVALID
+         */
 
         const invalidRows =
-            state.invalid.map(
-                function (item) {
-
-                    return {
-
-                        ...item.originalRow,
-
-                        "TT Release":
-                            item.releaseDateTime,
-
-                        "Validation Status":
-                            item.status,
-
-                        "Validation Note":
-                            item.reason
-
-                    };
-
-                }
+            makeValidationExportRows(
+                state.invalid
             );
 
 
-        const invalidSheet =
-            createWorksheet(
-                invalidRows,
-                [
-                    ...EXPECTED_HEADERS,
-
-                    "TT Release",
-                    "Validation Status",
-                    "Validation Note"
-
-                ]
-            );
-
-
-        autoWidth(
-            invalidSheet,
+        appendSheet(
             invalidRows,
-            [
-                ...EXPECTED_HEADERS,
-
-                "TT Release",
-                "Validation Status",
-                "Validation Note"
-
-            ]
-        );
-
-
-        XLSX.utils.book_append_sheet(
-            workbook,
-            invalidSheet,
+            validationHeaders(),
             "INVALID"
         );
 
 
-        /* ---------------------------------------------
-           MATERIAL
-        --------------------------------------------- */
+        /*
+         * MATERIAL
+         */
 
-        const materialRows =
-            state.materials
-                .filter(
-                    function (item) {
-
-                        return (
-                            item &&
-                            item.ticket
-                        );
-
-                    }
-                )
-                .map(
-                    function (item) {
-
-                        return {
-
-                            "Ticket":
-                                item.ticket,
-
-                            "Material":
-                                item.material,
-
-                            "Original Material":
-                                item.originalMaterial,
-
-                            "Quantity":
-                                item.quantity,
-
-                            "Unit":
-                                item.unit,
-
-                            "Code":
-                                item.code,
-
-                            "Type":
-                                item.type,
-
-                            "Matched Alias":
-                                item.matchedAlias,
-
-                            "Raw":
-                                item.raw
-
-                        };
-
-                    }
-                );
-
-
-        const materialHeaders = [
-
-            "Ticket",
-            "Material",
-            "Original Material",
-            "Quantity",
-            "Unit",
-            "Code",
-            "Type",
-            "Matched Alias",
-            "Raw"
-
-        ];
-
-
-        const materialSheet =
-            createWorksheet(
-                materialRows,
-                materialHeaders
-            );
-
-
-        autoWidth(
-            materialSheet,
-            materialRows,
-            materialHeaders
-        );
-
-
-        XLSX.utils.book_append_sheet(
-            workbook,
-            materialSheet,
+        appendSheet(
+            makeMaterialExportRows(),
+            materialHeaders(),
             "MATERIAL"
         );
 
 
-        /* ---------------------------------------------
-           MATERIAL NOT FOUND
-        --------------------------------------------- */
+        /*
+         * MATERIAL ERROR
+         */
 
-        const notFoundRows =
-            state.materialNotFound
+        const materialErrorRows =
+            state.materialError
                 .filter(
                     function (item) {
 
                         return (
                             item &&
-                            item.ticket
+                            cleanValue(
+                                item.ticket
+                            )
                         );
 
                     }
                 );
 
 
-        const notFoundHeaders = [
+        appendSheet(
+            materialErrorRows,
+            [
+                "ticket",
+                "material",
+                "originalMaterial",
+                "quantity",
+                "unit",
+                "code",
+                "type",
+                "matchedAlias",
+                "raw",
+                "reason"
 
-            "ticket",
-            "material",
-            "originalMaterial",
-            "quantity",
-            "unit",
-            "code",
-            "type",
-            "reason"
-
-        ];
-
-
-        const notFoundSheet =
-            createWorksheet(
-                notFoundRows,
-                notFoundHeaders
-            );
-
-
-        autoWidth(
-            notFoundSheet,
-            notFoundRows,
-            notFoundHeaders
+            ],
+            "MATERIAL ERROR"
         );
 
 
-        XLSX.utils.book_append_sheet(
-            workbook,
-            notFoundSheet,
-            "NOT FOUND"
-        );
+        /*
+         * CUSTOM
+         */
 
+        appendSheet(
+            state.customMaterials.map(
+                function (item) {
 
-        /* ---------------------------------------------
-           CUSTOM MATERIAL
-        --------------------------------------------- */
+                    return {
 
-        const customRows =
-            state.customMaterials
-                .filter(
-                    function (item) {
+                        "Ticket":
+                            item.ticket,
 
-                        return (
-                            item &&
-                            item.ticket
-                        );
+                        "Material":
+                            item.material,
 
-                    }
-                )
-                .map(
-                    function (item) {
+                        "Original Material":
+                            item.originalMaterial,
 
-                        return {
+                        "Quantity":
+                            item.quantity,
 
-                            "Ticket":
-                                item.ticket,
+                        "Unit":
+                            item.unit,
 
-                            "Material":
-                                item.material,
+                        "Code":
+                            item.code,
 
-                            "Original Material":
-                                item.originalMaterial,
+                        "Type":
+                            item.type,
 
-                            "Quantity":
-                                item.quantity,
+                        "Matched Alias":
+                            item.matchedAlias,
 
-                            "Unit":
-                                item.unit,
+                        "Score":
+                            item.score,
 
-                            "Code":
-                                item.code,
+                        "Raw":
+                            item.raw
 
-                            "Type":
-                                item.type,
+                    };
 
-                            "Matched Alias":
-                                item.matchedAlias,
-
-                            "Raw":
-                                item.raw
-
-                        };
-
-                    }
-                );
-
-
-        const customHeaders = [
-
-            "Ticket",
-            "Material",
-            "Original Material",
-            "Quantity",
-            "Unit",
-            "Code",
-            "Type",
-            "Matched Alias",
-            "Raw"
-
-        ];
-
-
-        const customSheet =
-            createWorksheet(
-                customRows,
-                customHeaders
-            );
-
-
-        autoWidth(
-            customSheet,
-            customRows,
-            customHeaders
-        );
-
-
-        XLSX.utils.book_append_sheet(
-            workbook,
-            customSheet,
+                }
+            ),
+            materialHeaders(),
             "CUSTOM"
         );
 
@@ -2059,6 +2316,80 @@
             fileName ||
             "report_checker_result.xlsx"
         );
+
+    }
+
+
+    /* =====================================================
+       EXPORT RESULT
+       
+       Dipakai app.js:
+       excel.exportResult(type)
+    ===================================================== */
+
+    function exportResult(
+        type
+    ) {
+
+        switch (
+            String(
+                type || ""
+            ).toLowerCase()
+        ) {
+
+            case "valid":
+
+                exportSesuai(
+                    "Sesuai.xlsx"
+                );
+
+                break;
+
+
+            case "invalid":
+
+                exportTidakSesuai(
+                    "Tidak_Sesuai.xlsx"
+                );
+
+                break;
+
+
+            case "material":
+
+                exportMaterial(
+                    "Material.xlsx"
+                );
+
+                break;
+
+
+            case "material-error":
+
+                exportMaterialError(
+                    "Material_Error.xlsx"
+                );
+
+                break;
+
+
+            case "all":
+
+                exportAll(
+                    "Report_Checker_Result.xlsx"
+                );
+
+                break;
+
+
+            default:
+
+                throw new Error(
+                    "Tipe export tidak dikenal: " +
+                    type
+                );
+
+        }
 
     }
 
@@ -2080,6 +2411,9 @@
             rows:
                 state.rows,
 
+            originalRows:
+                state.originalRows,
+
             validationResults:
                 state.validationResults,
 
@@ -2095,6 +2429,9 @@
             materials:
                 state.materials,
 
+            materialError:
+                state.materialError,
+
             materialNotFound:
                 state.materialNotFound,
 
@@ -2102,7 +2439,29 @@
                 state.customMaterials,
 
             fileName:
-                state.fileName
+                state.fileName,
+
+            summary: {
+
+                total:
+                    state.validationResults.length,
+
+                sesuai:
+                    state.sesuai.length,
+
+                tidakSesuai:
+                    state.tidakSesuai.length,
+
+                invalid:
+                    state.invalid.length,
+
+                material:
+                    state.materials.length,
+
+                materialError:
+                    state.materialError.length
+
+            }
 
         };
 
@@ -2142,6 +2501,9 @@
         state.materials =
             [];
 
+        state.materialError =
+            [];
+
         state.materialNotFound =
             [];
 
@@ -2160,45 +2522,27 @@
 
     window.ReportCheckerExcel = {
 
-        /*
-         * Load Excel
-         */
         load:
             loadExcel,
 
-        /*
-         * Process workbook
-         */
         process:
             processWorkbook,
 
-        /*
-         * Header validation
-         */
         validateHeaders:
             validateHeaders,
 
-        /*
-         * Get ticket
-         */
         getTicket:
             getTicket,
 
-        /*
-         * State
-         */
+        getTTNumber:
+            getTTNumber,
+
         getState:
             getState,
 
-        /*
-         * Reset
-         */
         reset:
             reset,
 
-        /*
-         * Export individual
-         */
         exportSesuai:
             exportSesuai,
 
@@ -2211,21 +2555,25 @@
         exportMaterial:
             exportMaterial,
 
+        exportMaterialError:
+            exportMaterialError,
+
         exportMaterialNotFound:
             exportMaterialNotFound,
 
         exportCustomMaterial:
             exportCustomMaterial,
 
-        /*
-         * Export semua dalam 1 workbook
-         */
         exportAll:
             exportAll,
 
         /*
-         * Config
+         * Dipakai oleh app.js
          */
+
+        exportResult:
+            exportResult,
+
         headers:
             EXPECTED_HEADERS
 
