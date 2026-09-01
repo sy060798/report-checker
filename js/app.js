@@ -2,26 +2,29 @@
    REPORT CHECKER
    app.js
 
-   FULL VERSION
-   Integrasi:
-   - material-parser.js
-   - validator.js
+   FULL UPDATE
 
-   FITUR:
-   - Upload Excel
-   - Baca worksheet
-   - Deteksi header
-   - TT Number dari kolom "TT Number"
-   - Datetime Receive
-   - CIR
-   - Validasi TT Release
-   - Parse material dari CIR
-   - Material hanya dari MASTER LIST
-   - Material excluded otomatis ditolak
-   - Status SESUAI / TIDAK SESUAI / INVALID
-   - Tabel hasil
-   - Summary
-   - Export Excel
+   Struktur file:
+   report-checker/
+   ├── index.html
+   ├── css/
+   │   └── style.css
+   └── js/
+       ├── app.js
+       ├── excel.js
+       ├── validator.js
+       ├── cir-parser.js
+       ├── material-parser.js
+       └── settings.js
+
+   CATATAN:
+   - TIDAK menggunakan exporter.js
+   - Excel dibaca langsung menggunakan XLSX
+   - Export Excel juga langsung menggunakan XLSX
+   - TT Number hanya dari kolom "TT Number"
+   - Datetime Receive dari Excel
+   - TT Release dari CIR
+   - Material dari material-parser.js
 ========================================================= */
 
 (function () {
@@ -64,9 +67,7 @@
 
     function $(selector) {
 
-        return document.querySelector(
-            selector
-        );
+        return document.querySelector(selector);
 
     }
 
@@ -74,9 +75,7 @@
     function $$(selector) {
 
         return Array.from(
-            document.querySelectorAll(
-                selector
-            )
+            document.querySelectorAll(selector)
         );
 
     }
@@ -84,30 +83,21 @@
 
     function byId(id) {
 
-        return document.getElementById(
-            id
-        );
+        return document.getElementById(id);
 
     }
 
 
     /* =====================================================
-       ELEMENT FINDER
+       FIND ELEMENT
     ===================================================== */
 
-    function findElement(
-        selectors
-    ) {
+    function findElement(selectors) {
 
-        for (
-            const selector
-            of selectors
-        ) {
+        for (const selector of selectors) {
 
             const element =
-                document.querySelector(
-                    selector
-                );
+                document.querySelector(selector);
 
             if (element) {
 
@@ -123,7 +113,7 @@
 
 
     /* =====================================================
-       GET UI ELEMENTS
+       UI ELEMENTS
     ===================================================== */
 
     function getUI() {
@@ -135,6 +125,7 @@
                     "#fileInput",
                     "#excelFile",
                     "#uploadFile",
+                    "#file",
                     "input[type='file']"
                 ]),
 
@@ -142,28 +133,32 @@
                 findElement([
                     "#sheetSelect",
                     "#sheetName",
-                    "#worksheetSelect"
+                    "#worksheetSelect",
+                    "#sheet"
                 ]),
 
             uploadButton:
                 findElement([
                     "#uploadBtn",
                     "#btnUpload",
-                    "#processBtn"
+                    "#processBtn",
+                    "#chooseFileBtn"
                 ]),
 
             validateButton:
                 findElement([
                     "#validateBtn",
                     "#btnValidate",
-                    "#checkBtn"
+                    "#checkBtn",
+                    "#runBtn"
                 ]),
 
             exportButton:
                 findElement([
                     "#exportBtn",
                     "#btnExport",
-                    "#downloadBtn"
+                    "#downloadBtn",
+                    "#exportAllBtn"
                 ]),
 
             exportSesuaiButton:
@@ -178,6 +173,26 @@
                     "#btnExportTidakSesuai"
                 ]),
 
+            exportMaterialButton:
+                findElement([
+                    "#exportMaterialBtn",
+                    "#btnExportMaterial"
+                ]),
+
+            exportCombinedButton:
+                findElement([
+                    "#exportCombinedBtn",
+                    "#btnExportDetail",
+                    "#exportDetailBtn"
+                ]),
+
+            resetButton:
+                findElement([
+                    "#resetBtn",
+                    "#btnReset",
+                    "#clearBtn"
+                ]),
+
             status:
                 findElement([
                     "#status",
@@ -188,7 +203,8 @@
             loading:
                 findElement([
                     "#loading",
-                    "#loader"
+                    "#loader",
+                    "#spinner"
                 ]),
 
             table:
@@ -214,31 +230,36 @@
             total:
                 findElement([
                     "#total",
-                    "#totalCount"
+                    "#totalCount",
+                    "#countTotal"
                 ]),
 
             sesuai:
                 findElement([
                     "#sesuai",
-                    "#sesuaiCount"
+                    "#sesuaiCount",
+                    "#countSesuai"
                 ]),
 
             tidakSesuai:
                 findElement([
                     "#tidakSesuai",
-                    "#tidakSesuaiCount"
+                    "#tidakSesuaiCount",
+                    "#countTidakSesuai"
                 ]),
 
             invalid:
                 findElement([
                     "#invalid",
-                    "#invalidCount"
+                    "#invalidCount",
+                    "#countInvalid"
                 ]),
 
             fileName:
                 findElement([
                     "#fileName",
-                    "#selectedFile"
+                    "#selectedFile",
+                    "#fileNameText"
                 ])
 
         };
@@ -247,16 +268,12 @@
 
 
     /* =====================================================
-       UI
+       STATUS
     ===================================================== */
 
-    function setStatus(
-        message,
-        type
-    ) {
+    function setStatus(message, type) {
 
-        const ui =
-            getUI();
+        const ui = getUI();
 
         if (!ui.status) {
 
@@ -264,73 +281,55 @@
 
         }
 
-
         ui.status.textContent =
             message || "";
-
 
         ui.status.className =
             "status";
 
-
         if (type) {
 
-            ui.status.classList.add(
-                type
-            );
+            ui.status.classList.add(type);
 
         }
-
-    }
-
-
-    function setLoading(
-        loading
-    ) {
-
-        const ui =
-            getUI();
-
-
-        if (ui.loading) {
-
-            ui.loading.style.display =
-                loading
-                    ? ""
-                    : "none";
-
-        }
-
-    }
-
-
-    function setDisabled(
-        element,
-        disabled
-    ) {
-
-        if (!element) {
-
-            return;
-
-        }
-
-
-        element.disabled =
-            !!disabled;
 
     }
 
 
     /* =====================================================
-       CHECK DEPENDENCIES
+       LOADING
+    ===================================================== */
+
+    function setLoading(loading) {
+
+        const ui = getUI();
+
+        if (!ui.loading) {
+
+            return;
+
+        }
+
+        ui.loading.style.display =
+            loading ? "" : "none";
+
+    }
+
+
+    /* =====================================================
+       DEPENDENCIES
     ===================================================== */
 
     function checkDependencies() {
 
+        /*
+         * XLSX bisa berasal dari:
+         * - CDN di index.html
+         * - excel.js
+         */
+
         if (
-            typeof XLSX ===
-            "undefined"
+            typeof XLSX === "undefined"
         ) {
 
             console.error(
@@ -338,25 +337,7 @@
             );
 
             setStatus(
-                "Library XLSX belum tersedia.",
-                "error"
-            );
-
-            return false;
-
-        }
-
-
-        if (
-            !window.ReportCheckerMaterial
-        ) {
-
-            console.error(
-                "material-parser.js belum dimuat."
-            );
-
-            setStatus(
-                "material-parser.js belum tersedia.",
+                "Library Excel (XLSX) belum tersedia. Pastikan excel.js atau SheetJS sudah dimuat.",
                 "error"
             );
 
@@ -383,6 +364,27 @@
         }
 
 
+        /*
+         * Material parser bersifat optional.
+         *
+         * Jika tersedia:
+         * material akan diproses.
+         *
+         * Jika tidak tersedia:
+         * validasi utama tetap dapat berjalan.
+         */
+
+        if (
+            !window.ReportCheckerMaterial
+        ) {
+
+            console.warn(
+                "material-parser.js belum tersedia. Material tidak akan diproses."
+            );
+
+        }
+
+
         return true;
 
     }
@@ -392,9 +394,7 @@
        NORMALIZE HEADER
     ===================================================== */
 
-    function normalizeHeader(
-        value
-    ) {
+    function normalizeHeader(value) {
 
         if (
             value === null ||
@@ -404,7 +404,6 @@
             return "";
 
         }
-
 
         return String(value)
 
@@ -423,10 +422,7 @@
        FIND HEADER
     ===================================================== */
 
-    function findHeader(
-        headers,
-        names
-    ) {
+    function findHeader(headers, names) {
 
         if (
             !Array.isArray(headers)
@@ -436,28 +432,19 @@
 
         }
 
-
         const wanted =
             names.map(
                 normalizeHeader
             );
 
 
-        for (
-            const header
-            of headers
-        ) {
+        for (const header of headers) {
 
             const normalized =
-                normalizeHeader(
-                    header
-                );
-
+                normalizeHeader(header);
 
             if (
-                wanted.includes(
-                    normalized
-                )
+                wanted.includes(normalized)
             ) {
 
                 return header;
@@ -466,19 +453,16 @@
 
         }
 
-
         return null;
 
     }
 
 
     /* =====================================================
-       REQUIRED COLUMNS
+       DETECT COLUMNS
     ===================================================== */
 
-    function detectColumns(
-        rows
-    ) {
+    function detectColumns(rows) {
 
         if (
             !Array.isArray(rows) ||
@@ -506,38 +490,40 @@
 
         return {
 
+            /*
+             * WAJIB TT Number.
+             *
+             * Tidak menggunakan:
+             * - Customer Ticket
+             * - Ref Ticket
+             * - Ticket
+             */
+
             ttNumber:
                 findHeader(
                     headers,
                     [
-                        "TT Number",
-                        "TT number",
-                        "TT_NUMBER",
-                        "TT_Number"
+                        "TT Number"
                     ]
                 ),
+
 
             datetimeReceive:
                 findHeader(
                     headers,
                     [
                         "Datetime Receive",
-                        "Datetime receive",
                         "DateTime Receive",
-                        "Receive Datetime",
-                        "Receive Date",
-                        "Datetime"
+                        "Datetime receive"
                     ]
                 ),
+
 
             cir:
                 findHeader(
                     headers,
                     [
-                        "CIR",
-                        "cir",
-                        "CIR Text",
-                        "CIR_TEXT"
+                        "CIR"
                     ]
                 )
 
@@ -548,32 +534,19 @@
 
     /* =====================================================
        NORMALIZE INPUT ROW
-       
-       Penting:
-       Validator hanya membaca:
-       "TT Number"
-       "Datetime Receive"
-       "CIR"
     ===================================================== */
 
-    function normalizeInputRow(
-        row,
-        columns
-    ) {
+    function normalizeInputRow(row, columns) {
 
         const output = {
 
-            "TT Number":
-                "",
+            "TT Number": "",
 
-            "Datetime Receive":
-                "",
+            "Datetime Receive": "",
 
-            "CIR":
-                "",
+            "CIR": "",
 
-            originalRow:
-                row
+            originalRow: row
 
         };
 
@@ -585,9 +558,7 @@
         }
 
 
-        if (
-            columns.ttNumber
-        ) {
+        if (columns.ttNumber) {
 
             output["TT Number"] =
                 row[
@@ -597,13 +568,9 @@
         }
 
 
-        if (
-            columns.datetimeReceive
-        ) {
+        if (columns.datetimeReceive) {
 
-            output[
-                "Datetime Receive"
-            ] =
+            output["Datetime Receive"] =
                 row[
                     columns.datetimeReceive
                 ];
@@ -611,9 +578,7 @@
         }
 
 
-        if (
-            columns.cir
-        ) {
+        if (columns.cir) {
 
             output["CIR"] =
                 row[
@@ -629,18 +594,26 @@
 
 
     /* =====================================================
-       READ FILE
+       READ EXCEL FILE
     ===================================================== */
 
-    function readFile(
-        file
-    ) {
+    function readExcelFile(file) {
 
         return new Promise(
-            function (
-                resolve,
-                reject
-            ) {
+            function (resolve, reject) {
+
+                if (!file) {
+
+                    reject(
+                        new Error(
+                            "File tidak dipilih."
+                        )
+                    );
+
+                    return;
+
+                }
+
 
                 const reader =
                     new FileReader();
@@ -661,29 +634,39 @@
                                 XLSX.read(
                                     data,
                                     {
-                                        type:
-                                            "array",
-                                        cellDates:
-                                            true,
-                                        cellNF:
-                                            false,
-                                        cellText:
-                                            false
+                                        type: "array",
+
+                                        cellDates: true,
+
+                                        cellNF: false,
+
+                                        cellText: false,
+
+                                        raw: true
                                     }
                                 );
 
 
-                            resolve(
-                                workbook
-                            );
+                            if (
+                                !workbook ||
+                                !workbook.SheetNames ||
+                                !workbook.SheetNames.length
+                            ) {
+
+                                throw new Error(
+                                    "File Excel tidak memiliki worksheet."
+                                );
+
+                            }
+
+
+                            resolve(workbook);
 
                         }
 
                         catch (error) {
 
-                            reject(
-                                error
-                            );
+                            reject(error);
 
                         }
 
@@ -695,16 +678,14 @@
 
                         reject(
                             new Error(
-                                "Gagal membaca file."
+                                "Gagal membaca file Excel."
                             )
                         );
 
                     };
 
 
-                reader.readAsArrayBuffer(
-                    file
-                );
+                reader.readAsArrayBuffer(file);
 
             }
         );
@@ -716,9 +697,7 @@
        WORKSHEET TO JSON
     ===================================================== */
 
-    function worksheetToJSON(
-        worksheet
-    ) {
+    function worksheetToJSON(worksheet) {
 
         if (!worksheet) {
 
@@ -747,9 +726,7 @@
        GET SHEET NAMES
     ===================================================== */
 
-    function getSheetNames(
-        workbook
-    ) {
+    function getSheetNames(workbook) {
 
         if (
             !workbook ||
@@ -772,9 +749,7 @@
        POPULATE SHEET SELECT
     ===================================================== */
 
-    function populateSheetSelect(
-        workbook
-    ) {
+    function populateSheetSelect(workbook) {
 
         const ui =
             getUI();
@@ -839,16 +814,19 @@
 
 
     /* =====================================================
-       LOAD SELECTED SHEET
+       LOAD SHEET
     ===================================================== */
 
-    function loadSheet(
-        sheetName
-    ) {
+    function loadSheet(sheetName) {
 
         if (
             !state.workbook
         ) {
+
+            setStatus(
+                "Workbook belum tersedia.",
+                "error"
+            );
 
             return false;
 
@@ -899,79 +877,73 @@
                 : [];
 
 
+        console.log(
+            "Worksheet loaded:",
+            {
+                sheetName,
+                rowCount: rows.length,
+                headers: state.headers
+            }
+        );
+
+
         return true;
 
     }
 
 
     /* =====================================================
-       VALIDATE REQUIRED COLUMNS
+       VALIDATE COLUMNS
     ===================================================== */
 
-    function validateColumns(
-        rows
-    ) {
+    function validateColumns(rows) {
 
         const columns =
-            detectColumns(
-                rows
-            );
+            detectColumns(rows);
 
 
-        if (
-            !columns.ttNumber
-        ) {
+        if (!columns.ttNumber) {
 
             return {
 
-                valid:
-                    false,
+                valid: false,
 
                 error:
-                    'Kolom "TT Number" tidak ditemukan.',
+                    'Kolom "TT Number" tidak ditemukan. Pastikan nama kolom tepat "TT Number".',
 
-                columns:
-                    columns
+                columns
 
             };
 
         }
 
 
-        if (
-            !columns.datetimeReceive
-        ) {
+        if (!columns.datetimeReceive) {
 
             return {
 
-                valid:
-                    false,
+                valid: false,
 
                 error:
                     'Kolom "Datetime Receive" tidak ditemukan.',
 
-                columns:
-                    columns
+                columns
 
             };
 
         }
 
 
-        if (
-            !columns.cir
-        ) {
+        if (!columns.cir) {
 
             return {
 
-                valid:
-                    false,
+                valid: false,
 
                 error:
                     'Kolom "CIR" tidak ditemukan.',
 
-                columns:
-                    columns
+                columns
 
             };
 
@@ -980,16 +952,95 @@
 
         return {
 
-            valid:
-                true,
+            valid: true,
 
-            error:
-                "",
+            error: "",
 
-            columns:
-                columns
+            columns
 
         };
+
+    }
+
+
+    /* =====================================================
+       PROCESS MATERIAL
+    ===================================================== */
+
+    function processMaterials(normalizedRows) {
+
+        const materialRows = [];
+
+
+        /*
+         * Jika parser tidak tersedia,
+         * return kosong.
+         */
+
+        if (
+            !window.ReportCheckerMaterial
+        ) {
+
+            return materialRows;
+
+        }
+
+
+        if (
+            typeof window
+                .ReportCheckerMaterial
+                .buildRows !== "function"
+        ) {
+
+            console.warn(
+                "ReportCheckerMaterial.buildRows tidak ditemukan."
+            );
+
+            return materialRows;
+
+        }
+
+
+        normalizedRows.forEach(
+            function (row) {
+
+                try {
+
+                    const parsed =
+                        window
+                            .ReportCheckerMaterial
+                            .buildRows(
+                                row,
+                                "CIR"
+                            );
+
+
+                    if (
+                        Array.isArray(parsed)
+                    ) {
+
+                        materialRows.push(
+                            ...parsed
+                        );
+
+                    }
+
+                }
+
+                catch (error) {
+
+                    console.error(
+                        "Material parser error:",
+                        error
+                    );
+
+                }
+
+            }
+        );
+
+
+        return materialRows;
 
     }
 
@@ -1001,11 +1052,14 @@
     function processData() {
 
         if (
+            !Array.isArray(
+                state.rows
+            ) ||
             !state.rows.length
         ) {
 
             setStatus(
-                "Tidak ada data.",
+                "Tidak ada data Excel.",
                 "error"
             );
 
@@ -1047,62 +1101,53 @@
             );
 
 
+        console.log(
+            "Normalized rows:",
+            normalizedRows
+        );
+
+
+        /*
+         * VALIDATOR
+         */
+
         const results =
-            window.ReportCheckerValidator
+            window
+                .ReportCheckerValidator
                 .validateRows(
                     normalizedRows
                 );
 
 
         state.results =
-            results;
+            Array.isArray(results)
+                ? results
+                : [];
 
 
         /*
-         * Material parser diproses
-         * secara terpisah.
+         * MATERIAL
          */
 
-        const materialRows = [];
-
-
-        normalizedRows.forEach(
-            function (row) {
-
-                const parsed =
-                    window.ReportCheckerMaterial
-                        .buildRows(
-                            row,
-                            "CIR"
-                        );
-
-
-                materialRows.push(
-                    ...parsed
-                );
-
-            }
-        );
-
-
         state.materialRows =
-            materialRows;
+            processMaterials(
+                normalizedRows
+            );
 
 
         /*
-         * Gabungkan informasi validation
-         * dengan material.
+         * COMBINED
          */
 
         state.combinedRows =
             buildCombinedRows(
                 normalizedRows,
-                results,
-                materialRows
+                state.results,
+                state.materialRows
             );
 
 
-        return results;
+        return state.results;
 
     }
 
@@ -1118,6 +1163,17 @@
     ) {
 
         const output = [];
+
+
+        if (
+            !Array.isArray(
+                validationResults
+            )
+        ) {
+
+            return output;
+
+        }
 
 
         for (
@@ -1136,35 +1192,40 @@
 
             const ticket =
                 validation.ticket ||
+                validation.ttNumber ||
                 "";
 
 
             const matchingMaterials =
-                materialRows.filter(
-                    function (material) {
+                Array.isArray(materialRows)
+                    ? materialRows.filter(
+                        function (material) {
 
-                        return (
-                            String(
-                                material.ticket ||
-                                ""
-                            ).trim() ===
-                            String(
-                                ticket
-                            ).trim()
-                        );
+                            return (
+                                String(
+                                    material?.ticket ||
+                                    ""
+                                ).trim() ===
+                                String(
+                                    ticket
+                                ).trim()
+                            );
 
-                    }
-                );
+                        }
+                    )
+                    : [];
 
+
+            /*
+             * Jika ada material.
+             */
 
             if (
                 matchingMaterials.length
             ) {
 
                 matchingMaterials.forEach(
-                    function (
-                        material
-                    ) {
+                    function (material) {
 
                         output.push({
 
@@ -1173,31 +1234,39 @@
 
                             "Datetime Receive":
                                 validation
-                                    .receiveDateFormatted,
+                                    .receiveDateFormatted ||
+                                "",
 
                             "TT Release":
                                 validation
-                                    .releaseDateTime,
+                                    .releaseDateTime ||
+                                "",
 
                             "Status":
                                 validation
-                                    .status,
+                                    .status ||
+                                "",
 
                             "Keterangan":
                                 validation
-                                    .reason,
+                                    .reason ||
+                                "",
 
                             "Material":
-                                material.material,
+                                material.material ||
+                                "",
 
                             "Quantity":
-                                material.quantity,
+                                material.quantity ??
+                                "",
 
                             "Satuan":
-                                material.unit,
+                                material.unit ||
+                                "",
 
                             "Material Score":
-                                material.score,
+                                material.score ??
+                                "",
 
                             "CIR":
                                 source.CIR ||
@@ -1205,14 +1274,17 @@
 
                             "Release Raw":
                                 validation
-                                    .releaseRaw
+                                    .releaseRaw ||
+                                ""
 
                         });
 
                     }
                 );
 
-            } else {
+            }
+
+            else {
 
                 output.push({
 
@@ -1221,19 +1293,23 @@
 
                     "Datetime Receive":
                         validation
-                            .receiveDateFormatted,
+                            .receiveDateFormatted ||
+                        "",
 
                     "TT Release":
                         validation
-                            .releaseDateTime,
+                            .releaseDateTime ||
+                        "",
 
                     "Status":
                         validation
-                            .status,
+                            .status ||
+                        "",
 
                     "Keterangan":
                         validation
-                            .reason,
+                            .reason ||
+                        "",
 
                     "Material":
                         "",
@@ -1253,7 +1329,8 @@
 
                     "Release Raw":
                         validation
-                            .releaseRaw
+                            .releaseRaw ||
+                        ""
 
                 });
 
@@ -1268,15 +1345,36 @@
 
 
     /* =====================================================
-       RENDER SUMMARY
+       SUMMARY
     ===================================================== */
 
-    function renderSummary(
-        results
-    ) {
+    function renderSummary(results) {
+
+        if (
+            !window.ReportCheckerValidator ||
+            typeof window
+                .ReportCheckerValidator
+                .summary !== "function"
+        ) {
+
+            return {
+
+                total: 0,
+
+                sesuai: 0,
+
+                tidakSesuai: 0,
+
+                invalid: 0
+
+            };
+
+        }
+
 
         const summary =
-            window.ReportCheckerValidator
+            window
+                .ReportCheckerValidator
                 .summary(
                     results
                 );
@@ -1344,9 +1442,7 @@
        ESCAPE HTML
     ===================================================== */
 
-    function escapeHTML(
-        value
-    ) {
+    function escapeHTML(value) {
 
         if (
             value === null ||
@@ -1392,9 +1488,7 @@
        STATUS CLASS
     ===================================================== */
 
-    function getStatusClass(
-        status
-    ) {
+    function getStatusClass(status) {
 
         switch (
             String(
@@ -1424,35 +1518,18 @@
 
 
     /* =====================================================
-       RENDER TABLE
+       RENDER RESULT TABLE
     ===================================================== */
 
-    function renderTable(
-        results
-    ) {
+    function renderTable(results) {
 
         const ui =
             getUI();
 
 
-        if (
-            !ui.table &&
-            !ui.tableBody
-        ) {
-
-            return;
-
-        }
-
-
         let tbody =
             ui.tableBody;
 
-
-        /*
-         * Jika tbody belum ada,
-         * cari/create.
-         */
 
         if (
             !tbody &&
@@ -1476,6 +1553,15 @@
 
         tbody.innerHTML =
             "";
+
+
+        if (
+            !Array.isArray(results)
+        ) {
+
+            return;
+
+        }
 
 
         results.forEach(
@@ -1508,35 +1594,39 @@
 
                     <td>
                         ${escapeHTML(
-                            result.ticket
+                            result.ticket ||
+                            result.ttNumber ||
+                            ""
                         )}
                     </td>
 
                     <td>
                         ${escapeHTML(
-                            result
-                                .receiveDateFormatted
+                            result.receiveDateFormatted ||
+                            ""
                         )}
                     </td>
 
                     <td>
                         ${escapeHTML(
-                            result
-                                .releaseDateTime
+                            result.releaseDateTime ||
+                            ""
                         )}
                     </td>
 
                     <td>
                         <span class="status-badge ${statusClass}">
                             ${escapeHTML(
-                                result.status
+                                result.status ||
+                                ""
                             )}
                         </span>
                     </td>
 
                     <td>
                         ${escapeHTML(
-                            result.reason
+                            result.reason ||
+                            ""
                         )}
                     </td>
 
@@ -1557,9 +1647,7 @@
        RENDER MATERIAL TABLE
     ===================================================== */
 
-    function renderMaterialTable(
-        rows
-    ) {
+    function renderMaterialTable(rows) {
 
         const table =
             findElement([
@@ -1599,6 +1687,15 @@
             "";
 
 
+        if (
+            !Array.isArray(rows)
+        ) {
+
+            return;
+
+        }
+
+
         rows.forEach(
             function (
                 row,
@@ -1619,31 +1716,36 @@
 
                     <td>
                         ${escapeHTML(
-                            row.ticket
+                            row.ticket ||
+                            ""
                         )}
                     </td>
 
                     <td>
                         ${escapeHTML(
-                            row.material
+                            row.material ||
+                            ""
                         )}
                     </td>
 
                     <td>
                         ${escapeHTML(
-                            row.quantity
+                            row.quantity ??
+                            ""
                         )}
                     </td>
 
                     <td>
                         ${escapeHTML(
-                            row.unit
+                            row.unit ||
+                            ""
                         )}
                     </td>
 
                     <td>
                         ${escapeHTML(
-                            row.score
+                            row.score ??
+                            ""
                         )}
                     </td>
 
@@ -1664,9 +1766,7 @@
        RENDER COMBINED TABLE
     ===================================================== */
 
-    function renderCombinedTable(
-        rows
-    ) {
+    function renderCombinedTable(rows) {
 
         const table =
             findElement([
@@ -1705,6 +1805,15 @@
 
         tbody.innerHTML =
             "";
+
+
+        if (
+            !Array.isArray(rows)
+        ) {
+
+            return;
+
+        }
 
 
         rows.forEach(
@@ -1790,9 +1899,7 @@
        HANDLE FILE
     ===================================================== */
 
-    async function handleFile(
-        file
-    ) {
+    async function handleFile(file) {
 
         if (!file) {
 
@@ -1801,13 +1908,10 @@
         }
 
 
-        setLoading(
-            true
-        );
-
+        setLoading(true);
 
         setStatus(
-            "Membaca file...",
+            "Membaca file Excel...",
             "loading"
         );
 
@@ -1815,7 +1919,7 @@
         try {
 
             const workbook =
-                await readFile(
+                await readExcelFile(
                     file
                 );
 
@@ -1826,11 +1930,6 @@
 
             state.fileName =
                 file.name;
-
-
-            populateSheetSelect(
-                workbook
-            );
 
 
             const sheetNames =
@@ -1844,15 +1943,32 @@
             ) {
 
                 throw new Error(
-                    "Tidak ada worksheet di file."
+                    "Tidak ada worksheet di file Excel."
                 );
 
             }
 
 
-            loadSheet(
-                sheetNames[0]
+            populateSheetSelect(
+                workbook
             );
+
+
+            const firstSheet =
+                sheetNames[0];
+
+
+            if (
+                !loadSheet(
+                    firstSheet
+                )
+            ) {
+
+                throw new Error(
+                    "Gagal membuka worksheet."
+                );
+
+            }
 
 
             const ui =
@@ -1868,13 +1984,13 @@
 
 
             setStatus(
-                `File berhasil dibaca. ${state.rows.length} baris ditemukan.`,
+                `File berhasil dibaca. Worksheet "${firstSheet}" — ${state.rows.length} baris ditemukan.`,
                 "success"
             );
 
 
             /*
-             * Otomatis proses.
+             * Jalankan validasi otomatis.
              */
 
             runValidation();
@@ -1884,13 +2000,27 @@
         catch (error) {
 
             console.error(
+                "Excel error:",
                 error
             );
 
 
+            state.workbook =
+                null;
+
+            state.worksheet =
+                null;
+
+            state.rows =
+                [];
+
+            state.results =
+                [];
+
+
             setStatus(
-                error.message ||
-                "Gagal memproses file.",
+                error?.message ||
+                "Gagal membaca file Excel.",
                 "error"
             );
 
@@ -1898,9 +2028,7 @@
 
         finally {
 
-            setLoading(
-                false
-            );
+            setLoading(false);
 
         }
 
@@ -1936,9 +2064,7 @@
         }
 
 
-        setLoading(
-            true
-        );
+        setLoading(true);
 
 
         setStatus(
@@ -1954,24 +2080,19 @@
 
 
             if (
+                !Array.isArray(
+                    results
+                ) ||
                 !results.length
             ) {
 
-                renderSummary(
-                    []
-                );
+                renderSummary([]);
 
-                renderTable(
-                    []
-                );
+                renderTable([]);
 
-                renderMaterialTable(
-                    []
-                );
+                renderMaterialTable([]);
 
-                renderCombinedTable(
-                    []
-                );
+                renderCombinedTable([]);
 
                 return;
 
@@ -1999,7 +2120,8 @@
 
 
             const summary =
-                window.ReportCheckerValidator
+                window
+                    .ReportCheckerValidator
                     .summary(
                         results
                     );
@@ -2008,6 +2130,19 @@
             setStatus(
                 `Selesai. Total ${summary.total} data: ${summary.sesuai} sesuai, ${summary.tidakSesuai} tidak sesuai, ${summary.invalid} invalid.`,
                 "success"
+            );
+
+
+            console.log(
+                "Report Checker results:",
+                {
+                    summary,
+                    results,
+                    materials:
+                        state.materialRows,
+                    combined:
+                        state.combinedRows
+                }
             );
 
         }
@@ -2021,7 +2156,7 @@
 
 
             setStatus(
-                error.message ||
+                error?.message ||
                 "Terjadi kesalahan saat validasi.",
                 "error"
             );
@@ -2030,9 +2165,7 @@
 
         finally {
 
-            setLoading(
-                false
-            );
+            setLoading(false);
 
         }
 
@@ -2040,13 +2173,14 @@
 
 
     /* =====================================================
-       EXPORT XLSX
+       EXPORT EXCEL
+       
+       TIDAK MENGGUNAKAN exporter.js
+       
+       Langsung menggunakan XLSX.
     ===================================================== */
 
-    function exportRows(
-        rows,
-        fileName
-    ) {
+    function exportRows(rows, fileName) {
 
         if (
             !Array.isArray(rows) ||
@@ -2058,7 +2192,21 @@
                 "error"
             );
 
-            return;
+            return false;
+
+        }
+
+
+        if (
+            typeof XLSX === "undefined"
+        ) {
+
+            setStatus(
+                "Library XLSX tidak tersedia.",
+                "error"
+            );
+
+            return false;
 
         }
 
@@ -2068,6 +2216,72 @@
             const worksheet =
                 XLSX.utils.json_to_sheet(
                     rows
+                );
+
+
+            /*
+             * Lebar kolom otomatis.
+             */
+
+            const headers =
+                Object.keys(
+                    rows[0] || {}
+                );
+
+
+            worksheet["!cols"] =
+                headers.map(
+                    function (header) {
+
+                        let maxLength =
+                            String(
+                                header
+                            ).length;
+
+
+                        rows.forEach(
+                            function (row) {
+
+                                const value =
+                                    row[header];
+
+                                const length =
+                                    value === null ||
+                                    value === undefined
+                                        ? 0
+                                        : String(
+                                            value
+                                        ).length;
+
+
+                                if (
+                                    length >
+                                    maxLength
+                                ) {
+
+                                    maxLength =
+                                        length;
+
+                                }
+
+                            }
+                        );
+
+
+                        return {
+
+                            wch:
+                                Math.min(
+                                    Math.max(
+                                        maxLength + 2,
+                                        10
+                                    ),
+                                    60
+                                )
+
+                        };
+
+                    }
                 );
 
 
@@ -2093,21 +2307,109 @@
                 "success"
             );
 
+
+            return true;
+
         }
 
         catch (error) {
 
             console.error(
+                "Export error:",
                 error
             );
 
 
             setStatus(
-                "Gagal melakukan export.",
+                "Gagal melakukan export Excel.",
                 "error"
             );
 
+
+            return false;
+
         }
+
+    }
+
+
+    /* =====================================================
+       CREATE EXPORT FILE NAME
+    ===================================================== */
+
+    function createExportFileName(suffix) {
+
+        const original =
+            state.fileName
+                ? state.fileName
+                    .replace(
+                        /\.[^.]+$/,
+                        ""
+                    )
+                : "report-checker";
+
+
+        return (
+            `${original}-${suffix}.xlsx`
+        );
+
+    }
+
+
+    /* =====================================================
+       BUILD EXPORT ALL
+    ===================================================== */
+
+    function buildExportAllRows() {
+
+        return state.results
+
+            .filter(
+                function (result) {
+
+                    return (
+                        result &&
+                        result.ticket &&
+                        String(
+                            result.ticket
+                        ).trim()
+                    );
+
+                }
+            )
+
+            .map(
+                function (result) {
+
+                    return {
+
+                        "TT Number":
+                            result.ticket,
+
+                        "Datetime Receive":
+                            result.receiveDateFormatted ||
+                            "",
+
+                        "TT Release":
+                            result.releaseDateTime ||
+                            "",
+
+                        "Release Raw":
+                            result.releaseRaw ||
+                            "",
+
+                        "Status":
+                            result.status ||
+                            "",
+
+                        "Keterangan":
+                            result.reason ||
+                            ""
+
+                    };
+
+                }
+            );
 
     }
 
@@ -2133,49 +2435,7 @@
 
 
         const rows =
-            state.results
-
-                .filter(
-                    function (result) {
-
-                        return (
-                            result &&
-                            result.ticket
-                        );
-
-                    }
-                )
-
-                .map(
-                    function (result) {
-
-                        return {
-
-                            "TT Number":
-                                result.ticket,
-
-                            "Datetime Receive":
-                                result
-                                    .receiveDateFormatted,
-
-                            "TT Release":
-                                result
-                                    .releaseDateTime,
-
-                            "Release Raw":
-                                result
-                                    .releaseRaw,
-
-                            "Status":
-                                result.status,
-
-                            "Keterangan":
-                                result.reason
-
-                        };
-
-                    }
-                );
+            buildExportAllRows();
 
 
         exportRows(
@@ -2208,11 +2468,77 @@
         }
 
 
-        const rows =
-            window.ReportCheckerValidator
-                .exportSesuai(
-                    state.results
-                );
+        let rows = [];
+
+
+        if (
+            window.ReportCheckerValidator &&
+            typeof window
+                .ReportCheckerValidator
+                .exportSesuai ===
+            "function"
+        ) {
+
+            rows =
+                window
+                    .ReportCheckerValidator
+                    .exportSesuai(
+                        state.results
+                    );
+
+        }
+
+        else {
+
+            rows =
+                state.results
+
+                    .filter(
+                        function (result) {
+
+                            return (
+                                result &&
+                                result.status ===
+                                "SESUAI" &&
+                                result.ticket
+                            );
+
+                        }
+                    )
+
+                    .map(
+                        function (result) {
+
+                            return {
+
+                                "TT Number":
+                                    result.ticket,
+
+                                "Datetime Receive":
+                                    result.receiveDateFormatted ||
+                                    "",
+
+                                "TT Release":
+                                    result.releaseDateTime ||
+                                    "",
+
+                                "Release Raw":
+                                    result.releaseRaw ||
+                                    "",
+
+                                "Status":
+                                    result.status,
+
+                                "Keterangan":
+                                    result.reason ||
+                                    ""
+
+                            };
+
+                        }
+                    );
+
+        }
 
 
         exportRows(
@@ -2245,11 +2571,77 @@
         }
 
 
-        const rows =
-            window.ReportCheckerValidator
-                .exportTidakSesuai(
-                    state.results
-                );
+        let rows = [];
+
+
+        if (
+            window.ReportCheckerValidator &&
+            typeof window
+                .ReportCheckerValidator
+                .exportTidakSesuai ===
+            "function"
+        ) {
+
+            rows =
+                window
+                    .ReportCheckerValidator
+                    .exportTidakSesuai(
+                        state.results
+                    );
+
+        }
+
+        else {
+
+            rows =
+                state.results
+
+                    .filter(
+                        function (result) {
+
+                            return (
+                                result &&
+                                result.status ===
+                                "TIDAK SESUAI" &&
+                                result.ticket
+                            );
+
+                        }
+                    )
+
+                    .map(
+                        function (result) {
+
+                            return {
+
+                                "TT Number":
+                                    result.ticket,
+
+                                "Datetime Receive":
+                                    result.receiveDateFormatted ||
+                                    "",
+
+                                "TT Release":
+                                    result.releaseDateTime ||
+                                    "",
+
+                                "Release Raw":
+                                    result.releaseRaw ||
+                                    "",
+
+                                "Status":
+                                    result.status,
+
+                                "Keterangan":
+                                    result.reason ||
+                                    ""
+
+                            };
+
+                        }
+                    );
+
+        }
 
 
         exportRows(
@@ -2289,22 +2681,28 @@
                     return {
 
                         "TT Number":
-                            row.ticket,
+                            row.ticket ||
+                            "",
 
                         "Material":
-                            row.material,
+                            row.material ||
+                            "",
 
                         "Quantity":
-                            row.quantity,
+                            row.quantity ??
+                            "",
 
                         "Satuan":
-                            row.unit,
+                            row.unit ||
+                            "",
 
                         "Score":
-                            row.score,
+                            row.score ??
+                            "",
 
                         "Source":
-                            row.source
+                            row.source ||
+                            ""
 
                     };
 
@@ -2353,45 +2751,16 @@
 
 
     /* =====================================================
-       CREATE EXPORT FILE NAME
-    ===================================================== */
-
-    function createExportFileName(
-        suffix
-    ) {
-
-        const original =
-            state.fileName
-                ? state.fileName
-                    .replace(
-                        /\.[^.]+$/,
-                        ""
-                    )
-                : "report-checker";
-
-
-        return (
-            `${original}-${suffix}.xlsx`
-        );
-
-    }
-
-
-    /* =====================================================
        HANDLE SHEET CHANGE
     ===================================================== */
 
-    function handleSheetChange(
-        event
-    ) {
+    function handleSheetChange(event) {
 
         const sheetName =
             event.target.value;
 
 
-        if (
-            !sheetName
-        ) {
+        if (!sheetName) {
 
             return;
 
@@ -2405,207 +2774,12 @@
         ) {
 
             setStatus(
-                `Worksheet "${sheetName}" dipilih. ${state.rows.length} baris.`,
+                `Worksheet "${sheetName}" dipilih. ${state.rows.length} baris ditemukan.`,
                 "success"
             );
 
 
             runValidation();
-
-        }
-
-    }
-
-
-    /* =====================================================
-       EVENT BINDING
-    ===================================================== */
-
-    function bindEvents() {
-
-        const ui =
-            getUI();
-
-
-        /*
-         * File input.
-         */
-
-        if (
-            ui.fileInput
-        ) {
-
-            ui.fileInput.addEventListener(
-                "change",
-                function (event) {
-
-                    const file =
-                        event.target
-                            .files?.[0];
-
-
-                    if (file) {
-
-                        handleFile(
-                            file
-                        );
-
-                    }
-
-                }
-            );
-
-        }
-
-
-        /*
-         * Sheet select.
-         */
-
-        if (
-            ui.sheetSelect
-        ) {
-
-            ui.sheetSelect.addEventListener(
-                "change",
-                handleSheetChange
-            );
-
-        }
-
-
-        /*
-         * Upload button.
-         */
-
-        if (
-            ui.uploadButton
-        ) {
-
-            ui.uploadButton.addEventListener(
-                "click",
-                function () {
-
-                    if (
-                        ui.fileInput
-                    ) {
-
-                        ui.fileInput.click();
-
-                    }
-
-                }
-            );
-
-        }
-
-
-        /*
-         * Validate button.
-         */
-
-        if (
-            ui.validateButton
-        ) {
-
-            ui.validateButton.addEventListener(
-                "click",
-                runValidation
-            );
-
-        }
-
-
-        /*
-         * Export all.
-         */
-
-        if (
-            ui.exportButton
-        ) {
-
-            ui.exportButton.addEventListener(
-                "click",
-                exportAll
-            );
-
-        }
-
-
-        /*
-         * Export sesuai.
-         */
-
-        if (
-            ui.exportSesuaiButton
-        ) {
-
-            ui.exportSesuaiButton.addEventListener(
-                "click",
-                exportSesuai
-            );
-
-        }
-
-
-        /*
-         * Export tidak sesuai.
-         */
-
-        if (
-            ui.exportTidakSesuaiButton
-        ) {
-
-            ui.exportTidakSesuaiButton.addEventListener(
-                "click",
-                exportTidakSesuai
-            );
-
-        }
-
-
-        /*
-         * Optional material export.
-         */
-
-        const materialExportButton =
-            findElement([
-                "#exportMaterialBtn",
-                "#btnExportMaterial"
-            ]);
-
-
-        if (
-            materialExportButton
-        ) {
-
-            materialExportButton.addEventListener(
-                "click",
-                exportMaterial
-            );
-
-        }
-
-
-        /*
-         * Optional combined export.
-         */
-
-        const combinedExportButton =
-            findElement([
-                "#exportCombinedBtn",
-                "#btnExportDetail"
-            ]);
-
-
-        if (
-            combinedExportButton
-        ) {
-
-            combinedExportButton.addEventListener(
-                "click",
-                exportCombined
-            );
 
         }
 
@@ -2650,9 +2824,7 @@
             getUI();
 
 
-        if (
-            ui.fileInput
-        ) {
+        if (ui.fileInput) {
 
             ui.fileInput.value =
                 "";
@@ -2660,9 +2832,26 @@
         }
 
 
-        if (
-            ui.tableBody
-        ) {
+        if (ui.sheetSelect) {
+
+            ui.sheetSelect.innerHTML =
+                "";
+
+            ui.sheetSelect.disabled =
+                true;
+
+        }
+
+
+        if (ui.fileName) {
+
+            ui.fileName.textContent =
+                "";
+
+        }
+
+
+        if (ui.tableBody) {
 
             ui.tableBody.innerHTML =
                 "";
@@ -2721,9 +2910,7 @@
         }
 
 
-        renderSummary(
-            []
-        );
+        renderSummary([]);
 
 
         setStatus(
@@ -2735,21 +2922,69 @@
 
 
     /* =====================================================
-       DEBUG DATA
+       DEBUG
     ===================================================== */
 
     function debug() {
 
         console.log(
-            "ReportCheckerApp state:",
-            state
+            "===================================="
+        );
+
+        console.log(
+            "REPORT CHECKER DEBUG"
+        );
+
+        console.log(
+            "===================================="
+        );
+
+        console.log(
+            "File:",
+            state.fileName
+        );
+
+        console.log(
+            "Sheet:",
+            state.sheetName
+        );
+
+        console.log(
+            "Rows:",
+            state.rows
+        );
+
+        console.log(
+            "Headers:",
+            state.headers
+        );
+
+        console.log(
+            "Results:",
+            state.results
+        );
+
+        console.log(
+            "Materials:",
+            state.materialRows
+        );
+
+        console.log(
+            "Combined:",
+            state.combinedRows
+        );
+
+        console.log(
+            "===================================="
         );
 
 
         return {
 
-            state:
-                state,
+            state,
+
+            rows:
+                state.rows,
 
             results:
                 state.results,
@@ -2761,6 +2996,183 @@
                 state.combinedRows
 
         };
+
+    }
+
+
+    /* =====================================================
+       EVENT BINDING
+    ===================================================== */
+
+    function bindEvents() {
+
+        const ui =
+            getUI();
+
+
+        /*
+         * FILE INPUT
+         */
+
+        if (ui.fileInput) {
+
+            ui.fileInput.addEventListener(
+                "change",
+                function (event) {
+
+                    const file =
+                        event.target
+                            .files?.[0];
+
+
+                    if (file) {
+
+                        handleFile(
+                            file
+                        );
+
+                    }
+
+                }
+            );
+
+        }
+
+
+        /*
+         * SHEET SELECT
+         */
+
+        if (ui.sheetSelect) {
+
+            ui.sheetSelect.addEventListener(
+                "change",
+                handleSheetChange
+            );
+
+        }
+
+
+        /*
+         * UPLOAD BUTTON
+         */
+
+        if (ui.uploadButton) {
+
+            ui.uploadButton.addEventListener(
+                "click",
+                function () {
+
+                    if (
+                        ui.fileInput
+                    ) {
+
+                        ui.fileInput.click();
+
+                    }
+
+                }
+            );
+
+        }
+
+
+        /*
+         * VALIDATE BUTTON
+         */
+
+        if (ui.validateButton) {
+
+            ui.validateButton.addEventListener(
+                "click",
+                runValidation
+            );
+
+        }
+
+
+        /*
+         * EXPORT ALL
+         */
+
+        if (ui.exportButton) {
+
+            ui.exportButton.addEventListener(
+                "click",
+                exportAll
+            );
+
+        }
+
+
+        /*
+         * EXPORT SESUAI
+         */
+
+        if (ui.exportSesuaiButton) {
+
+            ui.exportSesuaiButton.addEventListener(
+                "click",
+                exportSesuai
+            );
+
+        }
+
+
+        /*
+         * EXPORT TIDAK SESUAI
+         */
+
+        if (ui.exportTidakSesuaiButton) {
+
+            ui.exportTidakSesuaiButton.addEventListener(
+                "click",
+                exportTidakSesuai
+            );
+
+        }
+
+
+        /*
+         * EXPORT MATERIAL
+         */
+
+        if (ui.exportMaterialButton) {
+
+            ui.exportMaterialButton.addEventListener(
+                "click",
+                exportMaterial
+            );
+
+        }
+
+
+        /*
+         * EXPORT DETAIL
+         */
+
+        if (ui.exportCombinedButton) {
+
+            ui.exportCombinedButton.addEventListener(
+                "click",
+                exportCombined
+            );
+
+        }
+
+
+        /*
+         * RESET
+         */
+
+        if (ui.resetButton) {
+
+            ui.resetButton.addEventListener(
+                "click",
+                reset
+            );
+
+        }
 
     }
 
@@ -2838,6 +3250,12 @@
         bindEvents();
 
 
+        /*
+         * Jangan memblokir aplikasi
+         * hanya karena material parser
+         * tidak tersedia.
+         */
+
         if (
             checkDependencies()
         ) {
@@ -2866,7 +3284,9 @@
             init
         );
 
-    } else {
+    }
+
+    else {
 
         init();
 
@@ -2874,11 +3294,11 @@
 
 
     /* =====================================================
-       DEBUG
+       CONSOLE
     ===================================================== */
 
     console.log(
-        "ReportChecker app.js loaded."
+        "ReportChecker app.js loaded. exporter.js dependency removed."
     );
 
 
