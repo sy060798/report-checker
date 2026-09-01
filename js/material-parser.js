@@ -3,17 +3,20 @@
    material-parser.js
 
    VERSION:
-   - Compatibility dengan excel.js yang memanggil flatten()
-   - Ticket Material = TT Number / kolom D
-   - Customer Ticket TIDAK digunakan sebagai Ticket
+   - Strict Material Matching
    - Material hanya dari MASTER LIST
-   - Matching material toleran terhadap typo / variasi tulisan
-   - Material yang tidak cukup mirip tidak dimasukkan
+   - Typo ringan masih diterima
+   - Material yang tidak cukup mirip ditolak
    - Material excluded tidak pernah masuk hasil
-   - Support CIR dari object maupun array
-   - Support parse(), parseMultiple(), parseWithTicket()
+   - Ticket Material = TT Number / kolom D
+   - Customer Ticket tidak digunakan sebagai Ticket
+   - Support CIR object maupun array
+   - Support parse()
+   - Support parseMultiple()
+   - Support parseWithTicket()
    - Support buildRows()
-   - Support flatten() untuk compatibility excel.js
+   - Support flatten()
+   - Support parseDetailed()
 ========================================================= */
 
 (function () {
@@ -103,6 +106,7 @@
 
         "tisu",
         "tissue",
+
         "wet tissue",
         "dry tissue",
 
@@ -126,18 +130,51 @@
 
 
     /* =====================================================
-       DEFAULT COLUMN
-       
-       A = Datetime Receive
-       B = Customer Ticket
-       C = Ref Ticket
-       D = TT Number
-       E = Cust ID
-       ...
-       CIR = kolom lainnya
+       TT NUMBER COLUMN
+
+       Excel:
+       A = 0
+       B = 1
+       C = 2
+       D = 3
+
+       TT Number = kolom D
     ===================================================== */
 
     const TT_NUMBER_COLUMN_INDEX = 3;
+
+
+    /* =====================================================
+       MATCHING CONFIG
+    ===================================================== */
+
+    const MATCH_CONFIG = {
+
+        /*
+         * Exact = 1.00
+         */
+
+        minimumScore: 0.82,
+
+        /*
+         * Typo untuk kata panjang.
+         */
+
+        longTokenMinimum: 0.78,
+
+        /*
+         * Token 4-5 karakter.
+         */
+
+        mediumTokenMinimum: 0.84,
+
+        /*
+         * Token pendek harus sangat mirip.
+         */
+
+        shortTokenMinimum: 0.92
+
+    };
 
 
     /* =====================================================
@@ -199,14 +236,44 @@
 
             .toLowerCase()
 
+            /*
+             * 40 x 40
+             * 40x40
+             */
             .replace(/\s*x\s*/gi, "x")
 
+            /*
+             * 1:8
+             * 1 : 8
+             */
+            .replace(/\s*:\s*/g, ":")
+
+            /*
+             * 1 / 8 dianggap 1:8
+             */
+            .replace(
+                /(\d+)\s*\/\s*(\d+)/g,
+                "$1:$2"
+            )
+
+            /*
+             * Hilangkan tanda kurung.
+             */
             .replace(/[()]/g, " ")
 
+            /*
+             * Hilangkan quote.
+             */
             .replace(/["']/g, "")
 
+            /*
+             * Hyphen / underscore
+             */
             .replace(/[_\-]+/g, " ")
 
+            /*
+             * Rapikan.
+             */
             .replace(/\s+/g, " ")
 
             .trim();
@@ -276,7 +343,9 @@
         }
 
         return normalized
+
             .split(/\s+/)
+
             .filter(Boolean);
 
     }
@@ -286,16 +355,10 @@
        LEVENSHTEIN
     ===================================================== */
 
-    function levenshtein(
-        a,
-        b
-    ) {
+    function levenshtein(a, b) {
 
-        a =
-            String(a || "");
-
-        b =
-            String(b || "");
+        a = String(a || "");
+        b = String(b || "");
 
         if (a === b) {
 
@@ -385,10 +448,7 @@
        SIMILARITY
     ===================================================== */
 
-    function similarity(
-        a,
-        b
-    ) {
+    function similarity(a, b) {
 
         const left =
             normalizeMaterialName(a);
@@ -413,14 +473,10 @@
 
         }
 
-        if (
-            left.includes(right) ||
-            right.includes(left)
-        ) {
-
-            return 0.95;
-
-        }
+        /*
+         * Jangan gunakan includes di sini
+         * sebagai penentu utama.
+         */
 
         const distance =
             levenshtein(
@@ -450,7 +506,75 @@
 
 
     /* =====================================================
+       TOKEN SCORE
+    ===================================================== */
+
+    function tokenSimilarity(
+        sourceToken,
+        targetToken
+    ) {
+
+        const source =
+            String(
+                sourceToken || ""
+            ).toLowerCase();
+
+        const target =
+            String(
+                targetToken || ""
+            ).toLowerCase();
+
+        if (
+            !source ||
+            !target
+        ) {
+
+            return 0;
+
+        }
+
+        /*
+         * Angka wajib exact.
+         *
+         * 1 != 2
+         * 12 != 24
+         */
+        if (
+            /^\d+$/.test(target)
+        ) {
+
+            return source === target
+                ? 1
+                : 0;
+
+        }
+
+        /*
+         * Exact token.
+         */
+        if (
+            source === target
+        ) {
+
+            return 1;
+
+        }
+
+        /*
+         * Typo ringan.
+         */
+        return similarity(
+            source,
+            target
+        );
+
+    }
+
+
+    /* =====================================================
        MATERIAL MATCH SCORE
+       
+       STRICT MODE
     ===================================================== */
 
     function materialMatchScore(
@@ -477,19 +601,14 @@
 
         }
 
+        /*
+         * EXACT
+         */
         if (
             source === target
         ) {
 
             return 1;
-
-        }
-
-        if (
-            source.includes(target)
-        ) {
-
-            return 0.96;
 
         }
 
@@ -508,14 +627,26 @@
 
         }
 
-        let matched = 0;
+        /*
+         * Special case:
+         *
+         * target = pigtail
+         * source = pigtail 10
+         *
+         * Setelah quantity dibuang,
+         * biasanya source sudah pigtail.
+         */
+
+        let matchedCount = 0;
+
+        let scoreTotal = 0;
 
         for (
             const targetToken
                 of targetTokens
         ) {
 
-            let bestTokenScore = 0;
+            let bestScore = 0;
 
             for (
                 const sourceToken
@@ -523,53 +654,100 @@
             ) {
 
                 const score =
-                    similarity(
+                    tokenSimilarity(
                         sourceToken,
                         targetToken
                     );
 
                 if (
                     score >
-                    bestTokenScore
+                    bestScore
                 ) {
 
-                    bestTokenScore =
+                    bestScore =
                         score;
 
                 }
 
             }
 
-            const minimum =
-                targetToken.length <= 3
-                    ? 0.82
-                    : 0.70;
+            let minimumScore;
 
             if (
-                bestTokenScore >=
-                minimum
+                targetToken.length <= 3
             ) {
 
-                matched += 1;
+                minimumScore =
+                    MATCH_CONFIG
+                        .shortTokenMinimum;
+
+            } else if (
+                targetToken.length <= 5
+            ) {
+
+                minimumScore =
+                    MATCH_CONFIG
+                        .mediumTokenMinimum;
+
+            } else {
+
+                minimumScore =
+                    MATCH_CONFIG
+                        .longTokenMinimum;
+
+            }
+
+            if (
+                bestScore >=
+                minimumScore
+            ) {
+
+                matchedCount++;
+
+                scoreTotal +=
+                    bestScore;
+
+            } else {
+
+                /*
+                 * Semua token master wajib cocok.
+                 */
+                return 0;
 
             }
 
         }
 
+        /*
+         * Semua token master harus ketemu.
+         */
+        if (
+            matchedCount !==
+            targetTokens.length
+        ) {
+
+            return 0;
+
+        }
+
         const tokenScore =
-            matched /
+            scoreTotal /
             targetTokens.length;
 
-        const wholeScore =
-            similarity(
-                source,
-                target
-            );
+        /*
+         * Untuk source yang jauh lebih panjang
+         * dari master, jangan terlalu mudah menerima.
+         */
+        if (
+            sourceTokens.length >
+            targetTokens.length + 2
+        ) {
 
-        return Math.max(
-            tokenScore,
-            wholeScore
-        );
+            return 0;
+
+        }
+
+        return tokenScore;
 
     }
 
@@ -578,9 +756,7 @@
        FIND BEST MATERIAL
     ===================================================== */
 
-    function findBestMaterial(
-        input
-    ) {
+    function findBestMaterial(input) {
 
         if (!input) {
 
@@ -588,11 +764,25 @@
 
         }
 
+        /*
+         * Excluded material langsung reject.
+         */
         if (
             isExcludedMaterial(
                 input
             )
         ) {
+
+            return null;
+
+        }
+
+        const source =
+            normalizeMaterialName(
+                input
+            );
+
+        if (!source) {
 
             return null;
 
@@ -609,7 +799,7 @@
 
             const score =
                 materialMatchScore(
-                    input,
+                    source,
                     master
                 );
 
@@ -628,9 +818,13 @@
 
         }
 
+        /*
+         * Tidak cukup mirip.
+         */
         if (
             !best ||
-            bestScore < 0.70
+            bestScore <
+            MATCH_CONFIG.minimumScore
         ) {
 
             return null;
@@ -656,11 +850,11 @@
        PRIORITAS:
        1. Array index D
        2. Object TT Number
+       3. originalRow
+       4. source
     ===================================================== */
 
-    function getTTNumber(
-        row
-    ) {
+    function getTTNumber(row) {
 
         if (!row) {
 
@@ -668,6 +862,9 @@
 
         }
 
+        /*
+         * Array
+         */
         if (
             Array.isArray(row)
         ) {
@@ -680,6 +877,9 @@
 
         }
 
+        /*
+         * Object
+         */
         const possibleFields = [
 
             "TT Number",
@@ -721,10 +921,8 @@
         }
 
         /*
-         * Support apabila excel.js
-         * menyimpan original row.
+         * originalRow
          */
-
         if (
             row.originalRow
         ) {
@@ -742,6 +940,9 @@
 
         }
 
+        /*
+         * source
+         */
         if (
             row.source
         ) {
@@ -782,7 +983,6 @@
         /*
          * Array + numeric index.
          */
-
         if (
             Array.isArray(row) &&
             typeof cirField === "number"
@@ -795,9 +995,8 @@
         }
 
         /*
-         * Object + field.
+         * Object + custom field.
          */
-
         if (
             !Array.isArray(row) &&
             cirField
@@ -822,7 +1021,6 @@
         /*
          * Object field CIR.
          */
-
         if (
             !Array.isArray(row)
         ) {
@@ -867,12 +1065,46 @@
 
 
     /* =====================================================
+       NORMALIZE NUMBER
+    ===================================================== */
+
+    function normalizeNumber(value) {
+
+        if (
+            value === null ||
+            value === undefined
+        ) {
+
+            return 0;
+
+        }
+
+        const normalized =
+            String(value)
+
+                .replace(",", ".")
+
+                .trim();
+
+        const result =
+            Number(
+                normalized
+            );
+
+        return Number.isFinite(
+            result
+        )
+            ? result
+            : 0;
+
+    }
+
+
+    /* =====================================================
        PARSE QTY
     ===================================================== */
 
-    function parseQty(
-        text
-    ) {
+    function parseQty(text) {
 
         if (!text) {
 
@@ -898,9 +1130,14 @@
 
         }
 
+        /*
+         * Contoh:
+         *
+         * Pigtail 10 pcs
+         */
         match =
             value.match(
-                /(?:^|\s)(\d+(?:[.,]\d+)?)\s*(?:pcs?|unit|batang|m|meter|metre)\b/i
+                /(?:^|\s)(\d+(?:[.,]\d+)?)\s*(?:pcs?|piece|unit|batang|m|meter|metre)\b/i
             );
 
         if (match) {
@@ -912,11 +1149,10 @@
         }
 
         /*
-         * Support:
+         * Contoh:
          *
-         * Material : 149
+         * Pigtail : 10
          */
-
         match =
             value.match(
                 /[:=]\s*(\d+(?:[.,]\d+)?)\s*$/i
@@ -931,42 +1167,6 @@
         }
 
         return 1;
-
-    }
-
-
-    /* =====================================================
-       NORMALIZE NUMBER
-    ===================================================== */
-
-    function normalizeNumber(
-        value
-    ) {
-
-        if (
-            value === null ||
-            value === undefined
-        ) {
-
-            return 0;
-
-        }
-
-        const normalized =
-            String(value)
-                .replace(",", ".")
-                .trim();
-
-        const result =
-            Number(
-                normalized
-            );
-
-        return Number.isFinite(
-            result
-        )
-            ? result
-            : 0;
 
     }
 
@@ -1075,17 +1275,81 @@
 
 
     /* =====================================================
-       PARSE MATERIAL LINE
+       CLEAN MATERIAL TEXT
     ===================================================== */
 
-    function parseMaterialLine(
+    function cleanMaterialText(
         line
     ) {
 
+        return normalizeLine(line)
+
+            /*
+             * Qty 10
+             */
+            .replace(
+                /\bqty\b\s*[:=]?\s*\d+(?:[.,]\d+)?/gi,
+                " "
+            )
+
+            /*
+             * Quantity 10
+             */
+            .replace(
+                /\bquantity\b\s*[:=]?\s*\d+(?:[.,]\d+)?/gi,
+                " "
+            )
+
+            /*
+             * Jumlah 10
+             */
+            .replace(
+                /\bjumlah\b\s*[:=]?\s*\d+(?:[.,]\d+)?/gi,
+                " "
+            )
+
+            /*
+             * 10 pcs
+             * 10 unit
+             * 10 meter
+             */
+            .replace(
+                /\b\d+(?:[.,]\d+)?\s*(?:pcs?|piece|unit|batang|m|meter|metre)\b/gi,
+                " "
+            )
+
+            /*
+             * : 10
+             * = 10
+             */
+            .replace(
+                /[:=]\s*\d+(?:[.,]\d+)?\s*$/i,
+                " "
+            )
+
+            /*
+             * Rapikan.
+             */
+            .replace(
+                /\s+/g,
+                " "
+            )
+
+            .trim();
+
+    }
+
+
+    /* =====================================================
+       PARSE MATERIAL LINE
+       
+       HANYA RETURN material kalau cocok MASTER.
+    ===================================================== */
+
+    function parseMaterialLine(line) {
+
         const originalLine =
-            normalizeLine(
-                line
-            );
+            normalizeLine(line);
 
         if (!originalLine) {
 
@@ -1094,9 +1358,8 @@
         }
 
         /*
-         * Heading tidak dianggap material.
+         * Heading.
          */
-
         if (
             /^material\s*:?\s*$/i.test(
                 originalLine
@@ -1108,111 +1371,81 @@
         }
 
         /*
-         * Excluded line langsung skip.
+         * Excluded.
          */
-
         if (
             isExcludedMaterial(
                 originalLine
             )
         ) {
 
+            return {
+
+                material: null,
+
+                qty: 0,
+
+                satuan: "",
+
+                score: 0,
+
+                sourceLine:
+                    originalLine,
+
+                status:
+                    "ERROR",
+
+                error:
+                    "Material excluded"
+
+            };
+
+        }
+
+        const materialText =
+            cleanMaterialText(
+                originalLine
+            );
+
+        /*
+         * Jangan mencoba material kosong.
+         */
+        if (!materialText) {
+
             return null;
 
         }
 
-        const candidates = [
+        const result =
+            findBestMaterial(
+                materialText
+            );
 
-            originalLine,
+        /*
+         * Tidak ditemukan di master.
+         */
+        if (!result) {
 
-            originalLine
-                .replace(
-                    /[:=]/g,
-                    " "
-                ),
+            return {
 
-            originalLine
-                .replace(
-                    /\bqty\b/gi,
-                    ""
-                ),
+                material: null,
 
-            originalLine
-                .replace(
-                    /\bquantity\b/gi,
-                    ""
-                )
+                qty: 0,
 
-        ];
+                satuan: "",
 
-        let best = null;
+                score: 0,
 
-        for (
-            const candidate
-                of candidates
-        ) {
+                sourceLine:
+                    originalLine,
 
-            const cleaned =
-                candidate
+                status:
+                    "ERROR",
 
-                    .replace(
-                        /\bqty\b\s*[:=]?\s*\d+(?:[.,]\d+)?/gi,
-                        " "
-                    )
+                error:
+                    "Material tidak ditemukan di MASTER LIST"
 
-                    .replace(
-                        /\bquantity\b\s*[:=]?\s*\d+(?:[.,]\d+)?/gi,
-                        " "
-                    )
-
-                    .replace(
-                        /\bjumlah\b\s*[:=]?\s*\d+(?:[.,]\d+)?/gi,
-                        " "
-                    )
-
-                    .replace(
-                        /\b\d+(?:[.,]\d+)?\s*(?:pcs?|unit|batang|m|meter|metre)\b/gi,
-                        " "
-                    )
-
-                    .replace(
-                        /\s+/g,
-                        " "
-                    )
-
-                    .trim();
-
-            const result =
-                findBestMaterial(
-                    cleaned
-                );
-
-            if (
-                result &&
-                (
-                    !best ||
-                    result.score >
-                    best.score
-                )
-            ) {
-
-                best = {
-
-                    material:
-                        result.material,
-
-                    score:
-                        result.score
-
-                };
-
-            }
-
-        }
-
-        if (!best) {
-
-            return null;
+            };
 
         }
 
@@ -1224,13 +1457,13 @@
         const satuan =
             parseSatuan(
                 originalLine,
-                best.material
+                result.material
             );
 
         return {
 
             material:
-                best.material,
+                result.material,
 
             qty:
                 qty,
@@ -1239,10 +1472,16 @@
                 satuan,
 
             score:
-                best.score,
+                result.score,
 
             sourceLine:
-                originalLine
+                originalLine,
+
+            status:
+                "OK",
+
+            error:
+                ""
 
         };
 
@@ -1251,16 +1490,14 @@
 
     /* =====================================================
        PARSE MATERIAL TEXT
+       
+       HANYA MATERIAL VALID YANG DIRETURN.
     ===================================================== */
 
-    function parseMaterialText(
-        text
-    ) {
+    function parseMaterialText(text) {
 
         const normalized =
-            normalizeText(
-                text
-            );
+            normalizeText(text);
 
         if (!normalized) {
 
@@ -1269,9 +1506,7 @@
         }
 
         const lines =
-            normalized.split(
-                "\n"
-            );
+            normalized.split("\n");
 
         const results = [];
 
@@ -1291,6 +1526,18 @@
 
             }
 
+            /*
+             * ERROR tidak masuk
+             * ke hasil utama.
+             */
+            if (
+                parsed.status !== "OK"
+            ) {
+
+                continue;
+
+            }
+
             results.push(
                 parsed
             );
@@ -1300,6 +1547,89 @@
         return mergeMaterials(
             results
         );
+
+    }
+
+
+    /* =====================================================
+       PARSE DETAILED
+       
+       Sama seperti parse(), tetapi menampilkan
+       material valid + error.
+       
+       Berguna untuk debugging/report checker.
+    ===================================================== */
+
+    function parseDetailed(text) {
+
+        const normalized =
+            normalizeText(text);
+
+        if (!normalized) {
+
+            return {
+
+                materials: [],
+
+                errors: []
+
+            };
+
+        }
+
+        const lines =
+            normalized.split("\n");
+
+        const materials = [];
+
+        const errors = [];
+
+        for (
+            const line
+                of lines
+        ) {
+
+            const parsed =
+                parseMaterialLine(
+                    line
+                );
+
+            if (!parsed) {
+
+                continue;
+
+            }
+
+            if (
+                parsed.status ===
+                "OK"
+            ) {
+
+                materials.push(
+                    parsed
+                );
+
+            } else {
+
+                errors.push(
+                    parsed
+                );
+
+            }
+
+        }
+
+        return {
+
+            materials:
+                mergeMaterials(
+                    materials
+                ),
+
+            errors:
+                errors
+
+        };
 
     }
 
@@ -1321,6 +1651,14 @@
         ) {
 
             if (!item) {
+
+                continue;
+
+            }
+
+            if (
+                !item.material
+            ) {
 
                 continue;
 
@@ -1368,6 +1706,12 @@
 
                         sourceLine:
                             item.sourceLine ||
+                            "",
+
+                        status:
+                            "OK",
+
+                        error:
                             ""
 
                     }
@@ -1445,11 +1789,6 @@
 
                 return {
 
-                    /*
-                     * Format utama
-                     * untuk app.js
-                     */
-
                     ticket:
                         ttNumber,
 
@@ -1505,7 +1844,13 @@
                         item.sourceLine,
 
                     Source:
-                        item.sourceLine
+                        item.sourceLine,
+
+                    status:
+                        "OK",
+
+                    error:
+                        ""
 
                 };
 
@@ -1516,7 +1861,7 @@
 
 
     /* =====================================================
-       PARSE MULTIPLE ROWS
+       PARSE MULTIPLE
     ===================================================== */
 
     function parseMultiple(
@@ -1635,7 +1980,13 @@
                         item.sourceLine,
 
                     Source:
-                        item.sourceLine
+                        item.sourceLine,
+
+                    status:
+                        "OK",
+
+                    error:
+                        ""
 
                 };
 
@@ -1648,33 +1999,10 @@
     /* =====================================================
        FLATTEN
        
-       Compatibility dengan excel.js.
-       
-       Bisa menerima:
-       
-       flatten(materials)
-       
-       flatten([row1, row2])
-       
-       flatten({
-           materials: [...]
-       })
-       
-       flatten({
-           material: [...]
-       })
-       
-       Tujuannya agar error:
-       
-       window.ReportCheckerMaterial.flatten
-       is not a function
-       
-       tidak terjadi lagi.
+       Compatibility excel.js
     ===================================================== */
 
-    function flatten(
-        input
-    ) {
+    function flatten(input) {
 
         if (
             input === null ||
@@ -1686,9 +2014,8 @@
         }
 
         /*
-         * Jika object hasil parser.
+         * Object hasil parser.
          */
-
         if (
             !Array.isArray(input) &&
             typeof input === "object"
@@ -1721,16 +2048,17 @@
             /*
              * Satu material object.
              */
-
             if (
                 input.Material ||
                 input.material
             ) {
 
                 return [
+
                     normalizeMaterialRow(
                         input
                     )
+
                 ];
 
             }
@@ -1742,7 +2070,6 @@
         /*
          * Array.
          */
-
         if (
             Array.isArray(input)
         ) {
@@ -1766,7 +2093,6 @@
                 /*
                  * Nested array.
                  */
-
                 if (
                     Array.isArray(item)
                 ) {
@@ -1782,10 +2108,8 @@
                 }
 
                 /*
-                 * Nested object yang punya
-                 * materials/materials array.
+                 * Nested parser object.
                  */
-
                 if (
                     typeof item === "object" &&
                     (
@@ -1809,9 +2133,8 @@
                 }
 
                 /*
-                 * Material object biasa.
+                 * Material object.
                  */
-
                 if (
                     typeof item === "object"
                 ) {
@@ -1837,14 +2160,9 @@
 
     /* =====================================================
        NORMALIZE MATERIAL ROW
-       
-       Membuat hasil konsisten untuk excel.js
-       dan app.js.
     ===================================================== */
 
-    function normalizeMaterialRow(
-        row
-    ) {
+    function normalizeMaterialRow(row) {
 
         if (!row) {
 
@@ -1962,7 +2280,15 @@
                 source,
 
             Source:
-                source
+                source,
+
+            status:
+                row.status ||
+                "OK",
+
+            error:
+                row.error ||
+                ""
 
         };
 
@@ -1989,42 +2315,42 @@
         /*
          * Parser utama
          */
-
         parse:
             parseMaterialText,
 
         /*
-         * Parse banyak row
+         * Parser detailed
          */
+        parseDetailed:
+            parseDetailed,
 
+        /*
+         * Banyak row
+         */
         parseMultiple:
             parseMultiple,
 
         /*
-         * Parse menggunakan ticket manual
+         * Manual ticket
          */
-
         parseWithTicket:
             parseWithTicket,
 
         /*
-         * Build row
+         * Build rows
          */
-
         buildRows:
             buildMaterialRows,
 
         /*
-         * Compatibility API
+         * Compatibility excel.js
          */
-
         flatten:
             flatten,
 
         /*
          * Utility
          */
-
         getTTNumber:
             getTTNumber,
 
@@ -2050,7 +2376,10 @@
             parseSatuan,
 
         mergeMaterials:
-            mergeMaterials
+            mergeMaterials,
+
+        cleanMaterialText:
+            cleanMaterialText
 
     };
 
@@ -2062,13 +2391,25 @@
     console.log(
         "ReportCheckerMaterial loaded.",
         {
+
             masterCount:
                 MATERIAL_MASTER.length,
+
+            minimumScore:
+                MATCH_CONFIG.minimumScore,
 
             hasFlatten:
                 typeof window
                     .ReportCheckerMaterial
-                    .flatten === "function"
+                    .flatten ===
+                "function",
+
+            hasParseDetailed:
+                typeof window
+                    .ReportCheckerMaterial
+                    .parseDetailed ===
+                "function"
+
         }
     );
 
