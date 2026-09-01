@@ -1,20 +1,24 @@
 /* =========================================================
    REPORT CHECKER - APP.JS
    Controller utama UI
-   Cocok dengan index.html versi terbaru
 
-   UPDATE:
-   - Ticket menggunakan TT Number
-   - TT Number utama berasal dari kolom D / index 3
-   - Tidak menggunakan Customer Ticket / Ref Ticket
-   - Mendukung beberapa nama field TT Number
-   - Jika hasil parser tidak membawa TT Number,
-     ambil dari originalRow / source / rowData / data
-   - Untuk array row, TT Number = index 3
-   - Material tetap ditampilkan
-   - Material Error tetap ditampilkan
-   - Tidak mengubah sistem result lama
-   - Aman jika field tertentu tidak tersedia
+   STRUKTUR FIXED:
+
+   REPORT UTAMA
+   D / index 3 = TT Number
+
+   MATERIAL.XLSX
+   A / index 0 = Ticket
+   B / index 1 = Material
+   C / index 2 = Qty
+   D / index 3 = Satuan
+   E / index 4 = Kode
+
+   CATATAN:
+   - Header Material.xlsx dianggap FIX.
+   - Ticket Material TIDAK menggunakan TT Number kolom D.
+   - Ticket Material selalu berasal dari kolom A.
+   - TT Number report utama tetap berasal dari kolom D.
 ========================================================= */
 
 (function () {
@@ -46,22 +50,40 @@
     ===================================================== */
 
     /*
-     * Kolom D pada spreadsheet.
+     * REPORT UTAMA
      *
-     * A = index 0
-     * B = index 1
-     * C = index 2
-     * D = index 3
+     * A = 0
+     * B = 1
+     * C = 2
+     * D = 3 = TT Number
      */
     const TT_NUMBER_COLUMN_INDEX = 3;
 
 
     /*
+     * MATERIAL.XLSX
+     *
+     * A = Ticket
+     * B = Material
+     * C = Qty
+     * D = Satuan
+     * E = Kode
+     */
+    const MATERIAL_TICKET_COLUMN_INDEX = 0;
+
+    const MATERIAL_NAME_COLUMN_INDEX = 1;
+
+    const MATERIAL_QTY_COLUMN_INDEX = 2;
+
+    const MATERIAL_UNIT_COLUMN_INDEX = 3;
+
+    const MATERIAL_CODE_COLUMN_INDEX = 4;
+
+
+    /*
      * CIR default = kolom AF.
      *
-     * A  = 0
-     * ...
-     * AF = 31
+     * AF = index 31
      */
     const DEFAULT_CIR_COLUMN_INDEX = 31;
 
@@ -169,6 +191,27 @@
             "hidden",
             !visible
         );
+
+    }
+
+
+    function cleanValue(value) {
+
+        if (
+            value ===
+                undefined ||
+            value ===
+                null
+        ) {
+
+            return "";
+
+        }
+
+
+        return String(
+            value
+        ).trim();
 
     }
 
@@ -1235,6 +1278,10 @@
     }
 
 
+    /* =====================================================
+       GENERIC VALUE
+    ===================================================== */
+
     function getValue(
         row,
         keys
@@ -1279,13 +1326,10 @@
 
 
     /* =====================================================
-       GET TT NUMBER FROM ARRAY
+       REPORT TT NUMBER
        
-       Array:
-       index 0 = A
-       index 1 = B
-       index 2 = C
-       index 3 = D = TT Number
+       REPORT UTAMA:
+       D = index 3
     ===================================================== */
 
     function getTTNumberFromArray(
@@ -1307,37 +1351,12 @@
             ];
 
 
-        if (
-            value ===
-                undefined ||
-            value ===
-                null
-        ) {
-
-            return "";
-
-        }
-
-
-        const result =
-            String(
-                value
-            ).trim();
-
-
-        return result;
+        return cleanValue(
+            value
+        );
 
     }
 
-
-    /* =====================================================
-       GET TT NUMBER FROM OBJECT
-       
-       Prioritas field TT Number.
-       
-       Customer Ticket dan Ref Ticket
-       TIDAK digunakan.
-    ===================================================== */
 
     function getTTNumberFromObject(
         row
@@ -1389,10 +1408,6 @@
         ];
 
 
-        /*
-         * Cek nama field yang umum terlebih dahulu.
-         */
-
         for (
             const key of possibleKeys
         ) {
@@ -1408,23 +1423,14 @@
             ) {
 
                 const value =
-                    row[key];
+                    cleanValue(
+                        row[key]
+                    );
 
 
-                if (
-                    value !==
-                        undefined &&
-                    value !==
-                        null &&
-                    String(
-                        value
-                    ).trim() !==
-                        ""
-                ) {
+                if (value) {
 
-                    return String(
-                        value
-                    ).trim();
+                    return value;
 
                 }
 
@@ -1434,15 +1440,7 @@
 
 
         /*
-         * Fallback:
-         * pencarian key secara case-insensitive.
-         *
-         * Contoh:
-         * TT Number
-         * tt number
-         * TT_Number
-         * tt_number
-         * TTNumber
+         * Case-insensitive fallback.
          */
 
         const keys =
@@ -1468,23 +1466,14 @@
             ) {
 
                 const value =
-                    row[key];
+                    cleanValue(
+                        row[key]
+                    );
 
 
-                if (
-                    value !==
-                        undefined &&
-                    value !==
-                        null &&
-                    String(
-                        value
-                    ).trim() !==
-                        ""
-                ) {
+                if (value) {
 
-                    return String(
-                        value
-                    ).trim();
+                    return value;
 
                 }
 
@@ -1499,23 +1488,13 @@
 
 
     /* =====================================================
-       GET TT NUMBER
+       GET REPORT TICKET
        
-       INI ADALAH SATU-SATUNYA FUNGSI YANG DIPAKAI
-       OLEH SEMUA TABLE UNTUK MENAMPILKAN TICKET.
+       Digunakan untuk:
+       - Valid
+       - Invalid
        
-       Urutan pencarian:
-       
-       1. row.ttNumber
-       2. field TT Number pada row
-       3. originalRow
-       4. source
-       5. rowData
-       6. data
-       7. metadata / meta
-       8. array index 3 / kolom D
-       
-       TIDAK ADA Customer Ticket / Ref Ticket.
+       TIDAK digunakan untuk Material.
     ===================================================== */
 
     function getTicketNumber(
@@ -1530,31 +1509,25 @@
 
 
         /*
-         * =================================================
-         * 1. Jika row langsung berupa array
-         * =================================================
+         * Row langsung array.
          */
 
         if (
             Array.isArray(row)
         ) {
 
-            const direct =
+            return (
                 getTTNumberFromArray(
                     row
-                );
-
-
-            return direct ||
-                "-";
+                ) ||
+                "-"
+            );
 
         }
 
 
         /*
-         * =================================================
-         * 2. Cari langsung pada result parser.
-         * =================================================
+         * Row object.
          */
 
         let ticket =
@@ -1571,9 +1544,7 @@
 
 
         /*
-         * =================================================
-         * 3. Cari pada originalRow.
-         * =================================================
+         * Cari originalRow.
          */
 
         const original =
@@ -1581,9 +1552,7 @@
 
 
         if (
-            Array.isArray(
-                original
-            )
+            Array.isArray(original)
         ) {
 
             ticket =
@@ -1616,9 +1585,7 @@
 
 
         /*
-         * =================================================
-         * 4. Cari pada source.
-         * =================================================
+         * source
          */
 
         const source =
@@ -1626,9 +1593,7 @@
 
 
         if (
-            Array.isArray(
-                source
-            )
+            Array.isArray(source)
         ) {
 
             ticket =
@@ -1661,9 +1626,7 @@
 
 
         /*
-         * =================================================
-         * 5. Cari pada rowData.
-         * =================================================
+         * rowData
          */
 
         const rowData =
@@ -1671,9 +1634,7 @@
 
 
         if (
-            Array.isArray(
-                rowData
-            )
+            Array.isArray(rowData)
         ) {
 
             ticket =
@@ -1706,9 +1667,7 @@
 
 
         /*
-         * =================================================
-         * 6. Cari pada data.
-         * =================================================
+         * data
          */
 
         const data =
@@ -1716,9 +1675,7 @@
 
 
         if (
-            Array.isArray(
-                data
-            )
+            Array.isArray(data)
         ) {
 
             ticket =
@@ -1751,9 +1708,7 @@
 
 
         /*
-         * =================================================
-         * 7. Cari metadata.
-         * =================================================
+         * metadata / meta
          */
 
         const metadata =
@@ -1775,12 +1730,7 @@
 
 
         /*
-         * =================================================
-         * 8. Fallback jika parser menyimpan
-         *    original row dalam properti lain.
-         *
-         *    Hanya ambil index 3 jika berupa array.
-         * =================================================
+         * Fallback row fields.
          */
 
         const possibleRowFields = [
@@ -1805,9 +1755,7 @@
 
 
             if (
-                Array.isArray(
-                    candidate
-                )
+                Array.isArray(candidate)
             ) {
 
                 ticket =
@@ -1849,6 +1797,570 @@
 
 
         return "-";
+
+    }
+
+
+    /* =====================================================
+       MATERIAL TICKET
+       
+       MATERIAL.XLSX FIXED:
+       
+       A = Ticket
+       B = Material
+       C = Qty
+       D = Satuan
+       E = Kode
+       
+       PENTING:
+       Jangan menggunakan getTicketNumber()
+       karena getTicketNumber() mengambil kolom D.
+    ===================================================== */
+
+    function getMaterialTicketFromArray(
+        row
+    ) {
+
+        if (
+            !Array.isArray(row)
+        ) {
+
+            return "";
+
+        }
+
+
+        return cleanValue(
+            row[
+                MATERIAL_TICKET_COLUMN_INDEX
+            ]
+        );
+
+    }
+
+
+    function getMaterialTicketFromObject(
+        row
+    ) {
+
+        if (
+            !row ||
+            typeof row !== "object" ||
+            Array.isArray(row)
+        ) {
+
+            return "";
+
+        }
+
+
+        const possibleKeys = [
+
+            "ticket",
+
+            "Ticket",
+
+            "ticketNumber",
+
+            "Ticket Number",
+
+            "ticket_number",
+
+            "noTicket",
+
+            "No Ticket",
+
+            "No. Ticket"
+
+        ];
+
+
+        for (
+            const key of possibleKeys
+        ) {
+
+            const value =
+                cleanValue(
+                    row[key]
+                );
+
+
+            if (value) {
+
+                return value;
+
+            }
+
+        }
+
+
+        /*
+         * Case-insensitive Ticket fallback.
+         */
+
+        const keys =
+            Object.keys(row);
+
+
+        for (
+            const key of keys
+        ) {
+
+            const normalizedKey =
+                String(key)
+                    .toLowerCase()
+                    .replace(
+                        /[\s_-]+/g,
+                        ""
+                    );
+
+
+            if (
+                normalizedKey ===
+                "ticket"
+            ) {
+
+                const value =
+                    cleanValue(
+                        row[key]
+                    );
+
+
+                if (value) {
+
+                    return value;
+
+                }
+
+            }
+
+        }
+
+
+        return "";
+
+    }
+
+
+    function getMaterialTicket(
+        row
+    ) {
+
+        if (!row) {
+
+            return "-";
+
+        }
+
+
+        /*
+         * 1. Material row langsung berupa array.
+         */
+
+        if (
+            Array.isArray(row)
+        ) {
+
+            return (
+
+                getMaterialTicketFromArray(
+                    row
+                )
+
+                ||
+
+                "-"
+
+            );
+
+        }
+
+
+        /*
+         * 2. Object langsung.
+         */
+
+        let ticket =
+            getMaterialTicketFromObject(
+                row
+            );
+
+
+        if (ticket) {
+
+            return ticket;
+
+        }
+
+
+        /*
+         * 3. originalRow.
+         */
+
+        const original =
+            row.originalRow;
+
+
+        if (
+            Array.isArray(original)
+        ) {
+
+            ticket =
+                getMaterialTicketFromArray(
+                    original
+                );
+
+
+            if (ticket) {
+
+                return ticket;
+
+            }
+
+        } else {
+
+            ticket =
+                getMaterialTicketFromObject(
+                    original
+                );
+
+
+            if (ticket) {
+
+                return ticket;
+
+            }
+
+        }
+
+
+        /*
+         * 4. source.
+         */
+
+        const source =
+            row.source;
+
+
+        if (
+            Array.isArray(source)
+        ) {
+
+            ticket =
+                getMaterialTicketFromArray(
+                    source
+                );
+
+
+            if (ticket) {
+
+                return ticket;
+
+            }
+
+        } else {
+
+            ticket =
+                getMaterialTicketFromObject(
+                    source
+                );
+
+
+            if (ticket) {
+
+                return ticket;
+
+            }
+
+        }
+
+
+        /*
+         * 5. rowData.
+         */
+
+        const rowData =
+            row.rowData;
+
+
+        if (
+            Array.isArray(rowData)
+        ) {
+
+            ticket =
+                getMaterialTicketFromArray(
+                    rowData
+                );
+
+
+            if (ticket) {
+
+                return ticket;
+
+            }
+
+        } else {
+
+            ticket =
+                getMaterialTicketFromObject(
+                    rowData
+                );
+
+
+            if (ticket) {
+
+                return ticket;
+
+            }
+
+        }
+
+
+        /*
+         * 6. data.
+         */
+
+        const data =
+            row.data;
+
+
+        if (
+            Array.isArray(data)
+        ) {
+
+            ticket =
+                getMaterialTicketFromArray(
+                    data
+                );
+
+
+            if (ticket) {
+
+                return ticket;
+
+            }
+
+        } else {
+
+            ticket =
+                getMaterialTicketFromObject(
+                    data
+                );
+
+
+            if (ticket) {
+
+                return ticket;
+
+            }
+
+        }
+
+
+        /*
+         * 7. rawRow / excelRow / sourceRow.
+         */
+
+        const possibleRowFields = [
+
+            "rawRow",
+
+            "excelRow",
+
+            "sourceRow",
+
+            "originalData"
+
+        ];
+
+
+        for (
+            const field of possibleRowFields
+        ) {
+
+            const candidate =
+                row[field];
+
+
+            if (
+                Array.isArray(candidate)
+            ) {
+
+                ticket =
+                    getMaterialTicketFromArray(
+                        candidate
+                    );
+
+
+                if (ticket) {
+
+                    return ticket;
+
+                }
+
+            }
+
+
+            if (
+                candidate &&
+                typeof candidate ===
+                    "object"
+            ) {
+
+                ticket =
+                    getMaterialTicketFromObject(
+                        candidate
+                    );
+
+
+                if (ticket) {
+
+                    return ticket;
+
+                }
+
+            }
+
+        }
+
+
+        return "-";
+
+    }
+
+
+    /* =====================================================
+       MATERIAL VALUE HELPERS
+       
+       Karena header fixed, array akan diprioritaskan
+       menggunakan posisi kolom A-E.
+    ===================================================== */
+
+    function getMaterialValue(
+        row,
+        columnIndex,
+        objectKeys
+    ) {
+
+        if (!row) {
+
+            return "";
+
+        }
+
+
+        /*
+         * Row langsung array.
+         */
+
+        if (
+            Array.isArray(row)
+        ) {
+
+            return cleanValue(
+                row[columnIndex]
+            );
+
+        }
+
+
+        /*
+         * Object langsung.
+         */
+
+        let value =
+            getValue(
+                row,
+                objectKeys
+            );
+
+
+        if (value !== "") {
+
+            return cleanValue(
+                value
+            );
+
+        }
+
+
+        /*
+         * originalRow.
+         */
+
+        const original =
+            row.originalRow;
+
+
+        if (
+            Array.isArray(original)
+        ) {
+
+            return cleanValue(
+                original[columnIndex]
+            );
+
+        }
+
+
+        /*
+         * source.
+         */
+
+        const source =
+            row.source;
+
+
+        if (
+            Array.isArray(source)
+        ) {
+
+            return cleanValue(
+                source[columnIndex]
+            );
+
+        }
+
+
+        /*
+         * rowData.
+         */
+
+        const rowData =
+            row.rowData;
+
+
+        if (
+            Array.isArray(rowData)
+        ) {
+
+            return cleanValue(
+                rowData[columnIndex]
+            );
+
+        }
+
+
+        /*
+         * data.
+         */
+
+        const data =
+            row.data;
+
+
+        if (
+            Array.isArray(data)
+        ) {
+
+            return cleanValue(
+                data[columnIndex]
+            );
+
+        }
+
+
+        return "";
 
     }
 
@@ -2179,6 +2691,14 @@
 
     /* =====================================================
        TABLE MATERIAL
+       
+       FIXED HEADER:
+       
+       A Ticket
+       B Material
+       C Qty
+       D Satuan
+       E Kode
     ===================================================== */
 
     function renderMaterialTable() {
@@ -2229,14 +2749,15 @@
             function (row) {
 
                 const ticket =
-                    getTicketNumber(
+                    getMaterialTicket(
                         row
                     );
 
 
                 const material =
-                    getValue(
+                    getMaterialValue(
                         row,
+                        MATERIAL_NAME_COLUMN_INDEX,
                         [
 
                             "material",
@@ -2256,8 +2777,9 @@
 
 
                 const qty =
-                    getValue(
+                    getMaterialValue(
                         row,
+                        MATERIAL_QTY_COLUMN_INDEX,
                         [
 
                             "quantity",
@@ -2277,8 +2799,9 @@
 
 
                 const unit =
-                    getValue(
+                    getMaterialValue(
                         row,
+                        MATERIAL_UNIT_COLUMN_INDEX,
                         [
 
                             "unit",
@@ -2294,8 +2817,9 @@
 
 
                 const code =
-                    getValue(
+                    getMaterialValue(
                         row,
+                        MATERIAL_CODE_COLUMN_INDEX,
                         [
 
                             "code",
@@ -2316,7 +2840,7 @@
                     "beforeend",
                     `
                     <tr>
-                        <td>${escapeHtml(ticket)}</td>
+                        <td>${escapeHtml(ticket || "-")}</td>
                         <td>${escapeHtml(material || "-")}</td>
                         <td>${escapeHtml(qty || "-")}</td>
                         <td>${escapeHtml(unit || "-")}</td>
@@ -2333,6 +2857,15 @@
 
     /* =====================================================
        TABLE MATERIAL ERROR
+       
+       Tetap mengikuti header Material.xlsx.
+       
+       A Ticket
+       B Material
+       C Qty
+       D Satuan
+       E Kode
+       F Error
     ===================================================== */
 
     function renderMaterialErrorTable() {
@@ -2383,14 +2916,15 @@
             function (row) {
 
                 const ticket =
-                    getTicketNumber(
+                    getMaterialTicket(
                         row
                     );
 
 
                 const material =
-                    getValue(
+                    getMaterialValue(
                         row,
+                        MATERIAL_NAME_COLUMN_INDEX,
                         [
 
                             "material",
@@ -2410,8 +2944,9 @@
 
 
                 const qty =
-                    getValue(
+                    getMaterialValue(
                         row,
+                        MATERIAL_QTY_COLUMN_INDEX,
                         [
 
                             "quantity",
@@ -2427,8 +2962,9 @@
 
 
                 const unit =
-                    getValue(
+                    getMaterialValue(
                         row,
+                        MATERIAL_UNIT_COLUMN_INDEX,
                         [
 
                             "unit",
@@ -2444,8 +2980,9 @@
 
 
                 const code =
-                    getValue(
+                    getMaterialValue(
                         row,
+                        MATERIAL_CODE_COLUMN_INDEX,
                         [
 
                             "code",
@@ -2487,7 +3024,7 @@
                     "beforeend",
                     `
                     <tr>
-                        <td>${escapeHtml(ticket)}</td>
+                        <td>${escapeHtml(ticket || "-")}</td>
                         <td>${escapeHtml(material || "-")}</td>
                         <td>${escapeHtml(qty || "-")}</td>
                         <td>${escapeHtml(unit || "-")}</td>
@@ -2543,9 +3080,44 @@
                 }
 
 
-                return Object
-                    .values(row)
-                    .some(
+                /*
+                 * Cari seluruh object value.
+                 */
+
+                const directMatch =
+                    Object
+                        .values(row)
+                        .some(
+                            function (value) {
+
+                                return String(
+                                    value ?? ""
+                                )
+                                    .toLowerCase()
+                                    .includes(
+                                        query
+                                    );
+
+                            }
+                        );
+
+
+                if (directMatch) {
+
+                    return true;
+
+                }
+
+
+                /*
+                 * Untuk array.
+                 */
+
+                if (
+                    Array.isArray(row)
+                ) {
+
+                    return row.some(
                         function (value) {
 
                             return String(
@@ -2558,6 +3130,11 @@
 
                         }
                     );
+
+                }
+
+
+                return false;
 
             }
         );
@@ -2833,6 +3410,10 @@
     }
 
 
+    /* =====================================================
+       FALLBACK EXPORT
+    ===================================================== */
+
     function fallbackExport(
         type
     ) {
@@ -2911,9 +3492,168 @@
         }
 
 
+        /*
+         * Material harus mempertahankan
+         * header fixed A-E.
+         */
+
+        if (
+            type ===
+                "material" ||
+
+            type ===
+                "material-error"
+
+        ) {
+
+            const materialRows =
+                rows.map(
+                    function (row) {
+
+                        return {
+
+                            Ticket:
+                                getMaterialTicket(
+                                    row
+                                ),
+
+                            Material:
+                                getMaterialValue(
+                                    row,
+                                    MATERIAL_NAME_COLUMN_INDEX,
+                                    [
+                                        "material",
+                                        "Material",
+                                        "name",
+                                        "Name",
+                                        "materialName"
+                                    ]
+                                ),
+
+                            Qty:
+                                getMaterialValue(
+                                    row,
+                                    MATERIAL_QTY_COLUMN_INDEX,
+                                    [
+                                        "quantity",
+                                        "qty",
+                                        "Qty",
+                                        "Quantity"
+                                    ]
+                                ),
+
+                            Satuan:
+                                getMaterialValue(
+                                    row,
+                                    MATERIAL_UNIT_COLUMN_INDEX,
+                                    [
+                                        "unit",
+                                        "satuan",
+                                        "Unit",
+                                        "Satuan"
+                                    ]
+                                ),
+
+                            Kode:
+                                getMaterialValue(
+                                    row,
+                                    MATERIAL_CODE_COLUMN_INDEX,
+                                    [
+                                        "code",
+                                        "kode",
+                                        "Kode",
+                                        "materialCode"
+                                    ]
+                                )
+
+                        };
+
+                    }
+                );
+
+
+            if (
+                type ===
+                "material-error"
+            ) {
+
+                materialRows.forEach(
+                    function (
+                        outputRow,
+                        index
+                    ) {
+
+                        const source =
+                            rows[index];
+
+
+                        outputRow.Error =
+                            getValue(
+                                source,
+                                [
+                                    "error",
+                                    "reason",
+                                    "message",
+                                    "keterangan",
+                                    "note"
+                                ]
+                            )
+                            ||
+                            "Material gagal diproses.";
+
+                    }
+                );
+
+            }
+
+
+            const worksheet =
+                XLSX.utils.json_to_sheet(
+                    materialRows
+                );
+
+
+            const workbook =
+                XLSX.utils.book_new();
+
+
+            XLSX.utils.book_append_sheet(
+                workbook,
+                worksheet,
+                "Data"
+            );
+
+
+            XLSX.writeFile(
+                workbook,
+                filename
+            );
+
+
+            return;
+
+        }
+
+
+        /*
+         * Export valid / invalid.
+         */
+
         const cleanRows =
             rows.map(
                 function (row) {
+
+                    if (
+                        !row ||
+                        typeof row !==
+                            "object" ||
+                        Array.isArray(row)
+                    ) {
+
+                        return row;
+
+                    }
+
 
                     const copy = {
                         ...row
@@ -2927,6 +3667,14 @@
                     delete copy.rowData;
 
                     delete copy.data;
+
+                    delete copy.rawRow;
+
+                    delete copy.excelRow;
+
+                    delete copy.sourceRow;
+
+                    delete copy.originalData;
 
 
                     return copy;
@@ -2959,6 +3707,10 @@
 
     }
 
+
+    /* =====================================================
+       DOWNLOAD BUTTON STATE
+    ===================================================== */
 
     function updateDownloadButtons() {
 
@@ -3634,10 +4386,16 @@
             },
 
         /*
-         * Debug helper:
-         * cek TT Number yang akan ditampilkan UI.
+         * Debug:
+         * Ticket report utama
          */
-        getTicketNumber
+        getTicketNumber,
+
+        /*
+         * Debug:
+         * Ticket Material.xlsx
+         */
+        getMaterialTicket
 
     };
 
