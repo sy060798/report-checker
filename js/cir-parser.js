@@ -11,6 +11,10 @@
    - Mendukung berbagai separator CIR
    - Tidak membaca TT Onsite sebagai TT Release
    - Sistem result lama tetap dipertahankan
+   - TICKET menggunakan TT NUMBER
+   - TT Number berasal dari KOLOM D
+   - Support parse(text, ttNumber)
+   - Support parseMultiple(rows, cirField, ttNumberField)
 ========================================================= */
 
 (function () {
@@ -25,21 +29,19 @@
     const DEFAULT_TIMEZONE = "Asia/Jakarta";
 
     /*
+     * Kolom D = TT Number
+     *
+     * Jika data berupa array:
+     * index 3 = kolom D
+     *
+     * Jika data berupa object:
+     * gunakan nama field TT Number / TTNumber / ttNumber.
+     */
+    const DEFAULT_TT_NUMBER_COLUMN_INDEX = 3;
+
+
+    /*
      * Maksimal jarak tanggal dari baris TT Release.
-     *
-     * Contoh valid:
-     *
-     * TT Release
-     * 18/08/2026 19:35
-     *
-     * atau:
-     *
-     * 18/08/2026 19:35 TT Release
-     *
-     * atau:
-     *
-     * 18/08/2026 19:35
-     * TT Release
      */
     const RELEASE_DATE_MAX_DISTANCE = 5;
 
@@ -83,6 +85,164 @@
 
 
     /* =====================================================
+       NORMALIZE TT NUMBER
+    ===================================================== */
+
+    function normalizeTTNumber(value) {
+
+        if (
+            value === null ||
+            value === undefined
+        ) {
+
+            return "";
+
+        }
+
+
+        return String(value)
+            .trim();
+
+    }
+
+
+    /* =====================================================
+       GET TT NUMBER DARI ROW
+       
+       Prioritas:
+       1. Field ttNumber
+       2. Field TT Number
+       3. Field TTNumber
+       4. Field TT NUMBER
+       5. Array index 3 = kolom D
+    ===================================================== */
+
+    function getTTNumberFromRow(
+        row
+    ) {
+
+        if (
+            row === null ||
+            row === undefined
+        ) {
+
+            return "";
+
+        }
+
+
+        /*
+         * Jika row berupa array.
+         *
+         * Kolom D = index 3.
+         */
+
+        if (
+            Array.isArray(row)
+        ) {
+
+            return normalizeTTNumber(
+                row[
+                    DEFAULT_TT_NUMBER_COLUMN_INDEX
+                ]
+            );
+
+        }
+
+
+        /*
+         * Jika row berupa object.
+         */
+
+        const possibleFields = [
+
+            "ttNumber",
+
+            "TT Number",
+
+            "TTNumber",
+
+            "TT NUMBER",
+
+            "tt number",
+
+            "TT_Number",
+
+            "tt_number"
+
+        ];
+
+
+        for (
+            const field of possibleFields
+        ) {
+
+            if (
+                Object.prototype.hasOwnProperty.call(
+                    row,
+                    field
+                )
+            ) {
+
+                const value =
+                    normalizeTTNumber(
+                        row[field]
+                    );
+
+
+                if (value) {
+
+                    return value;
+
+                }
+
+            }
+
+        }
+
+
+        /*
+         * Fallback berdasarkan key
+         * secara case-insensitive.
+         */
+
+        const keys =
+            Object.keys(row);
+
+
+        for (
+            const key of keys
+        ) {
+
+            const normalizedKey =
+                String(key)
+                    .toLowerCase()
+                    .replace(
+                        /[\s_-]+/g,
+                        ""
+                    );
+
+
+            if (
+                normalizedKey ===
+                "ttnumber"
+            ) {
+
+                return normalizeTTNumber(
+                    row[key]
+                );
+
+            }
+
+        }
+
+
+        return "";
+
+    }
+
+
+    /* =====================================================
        GET SETTINGS
     ===================================================== */
 
@@ -102,22 +262,37 @@
         return {
 
             releasePhrases: [
+
                 "TT Release",
+
                 "TT release",
+
                 "TT RELEASE",
+
                 "Ticket Release",
+
                 "Ticket release",
+
                 "TICKET RELEASE"
+
             ],
 
             notFoundPhrases: [
+
                 "NOT YET",
+
                 "NOT FOUND",
+
                 "Belum ada",
+
                 "Belum tersedia",
+
                 "Pending",
+
                 "N/A",
+
                 "-"
+
             ]
 
         };
@@ -172,12 +347,6 @@
 
         /*
          * Normalisasi slash ganda.
-         *
-         * 21//08/2026
-         * menjadi
-         * 21/08/2026
-         *
-         * Tetapi tidak mengubah format tanggal lain.
          */
 
         value =
@@ -380,10 +549,6 @@
         second
     ) {
 
-        /*
-         * Validasi basic.
-         */
-
         if (
             year < 1900 ||
             month < 1 ||
@@ -427,9 +592,6 @@
 
         /*
          * Validasi tanggal sebenarnya.
-         *
-         * 31/02/2026
-         * harus dianggap invalid.
          */
 
         if (
@@ -543,12 +705,6 @@
 
             /*
              * "-" terlalu umum.
-             *
-             * Contoh:
-             *
-             * LINK A - LINK B
-             *
-             * jangan dianggap NOT YET.
              */
 
             if (
@@ -580,24 +736,6 @@
 
     /* =====================================================
        FIND CIR HEADER
-       
-       Support:
-
-       CIR
-
-       CIR :
-
-       ====CIR====
-
-       ======CIR========
-
-       ===== CIR =====
-
-       ---- CIR ----
-
-       ___CIR___
-
-       # CIR #
     ===================================================== */
 
     function findCIRHeader(
@@ -627,17 +765,6 @@
             }
 
 
-            /*
-             * Buang dekorasi:
-             *
-             * =
-             * -
-             * _
-             * *
-             * #
-             * :
-             */
-
             const cleaned =
                 line
 
@@ -655,9 +782,7 @@
 
 
             /*
-             * Normal:
-             *
-             * CIR
+             * CIR normal.
              */
 
             if (
@@ -683,10 +808,7 @@
 
 
             /*
-             * Contoh:
-             *
-             * CIR :
-             * CIR =================
+             * CIR dengan separator.
              */
 
             if (
@@ -750,12 +872,6 @@
         }
 
 
-        /*
-         * Section berikutnya yang jelas.
-         *
-         * Jangan terlalu agresif.
-         */
-
         const sectionPatterns = [
 
             /^Material\s*:?\s*$/i,
@@ -795,9 +911,6 @@
 
     /* =====================================================
        GET CIR SECTION
-       
-       Penting:
-       TT Release hanya dicari setelah CIR header.
     ===================================================== */
 
     function getCIRSection(
@@ -862,8 +975,7 @@
 
 
             /*
-             * Jika ketemu section lain,
-             * CIR section selesai.
+             * Section lain.
              */
 
             if (
@@ -881,11 +993,7 @@
 
 
             /*
-             * Jika menemukan CIR header kedua,
-             * berhenti di header tersebut.
-             *
-             * Ini penting jika report mempunyai
-             * lebih dari satu blok CIR.
+             * CIR header kedua.
              */
 
             const normalized =
@@ -956,11 +1064,9 @@
     /* =====================================================
        FIND RELEASE LINE
        
-       Hanya bekerja pada CIR section.
+       Hanya pada CIR section.
        
-       Case insensitive.
-       
-       TT Onsite TIDAK dianggap TT Release.
+       TT Onsite tidak dianggap TT Release.
     ===================================================== */
 
     function findReleaseLine(
@@ -1042,11 +1148,6 @@
                     );
 
 
-                /*
-                 * Hanya match phrase yang memang
-                 * release.
-                 */
-
                 if (
                     regex.test(
                         line
@@ -1083,23 +1184,6 @@
 
     /* =====================================================
        SEARCH DATE AROUND RELEASE LINE
-       
-       Support:
-
-       18/08/2026 19:35 TT release
-
-       TT release
-       18/08/2026 19:35
-
-       18/08/2026 19:35
-       TT release
-
-       TT release
-
-
-       18/08/2026 19:35
-
-       Jarak maksimal 5 baris.
     ===================================================== */
 
     function searchDateAroundLine(
@@ -1137,8 +1221,6 @@
 
         /*
          * 2. Cari setelah TT Release.
-         *
-         * Prioritas ke baris setelahnya.
          */
 
         for (
@@ -1273,11 +1355,7 @@
 
 
     /* =====================================================
-       FIND TT RELEASE IN FULL REPORT
-       
-       Fungsi ini sengaja menggunakan CIR section.
-       
-       Tidak boleh mencari langsung dari seluruh report.
+       FIND TT RELEASE IN CIR
     ===================================================== */
 
     function findReleaseInCIR(
@@ -1379,15 +1457,32 @@
 
     /* =====================================================
        MAIN PARSER
+       
+       ticket sekarang = TT Number
+       
+       Pemakaian:
+       
+       parse(cirText, ttNumber)
     ===================================================== */
 
     function parseCIR(
-        cirText
+        cirText,
+        ttNumber
     ) {
 
         const text =
             normalizeText(
                 cirText
+            );
+
+
+        /*
+         * TT Number wajib digunakan.
+         */
+
+        const cleanTTNumber =
+            normalizeTTNumber(
+                ttNumber
             );
 
 
@@ -1402,6 +1497,16 @@
 
             status:
                 "NOT FOUND",
+
+            /*
+             * Ticket = TT Number.
+             */
+
+            ticket:
+                cleanTTNumber,
+
+            ttNumber:
+                cleanTTNumber,
 
             releaseDate:
                 null,
@@ -1425,6 +1530,23 @@
                 text
 
         };
+
+
+        /* =================================================
+           TT NUMBER KOSONG
+        ================================================= */
+
+        if (!cleanTTNumber) {
+
+            result.status =
+                "NO TT NUMBER";
+
+            result.note =
+                "CIR tidak diproses karena TT Number pada kolom D kosong.";
+
+            return result;
+
+        }
 
 
         /* =================================================
@@ -1604,11 +1726,37 @@
 
     /* =====================================================
        PARSE MULTIPLE CIR
+       
+       Support object:
+
+       {
+           CIR: "...",
+           "TT Number": "TT12345"
+       }
+
+       atau:
+
+       {
+           cir: "...",
+           ttNumber: "TT12345"
+       }
+
+       atau array:
+
+       [
+           ...,
+           ...,
+           CIR,
+           TT Number
+       ]
+
+       Dengan TT Number = kolom D / index 3.
     ===================================================== */
 
     function parseMultipleCIR(
         rows,
-        cirField
+        cirField,
+        ttNumberField
     ) {
 
         if (
@@ -1623,14 +1771,237 @@
         return rows.map(
             function (row) {
 
-                const cir =
-                    row
-                        ? row[cirField]
-                        : "";
+                let cir = "";
+
+
+                let ttNumber = "";
+
+
+                /* =========================================
+                   ARRAY ROW
+                ========================================= */
+
+                if (
+                    Array.isArray(row)
+                ) {
+
+                    /*
+                     * Jika cirField adalah angka,
+                     * langsung ambil berdasarkan index.
+                     */
+
+                    if (
+                        typeof cirField ===
+                        "number"
+                    ) {
+
+                        cir =
+                            row[cirField];
+
+                    } else {
+
+                        /*
+                         * Default CIR:
+                         *
+                         * Cari field index terakhir
+                         * jika diberikan.
+                         */
+
+                        cir =
+                            row[
+                                row.length - 1
+                            ];
+
+                    }
+
+
+                    /*
+                     * TT Number selalu kolom D
+                     * jika tidak diberikan field khusus.
+                     */
+
+                    if (
+                        typeof ttNumberField ===
+                        "number"
+                    ) {
+
+                        ttNumber =
+                            row[
+                                ttNumberField
+                            ];
+
+                    } else {
+
+                        ttNumber =
+                            row[
+                                DEFAULT_TT_NUMBER_COLUMN_INDEX
+                            ];
+
+                    }
+
+                }
+
+
+                /* =========================================
+                   OBJECT ROW
+                ========================================= */
+
+                else if (
+                    row &&
+                    typeof row === "object"
+                ) {
+
+                    if (
+                        cirField
+                    ) {
+
+                        cir =
+                            row[cirField];
+
+                    }
+
+
+                    ttNumber =
+                        ttNumberField
+                            ? row[
+                                ttNumberField
+                            ]
+                            : getTTNumberFromRow(
+                                row
+                            );
+
+                }
+
+
+                /*
+                 * Normalisasi TT Number.
+                 */
+
+                ttNumber =
+                    normalizeTTNumber(
+                        ttNumber
+                    );
 
 
                 return parseCIR(
-                    cir
+                    cir,
+                    ttNumber
+                );
+
+            }
+        );
+
+    }
+
+
+    /* =====================================================
+       PARSE ROW
+       
+       Helper khusus spreadsheet.
+       
+       Kolom D = TT Number.
+       
+       Parameter:
+       
+       row[3] = TT Number
+       row[31] = CIR
+       
+       Berdasarkan header user:
+       
+       A = Datetime Receive
+       B = Customer Ticket
+       C = Ref Ticket
+       D = TT Number
+       ...
+       AF = CIR
+       
+       Jadi:
+       TT Number = index 3
+       CIR       = index 31
+    ===================================================== */
+
+    function parseRow(
+        row,
+        cirColumnIndex
+    ) {
+
+        if (
+            !Array.isArray(row)
+        ) {
+
+            return parseCIR(
+                "",
+                ""
+            );
+
+        }
+
+
+        const ttNumber =
+            normalizeTTNumber(
+                row[
+                    DEFAULT_TT_NUMBER_COLUMN_INDEX
+                ]
+            );
+
+
+        /*
+         * CIR default = kolom AF
+         * berdasarkan struktur yang diberikan.
+         *
+         * Tetapi bisa diubah dengan parameter.
+         */
+
+        const cirIndex =
+            typeof cirColumnIndex ===
+            "number"
+
+                ? cirColumnIndex
+
+                : 31;
+
+
+        const cir =
+            row[cirIndex];
+
+
+        return parseCIR(
+            cir,
+            ttNumber
+        );
+
+    }
+
+
+    /* =====================================================
+       PARSE MULTIPLE SPREADSHEET ROWS
+       
+       Khusus format:
+       
+       D = TT Number
+       AF = CIR
+    ===================================================== */
+
+    function parseSpreadsheetRows(
+        rows,
+        cirColumnIndex
+    ) {
+
+        if (
+            !Array.isArray(rows)
+        ) {
+
+            return [];
+
+        }
+
+
+        return rows.map(
+            function (row) {
+
+                return parseRow(
+                    row,
+                    cirColumnIndex
                 );
 
             }
@@ -1645,26 +2016,69 @@
 
     window.ReportCheckerCIR = {
 
+        /*
+         * Main parser.
+         *
+         * parse(CIR, TT Number)
+         */
         parse:
             parseCIR,
 
+
+        /*
+         * Parse banyak row.
+         */
         parseMultiple:
             parseMultipleCIR,
 
+
+        /*
+         * Khusus spreadsheet.
+         *
+         * D = TT Number
+         * AF = CIR
+         */
+        parseRow:
+            parseRow,
+
+
+        parseSpreadsheetRows:
+            parseSpreadsheetRows,
+
+
+        /*
+         * Ambil TT Number dari object row.
+         */
+        getTTNumber:
+            getTTNumberFromRow,
+
+
+        /*
+         * Date parser.
+         */
         parseDateTime:
             parseDateTime,
+
 
         formatDateTime:
             formatDateTime,
 
+
         normalizeText:
             normalizeText,
+
+
+        normalizeTTNumber:
+            normalizeTTNumber,
+
 
         findCIRHeader:
             findCIRHeader,
 
+
         getCIRSection:
             getCIRSection,
+
 
         findReleaseLine:
             findReleaseLine
