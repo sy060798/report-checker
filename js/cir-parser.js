@@ -2,19 +2,30 @@
    REPORT CHECKER
    cir-parser.js
 
-   UPDATE:
+   UPDATE FINAL:
+
    - CIR header fleksibel
    - Case insensitive
-   - TT Release hanya dicari setelah CIR
-   - Mendukung tanggal sebelum / sesudah TT Release
-   - Mendukung // pada tanggal
-   - Mendukung berbagai separator CIR
-   - Tidak membaca TT Onsite sebagai TT Release
-   - Sistem result lama tetap dipertahankan
-   - TICKET menggunakan TT NUMBER
-   - TT Number berasal dari KOLOM D
+   - ===CIR====
+   - --- CIR ---
+   - CIR
+   - CIR :
+   - CIR dengan separator apa pun
+   - Setelah CIR ditemukan, cari DATETIME PALING AWAL
+   - Baris kosong/spasi panjang tidak masalah
+   - Tidak bergantung pada tulisan "TT Release"
+   - Mendukung format tanggal:
+       26/08/2026 21:12
+       26/08/2026 21.12
+       26//08//2026 21:12
+       26-08-2026 21:12
+       2026-08-26 21:12
+   - Mendukung tanggal + jam dengan teks setelahnya
+   - TT Number berasal dari kolom D
    - Support parse(text, ttNumber)
-   - Support parseMultiple(rows, cirField, ttNumberField)
+   - Support parseMultiple()
+   - Support parseRow()
+   - Support parseSpreadsheetRows()
 ========================================================= */
 
 (function () {
@@ -26,24 +37,33 @@
        CONSTANTS
     ===================================================== */
 
-    const DEFAULT_TIMEZONE = "Asia/Jakarta";
+    const DEFAULT_TIMEZONE =
+        "Asia/Jakarta";
+
 
     /*
      * Kolom D = TT Number
      *
-     * Jika data berupa array:
-     * index 3 = kolom D
+     * Array index:
      *
-     * Jika data berupa object:
-     * gunakan nama field TT Number / TTNumber / ttNumber.
+     * A = 0
+     * B = 1
+     * C = 2
+     * D = 3
      */
+
     const DEFAULT_TT_NUMBER_COLUMN_INDEX = 3;
 
 
     /*
-     * Maksimal jarak tanggal dari baris TT Release.
+     * Kolom AF = CIR
+     *
+     * A  = 0
+     * ...
+     * AF = 31
      */
-    const RELEASE_DATE_MAX_DISTANCE = 5;
+
+    const DEFAULT_CIR_COLUMN_INDEX = 31;
 
 
     /* =====================================================
@@ -63,9 +83,22 @@
 
 
         return String(value)
-            .replace(/\r\n/g, "\n")
-            .replace(/\r/g, "\n")
-            .replace(/\u00A0/g, " ")
+
+            .replace(
+                /\r\n/g,
+                "\n"
+            )
+
+            .replace(
+                /\r/g,
+                "\n"
+            )
+
+            .replace(
+                /\u00A0/g,
+                " "
+            )
+
             .trim();
 
     }
@@ -78,7 +111,12 @@
     function normalizeLine(value) {
 
         return String(value || "")
-            .replace(/\s+/g, " ")
+
+            .replace(
+                /\s+/g,
+                " "
+            )
+
             .trim();
 
     }
@@ -107,19 +145,10 @@
 
 
     /* =====================================================
-       GET TT NUMBER DARI ROW
-       
-       Prioritas:
-       1. Field ttNumber
-       2. Field TT Number
-       3. Field TTNumber
-       4. Field TT NUMBER
-       5. Array index 3 = kolom D
+       GET TT NUMBER FROM ROW
     ===================================================== */
 
-    function getTTNumberFromRow(
-        row
-    ) {
+    function getTTNumberFromRow(row) {
 
         if (
             row === null ||
@@ -131,11 +160,9 @@
         }
 
 
-        /*
-         * Jika row berupa array.
-         *
-         * Kolom D = index 3.
-         */
+        /* ================================================
+           ARRAY
+        ================================================ */
 
         if (
             Array.isArray(row)
@@ -150,9 +177,9 @@
         }
 
 
-        /*
-         * Jika row berupa object.
-         */
+        /* ================================================
+           OBJECT
+        ================================================ */
 
         const possibleFields = [
 
@@ -201,10 +228,9 @@
         }
 
 
-        /*
-         * Fallback berdasarkan key
-         * secara case-insensitive.
-         */
+        /* ================================================
+           CASE INSENSITIVE FIELD
+        ================================================ */
 
         const keys =
             Object.keys(row);
@@ -216,7 +242,9 @@
 
             const normalizedKey =
                 String(key)
+
                     .toLowerCase()
+
                     .replace(
                         /[\s_-]+/g,
                         ""
@@ -250,7 +278,8 @@
 
         if (
             window.ReportCheckerSettings &&
-            typeof window.ReportCheckerSettings.get ===
+            typeof
+                window.ReportCheckerSettings.get ===
                 "function"
         ) {
 
@@ -307,6 +336,7 @@
     function escapeRegExp(value) {
 
         return String(value)
+
             .replace(
                 /[.*+?^${}()|[\]\\]/g,
                 "\\$&"
@@ -316,20 +346,118 @@
 
 
     /* =====================================================
-       DATE PARSING
+       NORMALIZE DATE SEPARATOR
        
-       Support:
+       Contoh:
 
-       21/08/2026 19:07
-       21//08/2026 19:07
+       26//08//2026
+       ->
+       26/08/2026
 
-       18/08/2026 19:35
-       18-08-2026 19:35
+       26.08.2026
+       ->
+       26/08/2026
 
-       2026-08-18 19:35
+       Jam:
 
-       18/08/2026
-       2026-08-18
+       21.12
+       ->
+       21:12
+    ===================================================== */
+
+    function normalizeDateString(text) {
+
+        if (!text) {
+
+            return "";
+
+        }
+
+
+        let value =
+            normalizeLine(
+                text
+            );
+
+
+        /*
+         * Slash ganda.
+         */
+
+        value =
+            value.replace(
+                /\/{2,}/g,
+                "/"
+            );
+
+
+        /*
+         * Format tanggal dengan titik:
+         *
+         * 26.08.2026
+         *
+         * Jangan mengubah jam.
+         */
+
+        value =
+            value.replace(
+                /(\d{1,2})\.(\d{1,2})\.(\d{4})/g,
+                "$1/$2/$3"
+            );
+
+
+        /*
+         * Format jam:
+         *
+         * 21.12
+         * 21.12.30
+         *
+         * menjadi:
+         *
+         * 21:12
+         * 21:12:30
+         */
+
+        value =
+            value.replace(
+                /(\d{1,2})\.(\d{2})(?:\.(\d{2}))?(?=\s|$)/g,
+                function (
+                    match,
+                    hour,
+                    minute,
+                    second
+                ) {
+
+                    if (second) {
+
+                        return (
+                            hour +
+                            ":" +
+                            minute +
+                            ":" +
+                            second
+                        );
+
+                    }
+
+
+                    return (
+                        hour +
+                        ":" +
+                        minute
+                    );
+
+                }
+            );
+
+
+        return value;
+
+    }
+
+
+    /* =====================================================
+       DATE PARSING
     ===================================================== */
 
     function parseDateTime(text) {
@@ -341,18 +469,9 @@
         }
 
 
-        let value =
-            normalizeLine(text);
-
-
-        /*
-         * Normalisasi slash ganda.
-         */
-
-        value =
-            value.replace(
-                /\/{2,}/g,
-                "/"
+        const value =
+            normalizeDateString(
+                text
             );
 
 
@@ -495,7 +614,9 @@
                 Number(match[3]),
 
                 Number(match[2]),
+
                 Number(match[1]),
+
                 0,
                 0,
                 0
@@ -520,8 +641,11 @@
             return createDate(
 
                 Number(match[1]),
+
                 Number(match[2]),
+
                 Number(match[3]),
+
                 0,
                 0,
                 0
@@ -591,7 +715,7 @@
 
 
         /*
-         * Validasi tanggal sebenarnya.
+         * Validasi tanggal.
          */
 
         if (
@@ -631,14 +755,21 @@
         const pad =
             value =>
                 String(value)
-                    .padStart(2, "0");
+                    .padStart(
+                        2,
+                        "0"
+                    );
 
 
         return [
 
-            pad(date.getDate()),
+            pad(
+                date.getDate()
+            ),
 
-            pad(date.getMonth() + 1),
+            pad(
+                date.getMonth() + 1
+            ),
 
             date.getFullYear()
 
@@ -648,11 +779,17 @@
 
         [
 
-            pad(date.getHours()),
+            pad(
+                date.getHours()
+            ),
 
-            pad(date.getMinutes()),
+            pad(
+                date.getMinutes()
+            ),
 
-            pad(date.getSeconds())
+            pad(
+                date.getSeconds()
+            )
 
         ].join(":");
 
@@ -680,7 +817,8 @@
 
 
         for (
-            const phrase of phrases || []
+            const phrase of
+                phrases || []
         ) {
 
             if (!phrase) {
@@ -692,7 +830,9 @@
 
             const lowerPhrase =
                 String(phrase)
+
                     .toLowerCase()
+
                     .trim();
 
 
@@ -736,15 +876,31 @@
 
     /* =====================================================
        FIND CIR HEADER
+       
+       Sangat fleksibel.
+       
+       Contoh yang diterima:
+
+       CIR
+       CIR:
+       CIR :
+       ===CIR====
+       === CIR ===
+       ---CIR---
+       *** CIR ***
+       ### CIR ###
+       [CIR]
+       CIR INFORMATION
+       CIR DATA
     ===================================================== */
 
-    function findCIRHeader(
-        lines
-    ) {
+    function findCIRHeader(lines) {
 
         for (
             let index = 0;
+
             index < lines.length;
+
             index++
         ) {
 
@@ -765,16 +921,20 @@
             }
 
 
+            /*
+             * Bersihkan separator.
+             */
+
             const cleaned =
                 line
 
                     .replace(
-                        /^[=\-_*#:\s]+/,
+                        /^[=\-_*#:\[\](){}\s]+/,
                         ""
                     )
 
                     .replace(
-                        /[=\-_*#:\s]+$/,
+                        /[=\-_*#:\[\](){}\s]+$/,
                         ""
                     )
 
@@ -782,7 +942,7 @@
 
 
             /*
-             * CIR normal.
+             * CIR persis.
              */
 
             if (
@@ -793,14 +953,11 @@
 
                 return {
 
-                    found:
-                        true,
+                    found: true,
 
-                    index:
-                        index,
+                    index: index,
 
-                    line:
-                        originalLine
+                    line: originalLine
 
                 };
 
@@ -808,7 +965,13 @@
 
 
             /*
-             * CIR dengan separator.
+             * CIR diikuti keterangan.
+             *
+             * Contoh:
+             *
+             * CIR DATA
+             * CIR INFORMATION
+             * CIR DETAIL
              */
 
             if (
@@ -819,14 +982,11 @@
 
                 return {
 
-                    found:
-                        true,
+                    found: true,
 
-                    index:
-                        index,
+                    index: index,
 
-                    line:
-                        originalLine
+                    line: originalLine
 
                 };
 
@@ -837,14 +997,11 @@
 
         return {
 
-            found:
-                false,
+            found: false,
 
-            index:
-                -1,
+            index: -1,
 
-            line:
-                ""
+            line: ""
 
         };
 
@@ -855,9 +1012,7 @@
        IS NEXT SECTION
     ===================================================== */
 
-    function isNextSection(
-        line
-    ) {
+    function isNextSection(line) {
 
         const value =
             normalizeLine(
@@ -911,11 +1066,12 @@
 
     /* =====================================================
        GET CIR SECTION
+       
+       Tetap disediakan untuk kompatibilitas
+       dengan sistem lama.
     ===================================================== */
 
-    function getCIRSection(
-        text
-    ) {
+    function getCIRSection(text) {
 
         const lines =
             normalizeText(
@@ -934,20 +1090,15 @@
 
             return {
 
-                found:
-                    false,
+                found: false,
 
-                headerIndex:
-                    -1,
+                headerIndex: -1,
 
-                endIndex:
-                    -1,
+                endIndex: -1,
 
-                lines:
-                    [],
+                lines: [],
 
-                text:
-                    ""
+                text: ""
 
             };
 
@@ -975,7 +1126,7 @@
 
 
             /*
-             * Section lain.
+             * Section berikutnya.
              */
 
             if (
@@ -993,7 +1144,7 @@
 
 
             /*
-             * CIR header kedua.
+             * CIR kedua.
              */
 
             const normalized =
@@ -1006,12 +1157,12 @@
                 normalized
 
                     .replace(
-                        /^[=\-_*#:\s]+/,
+                        /^[=\-_*#:\[\](){}\s]+/,
                         ""
                     )
 
                     .replace(
-                        /[=\-_*#:\s]+$/,
+                        /[=\-_*#:\[\](){}\s]+$/,
                         ""
                     )
 
@@ -1041,8 +1192,7 @@
 
         return {
 
-            found:
-                true,
+            found: true,
 
             headerIndex:
                 header.index,
@@ -1054,7 +1204,9 @@
                 cirLines,
 
             text:
-                cirLines.join("\n")
+                cirLines.join(
+                    "\n"
+                )
 
         };
 
@@ -1064,9 +1216,10 @@
     /* =====================================================
        FIND RELEASE LINE
        
-       Hanya pada CIR section.
+       Fungsi lama tetap tersedia.
        
-       TT Onsite tidak dianggap TT Release.
+       Tetapi parser utama TIDAK lagi bergantung
+       pada fungsi ini.
     ===================================================== */
 
     function findReleaseLine(
@@ -1092,7 +1245,9 @@
 
         for (
             let index = 0;
+
             index < lines.length;
+
             index++
         ) {
 
@@ -1183,36 +1338,53 @@
 
 
     /* =====================================================
-       SEARCH DATE AROUND RELEASE LINE
+       FIND FIRST DATETIME AFTER CIR
+       
+       INI ADALAH LOGIKA UTAMA BARU.
+       
+       Contoh:
+
+       ===CIR====
+
+
+       26/08/2026 21.12 TT RELEASE
+
+       27/08/2026 00.11 Team perjalanan
+
+       27/08/2026 00.55 Team onsite
+
+
+       Yang diambil:
+
+       26/08/2026 21:12:00
     ===================================================== */
 
-    function searchDateAroundLine(
-        lines,
-        releaseIndex
-    ) {
+    function findFirstDateAfterCIR(text) {
 
-        /*
-         * 1. Baris TT Release sendiri.
-         */
+        const lines =
+            normalizeText(
+                text
+            )
+                .split("\n");
 
-        let date =
-            parseDateTime(
-                lines[releaseIndex]
+
+        const header =
+            findCIRHeader(
+                lines
             );
 
 
-        if (date) {
+        if (!header.found) {
 
             return {
 
-                date:
-                    date,
+                found: false,
 
-                sourceLine:
-                    lines[releaseIndex],
+                date: null,
 
-                sourceIndex:
-                    releaseIndex
+                sourceLine: "",
+
+                sourceIndex: -1
 
             };
 
@@ -1220,112 +1392,61 @@
 
 
         /*
-         * 2. Cari setelah TT Release.
+         * Mulai tepat di bawah CIR.
          */
 
         for (
-            let offset = 1;
+            let index =
+                header.index + 1;
 
-            offset <=
-                RELEASE_DATE_MAX_DISTANCE;
+            index < lines.length;
 
-            offset++
+            index++
         ) {
 
-            const index =
-                releaseIndex +
-                offset;
-
-
-            if (
-                index >=
-                lines.length
-            ) {
-
-                break;
-
-            }
-
-
-            const line =
+            const originalLine =
                 lines[index];
 
 
             /*
-             * Jangan melewati section lain.
+             * Jangan hilangkan isi.
+             * Hanya untuk pengecekan.
              */
 
-            if (
-                isNextSection(
-                    line
-                )
-            ) {
-
-                break;
-
-            }
-
-
-            date =
-                parseDateTime(
-                    line
-                );
-
-
-            if (date) {
-
-                return {
-
-                    date:
-                        date,
-
-                    sourceLine:
-                        line,
-
-                    sourceIndex:
-                        index
-
-                };
-
-            }
-
-        }
-
-
-        /*
-         * 3. Cari sebelum TT Release.
-         */
-
-        for (
-            let offset = 1;
-
-            offset <=
-                RELEASE_DATE_MAX_DISTANCE;
-
-            offset++
-        ) {
-
-            const index =
-                releaseIndex -
-                offset;
-
-
-            if (
-                index < 0
-            ) {
-
-                break;
-
-            }
-
-
             const line =
-                lines[index];
+                normalizeLine(
+                    originalLine
+                );
 
 
-            date =
-                parseDateTime(
+            /*
+             * Baris kosong dilewati.
+             */
+
+            if (!line) {
+
+                continue;
+
+            }
+
+
+            /*
+             * Normalisasi format tanggal/jam.
+             */
+
+            const normalizedDateLine =
+                normalizeDateString(
                     line
+                );
+
+
+            /*
+             * Coba parse tanggal.
+             */
+
+            const date =
+                parseDateTime(
+                    normalizedDateLine
                 );
 
 
@@ -1333,11 +1454,12 @@
 
                 return {
 
-                    date:
-                        date,
+                    found: true,
+
+                    date: date,
 
                     sourceLine:
-                        line,
+                        originalLine,
 
                     sourceIndex:
                         index
@@ -1349,13 +1471,28 @@
         }
 
 
-        return null;
+        return {
+
+            found: false,
+
+            date: null,
+
+            sourceLine: "",
+
+            sourceIndex: -1
+
+        };
 
     }
 
 
     /* =====================================================
        FIND TT RELEASE IN CIR
+       
+       Sekarang:
+       
+       TT Release =
+       DATETIME PALING AWAL SETELAH CIR
     ===================================================== */
 
     function findReleaseInCIR(
@@ -1369,17 +1506,19 @@
             );
 
 
+        /*
+         * CIR tidak ditemukan.
+         */
+
         if (
             !cirSection.found
         ) {
 
             return {
 
-                cirFound:
-                    false,
+                cirFound: false,
 
-                releaseFound:
-                    false,
+                releaseFound: false,
 
                 cirSection:
                     cirSection,
@@ -1395,22 +1534,30 @@
         }
 
 
-        const releaseLine =
-            findReleaseLine(
-                cirSection.text,
-                settings.releasePhrases
+        /*
+         * Cari tanggal paling awal
+         * setelah CIR.
+         */
+
+        const dateResult =
+            findFirstDateAfterCIR(
+                text
             );
 
 
-        if (!releaseLine) {
+        /*
+         * Tidak ada tanggal.
+         */
+
+        if (
+            !dateResult.found
+        ) {
 
             return {
 
-                cirFound:
-                    true,
+                cirFound: true,
 
-                releaseFound:
-                    false,
+                releaseFound: false,
 
                 cirSection:
                     cirSection,
@@ -1426,20 +1573,35 @@
         }
 
 
-        const dateResult =
-            searchDateAroundLine(
-                cirSection.lines,
-                releaseLine.index
-            );
+        /*
+         * Jadikan baris tanggal sebagai
+         * release line.
+         */
+
+        const releaseLine = {
+
+            line:
+                dateResult.sourceLine,
+
+            normalizedLine:
+                normalizeLine(
+                    dateResult.sourceLine
+                ),
+
+            index:
+                dateResult.sourceIndex,
+
+            phrase:
+                "CIR"
+
+        };
 
 
         return {
 
-            cirFound:
-                true,
+            cirFound: true,
 
-            releaseFound:
-                true,
+            releaseFound: true,
 
             cirSection:
                 cirSection,
@@ -1458,11 +1620,12 @@
     /* =====================================================
        MAIN PARSER
        
-       ticket sekarang = TT Number
-       
        Pemakaian:
-       
-       parse(cirText, ttNumber)
+
+       ReportCheckerCIR.parse(
+           cirText,
+           ttNumber
+       );
     ===================================================== */
 
     function parseCIR(
@@ -1477,7 +1640,7 @@
 
 
         /*
-         * TT Number wajib digunakan.
+         * TT Number wajib.
          */
 
         const cleanTTNumber =
@@ -1492,14 +1655,13 @@
 
         const result = {
 
-            found:
-                false,
+            found: false,
 
             status:
                 "NOT FOUND",
 
             /*
-             * Ticket = TT Number.
+             * Ticket = TT Number
              */
 
             ticket:
@@ -1567,7 +1729,7 @@
 
 
         /* =================================================
-           CARI TT RELEASE DI DALAM CIR
+           CARI RELEASE
         ================================================= */
 
         const searchResult =
@@ -1601,7 +1763,7 @@
 
 
         /* =================================================
-           TT RELEASE TIDAK ADA
+           RELEASE TIDAK DITEMUKAN
         ================================================= */
 
         if (
@@ -1626,7 +1788,7 @@
 
                     ? "Ditemukan indikasi data belum tersedia pada section CIR."
 
-                    : "Frasa TT Release tidak ditemukan pada section CIR.";
+                    : "Tanggal dan jam tidak ditemukan setelah tulisan CIR.";
 
 
             return result;
@@ -1651,7 +1813,7 @@
 
 
         /*
-         * Index global terhadap report.
+         * Source index global.
          */
 
         result.sourceIndex =
@@ -1674,7 +1836,7 @@
                 "NOT FOUND";
 
             result.note =
-                "TT Release ditemukan tetapi tanggal/jam tidak dapat dibaca.";
+                "Tanggal dan jam setelah CIR tidak dapat dibaca.";
 
             return result;
 
@@ -1703,20 +1865,16 @@
             );
 
 
-        if (
-            dateResult.sourceIndex !==
-            releaseLine.index
-        ) {
+        result.sourceLine =
+            dateResult.sourceLine;
 
-            result.note =
-                "TT Release ditemukan pada section CIR dan tanggal release ditemukan di sekitar baris TT Release.";
 
-        } else {
+        /*
+         * Catatan hasil.
+         */
 
-            result.note =
-                "TT Release berhasil ditemukan pada section CIR.";
-
-        }
+        result.note =
+            "Tanggal dan jam paling awal setelah CIR berhasil ditemukan.";
 
 
         return result;
@@ -1727,7 +1885,7 @@
     /* =====================================================
        PARSE MULTIPLE CIR
        
-       Support object:
+       Support:
 
        {
            CIR: "...",
@@ -1740,17 +1898,6 @@
            cir: "...",
            ttNumber: "TT12345"
        }
-
-       atau array:
-
-       [
-           ...,
-           ...,
-           CIR,
-           TT Number
-       ]
-
-       Dengan TT Number = kolom D / index 3.
     ===================================================== */
 
     function parseMultipleCIR(
@@ -1773,7 +1920,6 @@
 
                 let cir = "";
 
-
                 let ttNumber = "";
 
 
@@ -1786,8 +1932,7 @@
                 ) {
 
                     /*
-                     * Jika cirField adalah angka,
-                     * langsung ambil berdasarkan index.
+                     * CIR berdasarkan index.
                      */
 
                     if (
@@ -1796,15 +1941,15 @@
                     ) {
 
                         cir =
-                            row[cirField];
+                            row[
+                                cirField
+                            ];
 
                     } else {
 
                         /*
-                         * Default CIR:
-                         *
-                         * Cari field index terakhir
-                         * jika diberikan.
+                         * Fallback:
+                         * field terakhir.
                          */
 
                         cir =
@@ -1816,8 +1961,7 @@
 
 
                     /*
-                     * TT Number selalu kolom D
-                     * jika tidak diberikan field khusus.
+                     * TT Number.
                      */
 
                     if (
@@ -1856,16 +2000,20 @@
                     ) {
 
                         cir =
-                            row[cirField];
+                            row[
+                                cirField
+                            ];
 
                     }
 
 
                     ttNumber =
                         ttNumberField
+
                             ? row[
                                 ttNumberField
                             ]
+
                             : getTTNumberFromRow(
                                 row
                             );
@@ -1874,7 +2022,7 @@
 
 
                 /*
-                 * Normalisasi TT Number.
+                 * Normalisasi.
                  */
 
                 ttNumber =
@@ -1897,27 +2045,10 @@
     /* =====================================================
        PARSE ROW
        
-       Helper khusus spreadsheet.
-       
-       Kolom D = TT Number.
-       
-       Parameter:
-       
-       row[3] = TT Number
-       row[31] = CIR
-       
-       Berdasarkan header user:
-       
-       A = Datetime Receive
-       B = Customer Ticket
-       C = Ref Ticket
-       D = TT Number
-       ...
+       Spreadsheet:
+
+       D  = TT Number
        AF = CIR
-       
-       Jadi:
-       TT Number = index 3
-       CIR       = index 31
     ===================================================== */
 
     function parseRow(
@@ -1937,6 +2068,10 @@
         }
 
 
+        /*
+         * TT Number = kolom D.
+         */
+
         const ttNumber =
             normalizeTTNumber(
                 row[
@@ -1946,10 +2081,7 @@
 
 
         /*
-         * CIR default = kolom AF
-         * berdasarkan struktur yang diberikan.
-         *
-         * Tetapi bisa diubah dengan parameter.
+         * CIR default = AF.
          */
 
         const cirIndex =
@@ -1958,11 +2090,13 @@
 
                 ? cirColumnIndex
 
-                : 31;
+                : DEFAULT_CIR_COLUMN_INDEX;
 
 
         const cir =
-            row[cirIndex];
+            row[
+                cirIndex
+            ];
 
 
         return parseCIR(
@@ -1975,11 +2109,6 @@
 
     /* =====================================================
        PARSE MULTIPLE SPREADSHEET ROWS
-       
-       Khusus format:
-       
-       D = TT Number
-       AF = CIR
     ===================================================== */
 
     function parseSpreadsheetRows(
@@ -2019,36 +2148,44 @@
         /*
          * Main parser.
          *
-         * parse(CIR, TT Number)
+         * parse(
+         *     CIR,
+         *     TT Number
+         * )
          */
+
         parse:
             parseCIR,
 
 
         /*
-         * Parse banyak row.
+         * Parse banyak data.
          */
+
         parseMultiple:
             parseMultipleCIR,
 
 
         /*
-         * Khusus spreadsheet.
-         *
-         * D = TT Number
-         * AF = CIR
+         * Parse satu row spreadsheet.
          */
+
         parseRow:
             parseRow,
 
+
+        /*
+         * Parse banyak row spreadsheet.
+         */
 
         parseSpreadsheetRows:
             parseSpreadsheetRows,
 
 
         /*
-         * Ambil TT Number dari object row.
+         * Ambil TT Number.
          */
+
         getTTNumber:
             getTTNumberFromRow,
 
@@ -2056,13 +2193,22 @@
         /*
          * Date parser.
          */
+
         parseDateTime:
             parseDateTime,
 
 
+        /*
+         * Format date.
+         */
+
         formatDateTime:
             formatDateTime,
 
+
+        /*
+         * Normalize.
+         */
 
         normalizeText:
             normalizeText,
@@ -2071,6 +2217,10 @@
         normalizeTTNumber:
             normalizeTTNumber,
 
+
+        /*
+         * CIR helpers.
+         */
 
         findCIRHeader:
             findCIRHeader,
@@ -2081,7 +2231,25 @@
 
 
         findReleaseLine:
-            findReleaseLine
+            findReleaseLine,
+
+
+        /*
+         * Fungsi baru:
+         * mencari datetime pertama
+         * setelah CIR.
+         */
+
+        findFirstDateAfterCIR:
+            findFirstDateAfterCIR,
+
+
+        /*
+         * Fungsi utama pencarian release.
+         */
+
+        findReleaseInCIR:
+            findReleaseInCIR
 
     };
 
