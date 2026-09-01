@@ -2,7 +2,7 @@
    REPORT CHECKER
    material-parser.js
 
-   VERSION:
+   UPDATED VERSION
    - Strict Material Matching
    - Material hanya dari MASTER LIST
    - Typo ringan masih diterima
@@ -17,6 +17,15 @@
    - Support buildRows()
    - Support flatten()
    - Support parseDetailed()
+
+   UPDATE:
+   - getTTNumber() lebih kuat
+   - Prioritas nomor ticket dari kolom D
+   - Support berbagai nama field TT Number
+   - Support originalRow
+   - Support source
+   - Support nested row
+   - Output Ticket tetap tersedia di semua format
 ========================================================= */
 
 (function () {
@@ -31,63 +40,44 @@
     const MATERIAL_MASTER = [
 
         "Pigtail",
-
         "Patchcord",
 
         "Splitter 1:2",
-
         "Splitter 1:4",
-
         "Splitter 1:8",
-
         "Splitter 1:16",
 
         "2C (METER)",
-
         "12C (Meter)",
-
         "24C (Meter)",
-
         "48C (Meter)",
-
         "96C (Meter)",
 
         "DPFO",
 
         "12C DOME (UNIT)",
-
         "24C DOME (UNIT)",
-
         "48C DOME (UNIT)",
-
         "96C DOME (UNIT)",
-
         "144C DOME (UNIT)",
 
         "24C INLINE (Unit)",
-
         "48C INLINE (Unit)",
-
         "96C INLINE (Unit)",
-
         "144C INLINE (Unit)",
 
         "Fixing Slack",
-
         "Kaset JB",
 
         "Terminal Roset (Unit)",
 
         "Tiang 7 (Batang)",
-
         "Tiang 9 (Batang)",
 
         "Subduct",
 
         "Handhole 40 x 40",
-
         "Handhole 60 x 60",
-
         "Handhole 80 x 80",
 
         "Dead End"
@@ -150,27 +140,11 @@
 
     const MATCH_CONFIG = {
 
-        /*
-         * Exact = 1.00
-         */
-
         minimumScore: 0.82,
-
-        /*
-         * Typo untuk kata panjang.
-         */
 
         longTokenMinimum: 0.78,
 
-        /*
-         * Token 4-5 karakter.
-         */
-
         mediumTokenMinimum: 0.84,
-
-        /*
-         * Token pendek harus sangat mirip.
-         */
 
         shortTokenMinimum: 0.92
 
@@ -236,44 +210,21 @@
 
             .toLowerCase()
 
-            /*
-             * 40 x 40
-             * 40x40
-             */
             .replace(/\s*x\s*/gi, "x")
 
-            /*
-             * 1:8
-             * 1 : 8
-             */
             .replace(/\s*:\s*/g, ":")
 
-            /*
-             * 1 / 8 dianggap 1:8
-             */
             .replace(
                 /(\d+)\s*\/\s*(\d+)/g,
                 "$1:$2"
             )
 
-            /*
-             * Hilangkan tanda kurung.
-             */
             .replace(/[()]/g, " ")
 
-            /*
-             * Hilangkan quote.
-             */
             .replace(/["']/g, "")
 
-            /*
-             * Hyphen / underscore
-             */
             .replace(/[_\-]+/g, " ")
 
-            /*
-             * Rapikan.
-             */
             .replace(/\s+/g, " ")
 
             .trim();
@@ -288,9 +239,7 @@
     function isExcludedMaterial(value) {
 
         const normalized =
-            normalizeMaterialName(
-                value
-            );
+            normalizeMaterialName(value);
 
         if (!normalized) {
 
@@ -300,7 +249,7 @@
 
         for (
             const excluded
-                of EXCLUDED_MATERIAL_PATTERNS
+            of EXCLUDED_MATERIAL_PATTERNS
         ) {
 
             const normalizedExcluded =
@@ -332,9 +281,7 @@
     function tokenize(value) {
 
         const normalized =
-            normalizeMaterialName(
-                value
-            );
+            normalizeMaterialName(value);
 
         if (!normalized) {
 
@@ -473,11 +420,6 @@
 
         }
 
-        /*
-         * Jangan gunakan includes di sini
-         * sebagai penentu utama.
-         */
-
         const distance =
             levenshtein(
                 left,
@@ -535,9 +477,6 @@
 
         /*
          * Angka wajib exact.
-         *
-         * 1 != 2
-         * 12 != 24
          */
         if (
             /^\d+$/.test(target)
@@ -549,9 +488,6 @@
 
         }
 
-        /*
-         * Exact token.
-         */
         if (
             source === target
         ) {
@@ -560,9 +496,6 @@
 
         }
 
-        /*
-         * Typo ringan.
-         */
         return similarity(
             source,
             target
@@ -573,8 +506,6 @@
 
     /* =====================================================
        MATERIAL MATCH SCORE
-       
-       STRICT MODE
     ===================================================== */
 
     function materialMatchScore(
@@ -583,14 +514,10 @@
     ) {
 
         const source =
-            normalizeMaterialName(
-                input
-            );
+            normalizeMaterialName(input);
 
         const target =
-            normalizeMaterialName(
-                master
-            );
+            normalizeMaterialName(master);
 
         if (
             !source ||
@@ -601,9 +528,6 @@
 
         }
 
-        /*
-         * EXACT
-         */
         if (
             source === target
         ) {
@@ -627,30 +551,20 @@
 
         }
 
-        /*
-         * Special case:
-         *
-         * target = pigtail
-         * source = pigtail 10
-         *
-         * Setelah quantity dibuang,
-         * biasanya source sudah pigtail.
-         */
-
         let matchedCount = 0;
 
         let scoreTotal = 0;
 
         for (
             const targetToken
-                of targetTokens
+            of targetTokens
         ) {
 
             let bestScore = 0;
 
             for (
                 const sourceToken
-                    of sourceTokens
+                of sourceTokens
             ) {
 
                 const score =
@@ -709,18 +623,12 @@
 
             } else {
 
-                /*
-                 * Semua token master wajib cocok.
-                 */
                 return 0;
 
             }
 
         }
 
-        /*
-         * Semua token master harus ketemu.
-         */
         if (
             matchedCount !==
             targetTokens.length
@@ -734,10 +642,6 @@
             scoreTotal /
             targetTokens.length;
 
-        /*
-         * Untuk source yang jauh lebih panjang
-         * dari master, jangan terlalu mudah menerima.
-         */
         if (
             sourceTokens.length >
             targetTokens.length + 2
@@ -764,13 +668,8 @@
 
         }
 
-        /*
-         * Excluded material langsung reject.
-         */
         if (
-            isExcludedMaterial(
-                input
-            )
+            isExcludedMaterial(input)
         ) {
 
             return null;
@@ -778,9 +677,7 @@
         }
 
         const source =
-            normalizeMaterialName(
-                input
-            );
+            normalizeMaterialName(input);
 
         if (!source) {
 
@@ -794,7 +691,7 @@
 
         for (
             const master
-                of MATERIAL_MASTER
+            of MATERIAL_MASTER
         ) {
 
             const score =
@@ -818,9 +715,6 @@
 
         }
 
-        /*
-         * Tidak cukup mirip.
-         */
         if (
             !best ||
             bestScore <
@@ -848,10 +742,13 @@
        GET TT NUMBER
        
        PRIORITAS:
-       1. Array index D
+       
+       1. ARRAY -> kolom D
        2. Object TT Number
-       3. originalRow
-       4. source
+       3. Object Ticket
+       4. originalRow
+       5. source
+       6. row
     ===================================================== */
 
     function getTTNumber(row) {
@@ -862,57 +759,105 @@
 
         }
 
-        /*
-         * Array
-         */
+
+        /* ================================================
+           1. ARRAY
+
+           Excel:
+           A = 0
+           B = 1
+           C = 2
+           D = 3
+        ================================================ */
+
         if (
             Array.isArray(row)
         ) {
 
-            return normalizeLine(
-                row[
-                    TT_NUMBER_COLUMN_INDEX
-                ]
-            );
+            const value =
+                normalizeLine(
+                    row[
+                        TT_NUMBER_COLUMN_INDEX
+                    ]
+                );
+
+            if (value) {
+
+                return value;
+
+            }
 
         }
 
-        /*
-         * Object
-         */
-        const possibleFields = [
 
-            "TT Number",
-            "TT number",
-            "TT_NUMBER",
-            "tt_number",
-            "TTNumber",
-            "ttNumber"
+        /* ================================================
+           2. OBJECT
 
-        ];
+           Berbagai kemungkinan nama field.
+        ================================================ */
 
-        for (
-            const field
-                of possibleFields
+        if (
+            typeof row === "object"
         ) {
 
-            if (
-                Object.prototype
-                    .hasOwnProperty
-                    .call(
-                        row,
-                        field
-                    )
+            const possibleFields = [
+
+                "TT Number",
+                "TT number",
+                "TT NUMBER",
+
+                "TT_Number",
+                "TT_NUMBER",
+
+                "tt_number",
+
+                "TTNumber",
+                "ttNumber",
+
+                "TT No",
+                "TT NO",
+
+                "TT No.",
+                "TT NO.",
+
+                "TT No. ",
+
+                "Ticket Number",
+                "Ticket number",
+
+                "ticketNumber",
+                "ticket_number",
+
+                "Ticket",
+                "ticket"
+
+            ];
+
+
+            for (
+                const field
+                of possibleFields
             ) {
 
-                const value =
-                    normalizeLine(
-                        row[field]
-                    );
+                if (
+                    Object.prototype
+                        .hasOwnProperty
+                        .call(
+                            row,
+                            field
+                        )
+                ) {
 
-                if (value) {
+                    const value =
+                        normalizeLine(
+                            row[field]
+                        );
 
-                    return value;
+                    if (value) {
+
+                        return value;
+
+                    }
 
                 }
 
@@ -920,9 +865,11 @@
 
         }
 
-        /*
-         * originalRow
-         */
+
+        /* ================================================
+           3. originalRow
+        ================================================ */
+
         if (
             row.originalRow
         ) {
@@ -940,9 +887,11 @@
 
         }
 
-        /*
-         * source
-         */
+
+        /* ================================================
+           4. source
+        ================================================ */
+
         if (
             row.source
         ) {
@@ -959,6 +908,29 @@
             }
 
         }
+
+
+        /* ================================================
+           5. row nested
+        ================================================ */
+
+        if (
+            row.row
+        ) {
+
+            const nested =
+                getTTNumber(
+                    row.row
+                );
+
+            if (nested) {
+
+                return nested;
+
+            }
+
+        }
+
 
         return "";
 
@@ -980,9 +952,11 @@
 
         }
 
-        /*
-         * Array + numeric index.
-         */
+
+        /* ================================================
+           ARRAY + numeric index
+        ================================================ */
+
         if (
             Array.isArray(row) &&
             typeof cirField === "number"
@@ -994,9 +968,11 @@
 
         }
 
-        /*
-         * Object + custom field.
-         */
+
+        /* ================================================
+           OBJECT + CUSTOM FIELD
+        ================================================ */
+
         if (
             !Array.isArray(row) &&
             cirField
@@ -1018,9 +994,11 @@
 
         }
 
-        /*
-         * Object field CIR.
-         */
+
+        /* ================================================
+           OBJECT FIELD CIR
+        ================================================ */
+
         if (
             !Array.isArray(row)
         ) {
@@ -1030,16 +1008,19 @@
                 "CIR",
                 "cir",
                 "Cir",
+
                 "CIR Text",
                 "CIR_TEXT",
+
                 "cirText",
                 "cir_text"
 
             ];
 
+
             for (
                 const field
-                    of fields
+                of fields
             ) {
 
                 if (
@@ -1058,6 +1039,7 @@
             }
 
         }
+
 
         return "";
 
@@ -1113,9 +1095,7 @@
         }
 
         const value =
-            normalizeLine(
-                text
-            );
+            normalizeLine(text);
 
         let match =
             value.match(
@@ -1130,11 +1110,7 @@
 
         }
 
-        /*
-         * Contoh:
-         *
-         * Pigtail 10 pcs
-         */
+
         match =
             value.match(
                 /(?:^|\s)(\d+(?:[.,]\d+)?)\s*(?:pcs?|piece|unit|batang|m|meter|metre)\b/i
@@ -1148,11 +1124,7 @@
 
         }
 
-        /*
-         * Contoh:
-         *
-         * Pigtail : 10
-         */
+
         match =
             value.match(
                 /[:=]\s*(\d+(?:[.,]\d+)?)\s*$/i
@@ -1165,6 +1137,7 @@
             );
 
         }
+
 
         return 1;
 
@@ -1181,9 +1154,7 @@
     ) {
 
         const value =
-            normalizeLine(
-                text
-            );
+            normalizeLine(text);
 
         const match =
             value.match(
@@ -1234,15 +1205,14 @@
 
         }
 
+
         const normalized =
             normalizeMaterialName(
                 material
             );
 
         if (
-            normalized.includes(
-                "meter"
-            )
+            normalized.includes("meter")
         ) {
 
             return "m";
@@ -1250,9 +1220,7 @@
         }
 
         if (
-            normalized.includes(
-                "batang"
-            )
+            normalized.includes("batang")
         ) {
 
             return "batang";
@@ -1260,14 +1228,13 @@
         }
 
         if (
-            normalized.includes(
-                "unit"
-            )
+            normalized.includes("unit")
         ) {
 
             return "unit";
 
         }
+
 
         return "pcs";
 
@@ -1278,58 +1245,35 @@
        CLEAN MATERIAL TEXT
     ===================================================== */
 
-    function cleanMaterialText(
-        line
-    ) {
+    function cleanMaterialText(line) {
 
         return normalizeLine(line)
 
-            /*
-             * Qty 10
-             */
             .replace(
                 /\bqty\b\s*[:=]?\s*\d+(?:[.,]\d+)?/gi,
                 " "
             )
 
-            /*
-             * Quantity 10
-             */
             .replace(
                 /\bquantity\b\s*[:=]?\s*\d+(?:[.,]\d+)?/gi,
                 " "
             )
 
-            /*
-             * Jumlah 10
-             */
             .replace(
                 /\bjumlah\b\s*[:=]?\s*\d+(?:[.,]\d+)?/gi,
                 " "
             )
 
-            /*
-             * 10 pcs
-             * 10 unit
-             * 10 meter
-             */
             .replace(
                 /\b\d+(?:[.,]\d+)?\s*(?:pcs?|piece|unit|batang|m|meter|metre)\b/gi,
                 " "
             )
 
-            /*
-             * : 10
-             * = 10
-             */
             .replace(
                 /[:=]\s*\d+(?:[.,]\d+)?\s*$/i,
                 " "
             )
 
-            /*
-             * Rapikan.
-             */
             .replace(
                 /\s+/g,
                 " "
@@ -1342,8 +1286,6 @@
 
     /* =====================================================
        PARSE MATERIAL LINE
-       
-       HANYA RETURN material kalau cocok MASTER.
     ===================================================== */
 
     function parseMaterialLine(line) {
@@ -1357,9 +1299,11 @@
 
         }
 
+
         /*
-         * Heading.
+         * Heading material tidak dihitung.
          */
+
         if (
             /^material\s*:?\s*$/i.test(
                 originalLine
@@ -1370,9 +1314,11 @@
 
         }
 
+
         /*
-         * Excluded.
+         * Excluded material.
          */
+
         if (
             isExcludedMaterial(
                 originalLine
@@ -1402,28 +1348,29 @@
 
         }
 
+
         const materialText =
             cleanMaterialText(
                 originalLine
             );
 
-        /*
-         * Jangan mencoba material kosong.
-         */
         if (!materialText) {
 
             return null;
 
         }
 
+
         const result =
             findBestMaterial(
                 materialText
             );
 
+
         /*
-         * Tidak ditemukan di master.
+         * Tidak ditemukan.
          */
+
         if (!result) {
 
             return {
@@ -1449,6 +1396,7 @@
 
         }
 
+
         const qty =
             parseQty(
                 originalLine
@@ -1459,6 +1407,7 @@
                 originalLine,
                 result.material
             );
+
 
         return {
 
@@ -1490,8 +1439,6 @@
 
     /* =====================================================
        PARSE MATERIAL TEXT
-       
-       HANYA MATERIAL VALID YANG DIRETURN.
     ===================================================== */
 
     function parseMaterialText(text) {
@@ -1510,9 +1457,10 @@
 
         const results = [];
 
+
         for (
             const line
-                of lines
+            of lines
         ) {
 
             const parsed =
@@ -1526,10 +1474,12 @@
 
             }
 
+
             /*
-             * ERROR tidak masuk
-             * ke hasil utama.
+             * Hanya material OK
+             * masuk hasil utama.
              */
+
             if (
                 parsed.status !== "OK"
             ) {
@@ -1538,11 +1488,13 @@
 
             }
 
+
             results.push(
                 parsed
             );
 
         }
+
 
         return mergeMaterials(
             results
@@ -1553,11 +1505,6 @@
 
     /* =====================================================
        PARSE DETAILED
-       
-       Sama seperti parse(), tetapi menampilkan
-       material valid + error.
-       
-       Berguna untuk debugging/report checker.
     ===================================================== */
 
     function parseDetailed(text) {
@@ -1584,9 +1531,10 @@
 
         const errors = [];
 
+
         for (
             const line
-                of lines
+            of lines
         ) {
 
             const parsed =
@@ -1599,6 +1547,7 @@
                 continue;
 
             }
+
 
             if (
                 parsed.status ===
@@ -1619,6 +1568,7 @@
 
         }
 
+
         return {
 
             materials:
@@ -1638,16 +1588,15 @@
        MERGE MATERIAL
     ===================================================== */
 
-    function mergeMaterials(
-        materials
-    ) {
+    function mergeMaterials(materials) {
 
         const map =
             new Map();
 
+
         for (
             const item
-                of materials || []
+            of materials || []
         ) {
 
             if (!item) {
@@ -1674,10 +1623,12 @@
 
             }
 
+
             const key =
                 normalizeMaterialName(
                     item.material
                 );
+
 
             if (
                 !map.has(key)
@@ -1720,9 +1671,7 @@
             } else {
 
                 const existing =
-                    map.get(
-                        key
-                    );
+                    map.get(key);
 
                 existing.qty +=
                     Number(
@@ -1738,6 +1687,7 @@
 
                     );
 
+
                 if (
                     !existing.sourceLine &&
                     item.sourceLine
@@ -1752,6 +1702,7 @@
 
         }
 
+
         return Array.from(
             map.values()
         );
@@ -1761,6 +1712,8 @@
 
     /* =====================================================
        BUILD MATERIAL ROW
+       
+       Ticket selalu diambil dari getTTNumber()
     ===================================================== */
 
     function buildMaterialRows(
@@ -1773,21 +1726,30 @@
                 row
             );
 
+
         const cirText =
             getCIRValue(
                 row,
                 cirField
             );
 
+
         const materials =
             parseMaterialText(
                 cirText
             );
 
+
         return materials.map(
             function (item) {
 
                 return {
+
+                    /*
+                     * ==================================
+                     * TICKET
+                     * ==================================
+                     */
 
                     ticket:
                         ttNumber,
@@ -1801,11 +1763,25 @@
                     "TT Number":
                         ttNumber,
 
+
+                    /*
+                     * ==================================
+                     * MATERIAL
+                     * ==================================
+                     */
+
                     material:
                         item.material,
 
                     Material:
                         item.material,
+
+
+                    /*
+                     * ==================================
+                     * QUANTITY
+                     * ==================================
+                     */
 
                     quantity:
                         item.qty,
@@ -1816,6 +1792,13 @@
                     Qty:
                         item.qty,
 
+
+                    /*
+                     * ==================================
+                     * SATUAN
+                     * ==================================
+                     */
+
                     unit:
                         item.satuan,
 
@@ -1824,6 +1807,13 @@
 
                     Satuan:
                         item.satuan,
+
+
+                    /*
+                     * ==================================
+                     * KODE
+                     * ==================================
+                     */
 
                     code:
                         "",
@@ -1834,17 +1824,38 @@
                     Kode:
                         "",
 
+
+                    /*
+                     * ==================================
+                     * SCORE
+                     * ==================================
+                     */
+
                     score:
                         item.score,
 
                     Score:
                         item.score,
 
+
+                    /*
+                     * ==================================
+                     * SOURCE
+                     * ==================================
+                     */
+
                     source:
                         item.sourceLine,
 
                     Source:
                         item.sourceLine,
+
+
+                    /*
+                     * ==================================
+                     * STATUS
+                     * ==================================
+                     */
 
                     status:
                         "OK",
@@ -1877,11 +1888,13 @@
 
         }
 
+
         const output = [];
+
 
         for (
             const row
-                of rows
+            of rows
         ) {
 
             const materialRows =
@@ -1890,11 +1903,13 @@
                     cirField
                 );
 
+
             output.push(
                 ...materialRows
             );
 
         }
+
 
         return output;
 
@@ -1915,10 +1930,12 @@
                 ticket
             );
 
+
         const materials =
             parseMaterialText(
                 cirText
             );
+
 
         return materials.map(
             function (item) {
@@ -1937,11 +1954,13 @@
                     "TT Number":
                         ttNumber,
 
+
                     material:
                         item.material,
 
                     Material:
                         item.material,
+
 
                     quantity:
                         item.qty,
@@ -1952,6 +1971,7 @@
                     Qty:
                         item.qty,
 
+
                     unit:
                         item.satuan,
 
@@ -1960,6 +1980,7 @@
 
                     Satuan:
                         item.satuan,
+
 
                     code:
                         "",
@@ -1970,17 +1991,20 @@
                     Kode:
                         "",
 
+
                     score:
                         item.score,
 
                     Score:
                         item.score,
 
+
                     source:
                         item.sourceLine,
 
                     Source:
                         item.sourceLine,
+
 
                     status:
                         "OK",
@@ -1998,8 +2022,6 @@
 
     /* =====================================================
        FLATTEN
-       
-       Compatibility excel.js
     ===================================================== */
 
     function flatten(input) {
@@ -2013,9 +2035,11 @@
 
         }
 
+
         /*
          * Object hasil parser.
          */
+
         if (
             !Array.isArray(input) &&
             typeof input === "object"
@@ -2033,6 +2057,7 @@
 
             }
 
+
             if (
                 Array.isArray(
                     input.material
@@ -2045,9 +2070,11 @@
 
             }
 
+
             /*
              * Satu material object.
              */
+
             if (
                 input.Material ||
                 input.material
@@ -2063,22 +2090,26 @@
 
             }
 
+
             return [];
 
         }
 
+
         /*
          * Array.
          */
+
         if (
             Array.isArray(input)
         ) {
 
             const output = [];
 
+
             for (
                 const item
-                    of input
+                of input
             ) {
 
                 if (
@@ -2090,9 +2121,11 @@
 
                 }
 
+
                 /*
                  * Nested array.
                  */
+
                 if (
                     Array.isArray(item)
                 ) {
@@ -2107,9 +2140,11 @@
 
                 }
 
+
                 /*
                  * Nested parser object.
                  */
+
                 if (
                     typeof item === "object" &&
                     (
@@ -2132,9 +2167,11 @@
 
                 }
 
+
                 /*
                  * Material object.
                  */
+
                 if (
                     typeof item === "object"
                 ) {
@@ -2149,9 +2186,11 @@
 
             }
 
+
             return output;
 
         }
+
 
         return [];
 
@@ -2170,14 +2209,20 @@
 
         }
 
+
+        /*
+         * Ticket.
+         */
+
         const ticket =
-            normalizeLine(
-                row.ticket ||
-                row.Ticket ||
-                row.ttNumber ||
-                row["TT Number"] ||
-                ""
+            getTTNumber(
+                row
             );
+
+
+        /*
+         * Material.
+         */
 
         const material =
             normalizeLine(
@@ -2186,11 +2231,21 @@
                 ""
             );
 
+
+        /*
+         * Quantity.
+         */
+
         const qty =
             row.quantity ??
             row.qty ??
             row.Qty ??
             1;
+
+
+        /*
+         * Unit.
+         */
 
         const unit =
             normalizeLine(
@@ -2200,6 +2255,11 @@
                 ""
             );
 
+
+        /*
+         * Code.
+         */
+
         const code =
             normalizeLine(
                 row.code ||
@@ -2208,12 +2268,22 @@
                 ""
             );
 
+
+        /*
+         * Score.
+         */
+
         const score =
             Number(
                 row.score ??
                 row.Score ??
                 0
             ) || 0;
+
+
+        /*
+         * Source.
+         */
 
         const source =
             normalizeLine(
@@ -2223,7 +2293,12 @@
                 ""
             );
 
+
         return {
+
+            /*
+             * Ticket
+             */
 
             ticket:
                 ticket,
@@ -2237,11 +2312,21 @@
             "TT Number":
                 ticket,
 
+
+            /*
+             * Material
+             */
+
             material:
                 material,
 
             Material:
                 material,
+
+
+            /*
+             * Quantity
+             */
 
             quantity:
                 Number(qty) || 0,
@@ -2252,6 +2337,11 @@
             Qty:
                 Number(qty) || 0,
 
+
+            /*
+             * Unit
+             */
+
             unit:
                 unit,
 
@@ -2260,6 +2350,11 @@
 
             Satuan:
                 unit,
+
+
+            /*
+             * Code
+             */
 
             code:
                 code,
@@ -2270,17 +2365,32 @@
             Kode:
                 code,
 
+
+            /*
+             * Score
+             */
+
             score:
                 score,
 
             Score:
                 score,
 
+
+            /*
+             * Source
+             */
+
             source:
                 source,
 
             Source:
                 source,
+
+
+            /*
+             * Status
+             */
 
             status:
                 row.status ||
@@ -2312,45 +2422,24 @@
 
     window.ReportCheckerMaterial = {
 
-        /*
-         * Parser utama
-         */
         parse:
             parseMaterialText,
 
-        /*
-         * Parser detailed
-         */
         parseDetailed:
             parseDetailed,
 
-        /*
-         * Banyak row
-         */
         parseMultiple:
             parseMultiple,
 
-        /*
-         * Manual ticket
-         */
         parseWithTicket:
             parseWithTicket,
 
-        /*
-         * Build rows
-         */
         buildRows:
             buildMaterialRows,
 
-        /*
-         * Compatibility excel.js
-         */
         flatten:
             flatten,
 
-        /*
-         * Utility
-         */
         getTTNumber:
             getTTNumber,
 
@@ -2398,6 +2487,12 @@
             minimumScore:
                 MATCH_CONFIG.minimumScore,
 
+            ttNumberColumn:
+                "D",
+
+            ttNumberIndex:
+                TT_NUMBER_COLUMN_INDEX,
+
             hasFlatten:
                 typeof window
                     .ReportCheckerMaterial
@@ -2408,6 +2503,12 @@
                 typeof window
                     .ReportCheckerMaterial
                     .parseDetailed ===
+                "function",
+
+            hasGetTTNumber:
+                typeof window
+                    .ReportCheckerMaterial
+                    .getTTNumber ===
                 "function"
 
         }
