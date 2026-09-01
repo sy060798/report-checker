@@ -1,8 +1,13 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
     <title>Report Checker</title>
 
@@ -11,78 +16,123 @@
         content="Excel Report Checker untuk validasi Ticket Release dan parsing Material dari data CIR."
     >
 
-    <link rel="stylesheet" href="css/style.css">
+    <link
+        rel="stylesheet"
+        href="css/style.css"
+    >
 </head>
 
 <body>
 
-    <!-- =========================
+    <!-- =====================================================
          HEADER
-    ========================== -->
+    ====================================================== -->
+
     <header class="app-header">
+
         <div class="header-content">
-            <div>
-                <h1>Report Checker</h1>
-                <p>Validasi Ticket Release & Parsing Material</p>
+
+            <div class="header-title">
+
+                <h1>
+                    Report Checker
+                </h1>
+
+                <p>
+                    Validasi Ticket Release & Parsing Material
+                </p>
+
             </div>
 
             <div class="header-status">
-                <span id="systemStatus" class="status-badge offline">
+
+                <span
+                    id="systemStatus"
+                    class="status-badge offline"
+                >
                     Ready
                 </span>
+
             </div>
+
         </div>
+
     </header>
 
 
-    <!-- =========================
+    <!-- =====================================================
          MAIN
-    ========================== -->
+    ====================================================== -->
+
     <main class="container">
 
-        <!-- =========================
-             UPLOAD SECTION
-        ========================== -->
+
+        <!-- =================================================
+             UPLOAD EXCEL
+        ================================================== -->
+
         <section class="card upload-card">
 
             <div class="section-title">
+
                 <div>
-                    <h2>Upload Excel</h2>
+
+                    <h2>
+                        Upload Excel
+                    </h2>
+
                     <p>
                         Upload file Excel dengan struktur kolom A sampai AF.
                     </p>
+
                 </div>
+
             </div>
+
+
+            <!-- DROP ZONE -->
 
             <div
                 id="dropZone"
                 class="drop-zone"
                 tabindex="0"
             >
+
                 <div class="upload-icon">
                     📊
                 </div>
 
-                <h3>Drop Excel di sini</h3>
+                <h3>
+                    Drop Excel di sini
+                </h3>
 
                 <p>
                     atau klik untuk memilih file
                 </p>
 
                 <span class="file-format">
-                    .xlsx / .xls
+                    .xlsx / .xls / .xlsm
                 </span>
 
                 <input
                     type="file"
                     id="excelFile"
-                    accept=".xlsx,.xls"
+                    accept=".xlsx,.xls,.xlsm"
                     hidden
                 >
+
             </div>
 
-            <div id="selectedFile" class="selected-file hidden">
+
+            <!-- SELECTED FILE -->
+
+            <div
+                id="selectedFile"
+                class="selected-file hidden"
+            >
+
                 <div>
+
                     <strong id="fileName">
                         -
                     </strong>
@@ -90,6 +140,7 @@
                     <span id="fileSize">
                         -
                     </span>
+
                 </div>
 
                 <button
@@ -99,52 +150,82 @@
                 >
                     Hapus
                 </button>
+
             </div>
 
+
+            <!-- PROCESS BUTTON -->
+
             <div class="upload-actions">
+
                 <button
                     type="button"
                     id="processBtn"
                     class="btn btn-primary"
                     disabled
                 >
-                    <span>⚙️</span>
+
+                    <span>
+                        ⚙️
+                    </span>
+
                     Proses Excel
+
                 </button>
+
             </div>
+
+
+            <!-- PROCESSING -->
 
             <div
                 id="processingStatus"
                 class="processing-status hidden"
             >
+
                 <div class="spinner"></div>
 
                 <div>
-                    <strong>Sedang memproses...</strong>
+
+                    <strong>
+                        Sedang memproses...
+                    </strong>
+
                     <p id="processingText">
                         Membaca data Excel...
                     </p>
+
                 </div>
+
             </div>
 
         </section>
 
 
-        <!-- =========================
+        <!-- =================================================
              DASHBOARD
-        ========================== -->
+        ================================================== -->
+
         <section
             id="dashboardSection"
             class="dashboard-section hidden"
         >
 
+
+            <!-- DASHBOARD HEADER -->
+
             <div class="dashboard-header">
+
                 <div>
-                    <h2>Hasil Pemeriksaan</h2>
+
+                    <h2>
+                        Hasil Pemeriksaan
+                    </h2>
 
                     <p id="resultSummary">
                         -
                     </p>
+
                 </div>
 
                 <button
@@ -154,150 +235,250 @@
                 >
                     🔄 Proses File Baru
                 </button>
+
             </div>
 
 
-            <!-- STATISTICS -->
+            <!-- =================================================
+                 STATISTICS
+            ================================================== -->
+
             <div class="stats-grid">
 
+
+                <!-- TOTAL DATA -->
+
                 <div class="stat-card">
+
                     <div class="stat-icon blue">
                         📋
                     </div>
 
                     <div>
-                        <span>Total Data</span>
-                        <strong id="totalCount">0</strong>
+
+                        <span>
+                            Total Data
+                        </span>
+
+                        <strong id="totalCount">
+                            0
+                        </strong>
+
                     </div>
+
                 </div>
 
 
+                <!-- VALID -->
+
                 <div class="stat-card success">
+
                     <div class="stat-icon green">
                         ✓
                     </div>
 
                     <div>
-                        <span>Sesuai</span>
-                        <strong id="validCount">0</strong>
+
+                        <span>
+                            Sesuai
+                        </span>
+
+                        <strong id="validCount">
+                            0
+                        </strong>
+
                     </div>
+
                 </div>
 
 
+                <!-- INVALID -->
+
                 <div class="stat-card danger">
+
                     <div class="stat-icon red">
                         !
                     </div>
 
                     <div>
-                        <span>Tidak Sesuai</span>
-                        <strong id="invalidCount">0</strong>
+
+                        <span>
+                            Tidak Sesuai
+                        </span>
+
+                        <strong id="invalidCount">
+                            0
+                        </strong>
+
                     </div>
+
                 </div>
 
 
+                <!-- MATERIAL -->
+
                 <div class="stat-card warning">
+
                     <div class="stat-icon orange">
                         📦
                     </div>
 
                     <div>
-                        <span>Material</span>
-                        <strong id="materialCount">0</strong>
+
+                        <span>
+                            Material
+                        </span>
+
+                        <strong id="materialCount">
+                            0
+                        </strong>
+
                     </div>
+
                 </div>
 
 
+                <!-- MATERIAL ERROR -->
+
                 <div class="stat-card">
+
                     <div class="stat-icon purple">
                         ⚠
                     </div>
 
                     <div>
-                        <span>Material Error</span>
-                        <strong id="materialErrorCount">0</strong>
+
+                        <span>
+                            Material Error
+                        </span>
+
+                        <strong id="materialErrorCount">
+                            0
+                        </strong>
+
                     </div>
+
                 </div>
 
             </div>
 
 
-            <!-- =========================
-                 RESULT TABS
-            ========================== -->
+            <!-- =================================================
+                 RESULT CARD
+            ================================================== -->
+
             <div class="card result-card">
 
+
+                <!-- =================================================
+                     TABS
+                ================================================== -->
+
                 <div class="tabs">
+
+
+                    <!-- TAB VALID -->
 
                     <button
                         type="button"
                         class="tab-button active"
                         data-tab="valid"
                     >
-                        <span>✓</span>
+
+                        <span>
+                            ✓
+                        </span>
+
                         Sesuai
+
                         <span
                             id="validTabCount"
                             class="tab-count"
                         >
                             0
                         </span>
+
                     </button>
 
+
+                    <!-- TAB INVALID -->
 
                     <button
                         type="button"
                         class="tab-button"
                         data-tab="invalid"
                     >
-                        <span>!</span>
+
+                        <span>
+                            !
+                        </span>
+
                         Tidak Sesuai
+
                         <span
                             id="invalidTabCount"
                             class="tab-count"
                         >
                             0
                         </span>
+
                     </button>
 
+
+                    <!-- TAB MATERIAL -->
 
                     <button
                         type="button"
                         class="tab-button"
                         data-tab="material"
                     >
-                        <span>📦</span>
+
+                        <span>
+                            📦
+                        </span>
+
                         Material
+
                         <span
                             id="materialTabCount"
                             class="tab-count"
                         >
                             0
                         </span>
+
                     </button>
 
+
+                    <!-- TAB MATERIAL ERROR -->
 
                     <button
                         type="button"
                         class="tab-button"
                         data-tab="material-error"
                     >
-                        <span>⚠</span>
+
+                        <span>
+                            ⚠
+                        </span>
+
                         Material Error
+
                         <span
                             id="materialErrorTabCount"
                             class="tab-count"
                         >
                             0
                         </span>
+
                     </button>
 
                 </div>
 
 
-                <!-- =========================
-                     VALID DATA
-                ========================== -->
+                <!-- =================================================
+                     TAB SESUAI
+                ================================================== -->
+
                 <div
                     id="tab-valid"
                     class="tab-content active"
@@ -306,12 +487,16 @@
                     <div class="result-toolbar">
 
                         <div>
-                            <h3>Data Sesuai</h3>
+
+                            <h3>
+                                Data Sesuai
+                            </h3>
 
                             <p>
                                 Data dengan Ticket Release yang sesuai
                                 dengan aturan validasi.
                             </p>
+
                         </div>
 
                         <button
@@ -331,13 +516,31 @@
                         <table id="validTable">
 
                             <thead>
+
                                 <tr>
-                                    <th>Ticket</th>
-                                    <th>Datetime Receive</th>
-                                    <th>TT Release</th>
-                                    <th>Status</th>
-                                    <th>Keterangan</th>
+
+                                    <th>
+                                        Ticket
+                                    </th>
+
+                                    <th>
+                                        Datetime Receive
+                                    </th>
+
+                                    <th>
+                                        TT Release
+                                    </th>
+
+                                    <th>
+                                        Status
+                                    </th>
+
+                                    <th>
+                                        Keterangan
+                                    </th>
+
                                 </tr>
+
                             </thead>
 
                             <tbody id="validTableBody">
@@ -345,25 +548,81 @@
 
                         </table>
 
+
                         <div
                             id="validEmpty"
                             class="empty-state"
                         >
-                            <div>📋</div>
-                            <h3>Belum ada data</h3>
+
+                            <div>
+                                📋
+                            </div>
+
+                            <h3>
+                                Belum ada data
+                            </h3>
+
                             <p>
                                 Data yang sesuai akan muncul di sini.
                             </p>
+
                         </div>
+
+                    </div>
+
+
+                    <!-- PAGINATION VALID -->
+
+                    <div
+                        id="validPagination"
+                        class="pagination"
+                    >
+
+                        <button
+                            type="button"
+                            id="validPrevBtn"
+                            class="btn btn-secondary pagination-prev"
+                        >
+                            ← Sebelumnya
+                        </button>
+
+                        <div class="pagination-info">
+
+                            <span>
+                                Halaman
+                            </span>
+
+                            <strong id="validPageNumber">
+                                1
+                            </strong>
+
+                            <span>
+                                dari
+                            </span>
+
+                            <strong id="validPageTotal">
+                                1
+                            </strong>
+
+                        </div>
+
+                        <button
+                            type="button"
+                            id="validNextBtn"
+                            class="btn btn-secondary pagination-next"
+                        >
+                            Berikutnya →
+                        </button>
 
                     </div>
 
                 </div>
 
 
-                <!-- =========================
-                     INVALID DATA
-                ========================== -->
+                <!-- =================================================
+                     TAB TIDAK SESUAI
+                ================================================== -->
+
                 <div
                     id="tab-invalid"
                     class="tab-content"
@@ -372,11 +631,15 @@
                     <div class="result-toolbar">
 
                         <div>
-                            <h3>Data Tidak Sesuai</h3>
+
+                            <h3>
+                                Data Tidak Sesuai
+                            </h3>
 
                             <p>
                                 Data yang membutuhkan pengecekan.
                             </p>
+
                         </div>
 
                         <button
@@ -396,13 +659,31 @@
                         <table id="invalidTable">
 
                             <thead>
+
                                 <tr>
-                                    <th>Ticket</th>
-                                    <th>Datetime Receive</th>
-                                    <th>TT Release</th>
-                                    <th>Status</th>
-                                    <th>Keterangan</th>
+
+                                    <th>
+                                        Ticket
+                                    </th>
+
+                                    <th>
+                                        Datetime Receive
+                                    </th>
+
+                                    <th>
+                                        TT Release
+                                    </th>
+
+                                    <th>
+                                        Status
+                                    </th>
+
+                                    <th>
+                                        Keterangan
+                                    </th>
+
                                 </tr>
+
                             </thead>
 
                             <tbody id="invalidTableBody">
@@ -415,232 +696,373 @@
                             id="invalidEmpty"
                             class="empty-state"
                         >
-                            <div>✓</div>
-                            <h3>Tidak ada data bermasalah</h3>
+
+                            <div>
+                                ✓
+                            </div>
+
+                            <h3>
+                                Tidak ada data bermasalah
+                            </h3>
+
                             <p>
                                 Semua data berhasil melewati validasi.
                             </p>
+
                         </div>
 
                     </div>
 
-                </div>
 
+                    <!-- PAGINATION INVALID -->
 
-                <!-- =========================
-                     MATERIAL
-                ========================== -->
-                <div
-                    id="tab-material"
-                    class="tab-content"
-                >
+                    <div
+                        id="invalidPagination"
+                        class="pagination"
+                    >
 
-                    <div class="result-toolbar">
+                        <button
+                            type="button"
+                            id="invalidPrevBtn"
+                            class="btn btn-secondary pagination-prev"
+                        >
+                            ← Sebelumnya
+                        </button>
 
-                        <div>
-                            <h3>Material</h3>
+                        <div class="pagination-info">
 
-                            <p>
-                                Setiap material wajib memiliki Ticket.
-                            </p>
+                            <span>
+                                Halaman
+                            </span>
+
+                            <strong id="invalidPageNumber">
+                                1
+                            </strong>
+
+                            <span>
+                                dari
+                            </span>
+
+                            <strong id="invalidPageTotal">
+                                1
+                            </strong>
+
                         </div>
 
                         <button
                             type="button"
-                            id="downloadMaterialBtn"
-                            class="btn btn-warning"
-                            disabled
+                            id="invalidNextBtn"
+                            class="btn btn-secondary pagination-next"
                         >
-                            ⬇ Download Material.xlsx
+                            Berikutnya →
                         </button>
 
                     </div>
 
-
-                    <div class="table-wrapper">
-
-                        <table id="materialTable">
-
-                            <thead>
-                                <tr>
-                                    <th>Ticket</th>
-                                    <th>Material</th>
-                                    <th>Qty</th>
-                                    <th>Satuan</th>
-                                    <th>Kode</th>
-                                </tr>
-                            </thead>
-
-                            <tbody id="materialTableBody">
-                            </tbody>
-
-                        </table>
-
-
-                        <div
-                            id="materialEmpty"
-                            class="empty-state"
-                        >
-                            <div>📦</div>
-                            <h3>Belum ada material</h3>
-                            <p>
-                                Material yang berhasil diparsing
-                                akan muncul di sini.
-                            </p>
-                        </div>
-
-                    </div>
-
                 </div>
-
-
-                <!-- =========================
-                     MATERIAL ERROR
-                ========================== -->
-                <div
-                    id="tab-material-error"
-                    class="tab-content"
-                >
-
-                    <div class="result-toolbar">
-
-                        <div>
-                            <h3>Material Error</h3>
-
-                            <p>
-                                Material yang tidak memiliki Ticket
-                                atau gagal diparsing.
-                            </p>
-                        </div>
-
-                        <button
-                            type="button"
-                            id="downloadMaterialErrorBtn"
-                            class="btn btn-danger"
-                            disabled
-                        >
-                            ⬇ Download Material Error.xlsx
-                        </button>
-
-                    </div>
-
-
-                    <div class="table-wrapper">
-
-                        <table id="materialErrorTable">
-
-                            <thead>
-                                <tr>
-                                    <th>Ticket</th>
-                                    <th>Material</th>
-                                    <th>Qty</th>
-                                    <th>Satuan</th>
-                                    <th>Kode</th>
-                                    <th>Error</th>
-                                </tr>
-                            </thead>
-
-                            <tbody id="materialErrorTableBody">
-                            </tbody>
-
-                        </table>
-
-
-                        <div
-                            id="materialErrorEmpty"
-                            class="empty-state"
-                        >
-                            <div>✓</div>
-                            <h3>Tidak ada material error</h3>
-                            <p>
-                                Semua material memiliki Ticket
-                                dan berhasil diproses.
-                            </p>
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-        </section>
-
-
-        <!-- =========================
-             SETTINGS
-        ========================== -->
-        <section class="card settings-card">
-
-            <div class="section-title">
-
-                <div>
-                    <h2>⚙️ Pengaturan Parser</h2>
-
-                    <p>
-                        Atur berbagai format report yang digunakan
-                        untuk mencari Ticket Release dan Material.
-                    </p>
-                </div>
-
-                <button
-                    type="button"
-                    id="toggleSettingsBtn"
-                    class="btn btn-secondary"
-                >
-                    Buka Pengaturan
-                </button>
-
-            </div>
-
+            <!-- =================================================
+                 TAB MATERIAL
+            ================================================== -->
 
             <div
-                id="settingsPanel"
-                class="settings-panel hidden"
+                id="tab-material"
+                class="tab-content"
             >
 
-                <!-- MATERIAL START PHRASES -->
-                <div class="setting-group">
+                <div class="result-toolbar">
 
-                    <label>
-                        Frasa Awal Material
-                    </label>
+                    <div>
+                        <h3>Material</h3>
 
-                    <p class="setting-help">
-                        Parser akan mencari salah satu frasa ini
-                        sebagai awal bagian Material.
-                    </p>
+                        <p>
+                            Setiap material wajib memiliki Ticket.
+                        </p>
+                    </div>
 
-                    <textarea
-                        id="materialStartPhrases"
-                        rows="6"
-                        placeholder="Material :
+                    <button
+                        type="button"
+                        id="downloadMaterialBtn"
+                        class="btn btn-warning"
+                        disabled
+                    >
+                        ⬇ Download Material.xlsx
+                    </button>
+
+                </div>
+
+                <div class="table-wrapper">
+
+                    <table id="materialTable">
+
+                        <thead>
+                            <tr>
+                                <th>Ticket</th>
+                                <th>Material</th>
+                                <th>Qty</th>
+                                <th>Satuan</th>
+                                <th>Kode</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="materialTableBody"></tbody>
+
+                    </table>
+
+                    <div
+                        id="materialEmpty"
+                        class="empty-state"
+                    >
+                        <div>📦</div>
+
+                        <h3>Belum ada material</h3>
+
+                        <p>
+                            Material yang berhasil diparsing
+                            akan muncul di sini.
+                        </p>
+                    </div>
+
+                </div>
+
+                <!-- PAGINATION MATERIAL -->
+
+                <div
+                    id="materialPagination"
+                    class="pagination"
+                >
+
+                    <button
+                        type="button"
+                        id="materialPrevBtn"
+                        class="btn btn-secondary pagination-prev"
+                    >
+                        ← Sebelumnya
+                    </button>
+
+                    <div class="pagination-info">
+
+                        <span>Halaman</span>
+
+                        <strong id="materialPageNumber">
+                            1
+                        </strong>
+
+                        <span>dari</span>
+
+                        <strong id="materialPageTotal">
+                            1
+                        </strong>
+
+                    </div>
+
+                    <button
+                        type="button"
+                        id="materialNextBtn"
+                        class="btn btn-secondary pagination-next"
+                    >
+                        Berikutnya →
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <!-- =================================================
+                 TAB MATERIAL ERROR
+            ================================================== -->
+
+            <div
+                id="tab-material-error"
+                class="tab-content"
+            >
+
+                <div class="result-toolbar">
+
+                    <div>
+                        <h3>Material Error</h3>
+
+                        <p>
+                            Material yang tidak memiliki Ticket
+                            atau gagal diparsing.
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        id="downloadMaterialErrorBtn"
+                        class="btn btn-danger"
+                        disabled
+                    >
+                        ⬇ Download Material Error.xlsx
+                    </button>
+
+                </div>
+
+                <div class="table-wrapper">
+
+                    <table id="materialErrorTable">
+
+                        <thead>
+                            <tr>
+                                <th>Ticket</th>
+                                <th>Material</th>
+                                <th>Qty</th>
+                                <th>Satuan</th>
+                                <th>Kode</th>
+                                <th>Error</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="materialErrorTableBody"></tbody>
+
+                    </table>
+
+                    <div
+                        id="materialErrorEmpty"
+                        class="empty-state"
+                    >
+                        <div>✓</div>
+
+                        <h3>Tidak ada material error</h3>
+
+                        <p>
+                            Semua material memiliki Ticket
+                            dan berhasil diproses.
+                        </p>
+                    </div>
+
+                </div>
+
+                <!-- PAGINATION MATERIAL ERROR -->
+
+                <div
+                    id="materialErrorPagination"
+                    class="pagination"
+                >
+
+                    <button
+                        type="button"
+                        id="materialErrorPrevBtn"
+                        class="btn btn-secondary pagination-prev"
+                    >
+                        ← Sebelumnya
+                    </button>
+
+                    <div class="pagination-info">
+
+                        <span>Halaman</span>
+
+                        <strong id="materialErrorPageNumber">
+                            1
+                        </strong>
+
+                        <span>dari</span>
+
+                        <strong id="materialErrorPageTotal">
+                            1
+                        </strong>
+
+                    </div>
+
+                    <button
+                        type="button"
+                        id="materialErrorNextBtn"
+                        class="btn btn-secondary pagination-next"
+                    >
+                        Berikutnya →
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- =====================================================
+         SETTINGS
+    ====================================================== -->
+
+    <section class="card settings-card">
+
+        <div class="section-title">
+
+            <div>
+                <h2>⚙️ Pengaturan Parser</h2>
+
+                <p>
+                    Atur berbagai format report yang digunakan
+                    untuk mencari Ticket Release dan Material.
+                </p>
+            </div>
+
+            <button
+                type="button"
+                id="toggleSettingsBtn"
+                class="btn btn-secondary"
+            >
+                Buka Pengaturan
+            </button>
+
+        </div>
+
+
+        <div
+            id="settingsPanel"
+            class="settings-panel hidden"
+        >
+
+            <!-- =================================================
+                 MATERIAL START PHRASES
+            ================================================== -->
+
+            <div class="setting-group">
+
+                <label>
+                    Frasa Awal Material
+                </label>
+
+                <p class="setting-help">
+                    Parser akan mencari salah satu frasa ini
+                    sebagai awal bagian Material.
+                </p>
+
+                <textarea
+                    id="materialStartPhrases"
+                    rows="6"
+                    placeholder="Material :
 Material
 MATERIAL :
 Material yang digunakan :
 Material digunakan :
 List Material :"
-                    ></textarea>
+                ></textarea>
 
-                </div>
+            </div>
 
 
-                <!-- MATERIAL END PHRASES -->
-                <div class="setting-group">
+            <!-- =================================================
+                 MATERIAL END PHRASES
+            ================================================== -->
 
-                    <label>
-                        Frasa Akhir Material
-                    </label>
+            <div class="setting-group">
 
-                    <p class="setting-help">
-                        Parser berhenti membaca Material ketika
-                        menemukan salah satu frasa berikutnya.
-                    </p>
+                <label>
+                    Frasa Akhir Material
+                </label>
 
-                    <textarea
-                        id="materialEndPhrases"
-                        rows="6"
-                        placeholder="Tim QN
+                <p class="setting-help">
+                    Parser berhenti membaca Material ketika
+                    menemukan salah satu frasa berikutnya.
+                </p>
+
+                <textarea
+                    id="materialEndPhrases"
+                    rows="6"
+                    placeholder="Tim QN
 Team QN
 PIC FS
 PIC
@@ -648,192 +1070,217 @@ RFO
 Action
 Act:
 ==="
-                    ></textarea>
+                ></textarea>
 
-                </div>
+            </div>
 
 
-                <!-- TT RELEASE PHRASES -->
-                <div class="setting-group">
+            <!-- =================================================
+                 RELEASE PHRASES
+            ================================================== -->
 
-                    <label>
-                        Frasa Ticket Release
-                    </label>
+            <div class="setting-group">
 
-                    <p class="setting-help">
-                        Frasa yang digunakan untuk menemukan tanggal
-                        dan jam Ticket Release di dalam CIR.
-                    </p>
+                <label>
+                    Frasa Ticket Release
+                </label>
 
-                    <textarea
-                        id="releasePhrases"
-                        rows="5"
-                        placeholder="TT Release
+                <p class="setting-help">
+                    Frasa yang digunakan untuk menemukan tanggal
+                    dan jam Ticket Release di dalam CIR.
+                </p>
+
+                <textarea
+                    id="releasePhrases"
+                    rows="5"
+                    placeholder="TT Release
 TT release
 TT RELEASE
 Ticket Release
 Ticket release"
-                    ></textarea>
+                ></textarea>
 
-                </div>
+            </div>
 
 
-                <!-- NOT FOUND PHRASES -->
-                <div class="setting-group">
+            <!-- =================================================
+                 NOT FOUND PHRASES
+            ================================================== -->
 
-                    <label>
-                        Frasa Belum Ada / Not Found
-                    </label>
+            <div class="setting-group">
 
-                    <p class="setting-help">
-                        Kata-kata yang dianggap menunjukkan bahwa
-                        data belum tersedia.
-                    </p>
+                <label>
+                    Frasa Belum Ada / Not Found
+                </label>
 
-                    <textarea
-                        id="notFoundPhrases"
-                        rows="5"
-                        placeholder="NOT YET
+                <p class="setting-help">
+                    Kata-kata yang dianggap menunjukkan bahwa
+                    data belum tersedia.
+                </p>
+
+                <textarea
+                    id="notFoundPhrases"
+                    rows="5"
+                    placeholder="NOT YET
 Not Yet
 Belum ada
 Belum tersedia
 Pending
 N/A
 -"
-                    ></textarea>
+                ></textarea>
 
-                </div>
-
-
-                <!-- VALIDATION -->
-                <div class="setting-group">
-
-                    <label>
-                        Aturan Validasi Tanggal
-                    </label>
-
-                    <p class="setting-help">
-                        Tentukan hubungan antara Datetime Receive
-                        dan Ticket Release.
-                    </p>
-
-                    <div class="setting-row">
-
-                        <div class="field">
-
-                            <label for="validationType">
-                                Tipe Validasi
-                            </label>
-
-                            <select id="validationType">
-
-                                <option value="release-after-receive">
-                                    TT Release harus setelah Datetime Receive
-                                </option>
-
-                                <option value="same-date">
-                                    TT Release harus pada tanggal yang sama
-                                </option>
-
-                                <option value="same-or-after">
-                                    TT Release harus sama atau setelah Receive
-                                </option>
-
-                            </select>
-
-                        </div>
+            </div>
 
 
-                        <div class="field">
+            <!-- =================================================
+                 VALIDATION
+            ================================================== -->
 
-                            <label for="maxReleaseMinutes">
-                                Batas Waktu (menit)
-                            </label>
+            <div class="setting-group">
 
-                            <input
-                                type="number"
-                                id="maxReleaseMinutes"
-                                min="0"
-                                value="0"
-                                placeholder="0 = tanpa batas"
-                            >
+                <label>
+                    Aturan Validasi Tanggal
+                </label>
 
-                        </div>
+                <p class="setting-help">
+                    Tentukan hubungan antara Datetime Receive
+                    dan Ticket Release.
+                </p>
+
+                <div class="setting-row">
+
+                    <div class="field">
+
+                        <label for="validationType">
+                            Tipe Validasi
+                        </label>
+
+                        <select id="validationType">
+
+                            <option value="release-after-receive">
+                                TT Release harus setelah Datetime Receive
+                            </option>
+
+                            <option value="same-date">
+                                TT Release harus pada tanggal yang sama
+                            </option>
+
+                            <option value="same-or-after">
+                                TT Release harus sama atau setelah Receive
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <div class="field">
+
+                        <label for="maxReleaseMinutes">
+                            Batas Waktu (menit)
+                        </label>
+
+                        <input
+                            type="number"
+                            id="maxReleaseMinutes"
+                            min="0"
+                            value="0"
+                            placeholder="0 = tanpa batas"
+                        >
 
                     </div>
 
                 </div>
 
+            </div>
 
-                <div class="settings-actions">
 
-                    <button
-                        type="button"
-                        id="saveSettingsBtn"
-                        class="btn btn-primary"
-                    >
-                        💾 Simpan Pengaturan
-                    </button>
+            <!-- =================================================
+                 SETTINGS ACTION
+            ================================================== -->
 
-                    <button
-                        type="button"
-                        id="resetSettingsBtn"
-                        class="btn btn-secondary"
-                    >
-                        Reset Default
-                    </button>
+            <div class="settings-actions">
 
-                </div>
-
-                <div
-                    id="settingsSavedMessage"
-                    class="settings-saved hidden"
+                <button
+                    type="button"
+                    id="saveSettingsBtn"
+                    class="btn btn-primary"
                 >
-                    ✓ Pengaturan berhasil disimpan.
-                </div>
+                    💾 Simpan Pengaturan
+                </button>
+
+                <button
+                    type="button"
+                    id="resetSettingsBtn"
+                    class="btn btn-secondary"
+                >
+                    Reset Default
+                </button>
 
             </div>
 
-        </section>
 
-    </main>
+            <div
+                id="settingsSavedMessage"
+                class="settings-saved hidden"
+            >
+                ✓ Pengaturan berhasil disimpan.
+            </div>
 
+        </div>
 
-    <!-- =========================
-         FOOTER
-    ========================== -->
-    <footer class="app-footer">
+    </section>
 
-        <p>
-            Report Checker
-            <span>•</span>
-            Excel Ticket & CIR Validator
-        </p>
-
-        <p class="footer-note">
-            Data Excel diproses langsung di browser.
-        </p>
-
-    </footer>
+</main>
 
 
-    <!-- =========================
-         JAVASCRIPT
-    ========================== -->
+<!-- =====================================================
+     FOOTER
+====================================================== -->
 
-    <!-- SheetJS untuk membaca & membuat file Excel -->
-    <script
-        src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js">
-    </script>
+<footer class="app-footer">
 
-    <!-- Application -->
-    <script src="js/settings.js"></script>
-    <script src="js/cir-parser.js"></script>
-    <script src="js/material-parser.js"></script>
-    <script src="js/validator.js"></script>
-    <script src="js/excel.js"></script>
-    <script src="js/exporter.js"></script>
-    <script src="js/app.js"></script>
+    <p>
+        Report Checker
+        <span>•</span>
+        Excel Ticket & CIR Validator
+    </p>
+
+    <p class="footer-note">
+        Data Excel diproses langsung di browser.
+    </p>
+
+</footer>
+
+
+<!-- =====================================================
+     JAVASCRIPT
+====================================================== -->
+
+<!-- SheetJS untuk membaca dan membuat file Excel -->
+
+<script
+    src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"
+></script>
+
+
+<!-- Application Modules -->
+
+<script src="js/settings.js"></script>
+
+<script src="js/cir-parser.js"></script>
+
+<script src="js/material-parser.js"></script>
+
+<script src="js/validator.js"></script>
+
+<script src="js/excel.js"></script>
+
+<script src="js/exporter.js"></script>
+
+<script src="js/app.js"></script>
+
 
 </body>
 </html>
