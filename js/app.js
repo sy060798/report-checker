@@ -5,8 +5,12 @@
 
    UPDATE:
    - Ticket menggunakan TT Number
-   - Tidak memprioritaskan Customer Ticket / Ref Ticket
+   - TT Number utama berasal dari kolom D / index 3
+   - Tidak menggunakan Customer Ticket / Ref Ticket
    - Mendukung beberapa nama field TT Number
+   - Jika hasil parser tidak membawa TT Number,
+     ambil dari originalRow / source / rowData / data
+   - Untuk array row, TT Number = index 3
    - Material tetap ditampilkan
    - Material Error tetap ditampilkan
    - Tidak mengubah sistem result lama
@@ -35,6 +39,31 @@
         initialized: false
 
     };
+
+
+    /* =====================================================
+       CONSTANTS
+    ===================================================== */
+
+    /*
+     * Kolom D pada spreadsheet.
+     *
+     * A = index 0
+     * B = index 1
+     * C = index 2
+     * D = index 3
+     */
+    const TT_NUMBER_COLUMN_INDEX = 3;
+
+
+    /*
+     * CIR default = kolom AF.
+     *
+     * A  = 0
+     * ...
+     * AF = 31
+     */
+    const DEFAULT_CIR_COLUMN_INDEX = 31;
 
 
     /* =====================================================
@@ -157,7 +186,7 @@
             typeof window
                 .ReportCheckerExcel
                 .getState ===
-                "function"
+            "function"
 
         ) {
 
@@ -856,12 +885,6 @@
             );
 
 
-            /*
-             * Beri kesempatan browser memperbarui
-             * tampilan processing sebelum proses
-             * Excel yang berat dijalankan.
-             */
-
             await yieldToBrowser();
 
 
@@ -1256,37 +1279,82 @@
 
 
     /* =====================================================
-       GET TT NUMBER
+       GET TT NUMBER FROM ARRAY
        
-       PRIORITAS:
-       
-       1. ttNumber
-       2. TT Number
-       3. TT_Number
-       4. TTNumber
-       5. ticketNumber
-       6. ticket
-       7. nomorTT
-       8. noTT
-       
-       Kemudian cek originalRow/source.
-       
-       Customer Ticket / Ref Ticket TIDAK digunakan.
+       Array:
+       index 0 = A
+       index 1 = B
+       index 2 = C
+       index 3 = D = TT Number
     ===================================================== */
 
-    function getTicketNumber(
+    function getTTNumberFromArray(
         row
     ) {
 
-        const original =
-            row?.originalRow ||
-            row?.source ||
-            row?.rowData ||
-            row?.data ||
-            {};
+        if (
+            !Array.isArray(row)
+        ) {
+
+            return "";
+
+        }
 
 
-        const ticketKeys = [
+        const value =
+            row[
+                TT_NUMBER_COLUMN_INDEX
+            ];
+
+
+        if (
+            value ===
+                undefined ||
+            value ===
+                null
+        ) {
+
+            return "";
+
+        }
+
+
+        const result =
+            String(
+                value
+            ).trim();
+
+
+        return result;
+
+    }
+
+
+    /* =====================================================
+       GET TT NUMBER FROM OBJECT
+       
+       Prioritas field TT Number.
+       
+       Customer Ticket dan Ref Ticket
+       TIDAK digunakan.
+    ===================================================== */
+
+    function getTTNumberFromObject(
+        row
+    ) {
+
+        if (
+            !row ||
+            typeof row !== "object" ||
+            Array.isArray(row)
+        ) {
+
+            return "";
+
+        }
+
+
+        const possibleKeys = [
 
             "ttNumber",
 
@@ -1302,17 +1370,11 @@
 
             "ttnumber",
 
-            "ticketNumber",
+            "TT No",
 
-            "Ticket Number",
+            "TT No.",
 
-            "TicketNumber",
-
-            "ticket_number",
-
-            "ticket",
-
-            "Ticket",
+            "TT_NO",
 
             "nomorTT",
 
@@ -1322,78 +1384,466 @@
 
             "No TT",
 
-            "No. TT",
-
-            "TT No",
-
-            "TT No.",
-
-            "TT_NO"
+            "No. TT"
 
         ];
 
 
-        let ticket =
-            getValue(
-                row,
-                ticketKeys
-            );
+        /*
+         * Cek nama field yang umum terlebih dahulu.
+         */
 
-
-        if (
-            ticket !== ""
+        for (
+            const key of possibleKeys
         ) {
 
-            return String(
-                ticket
-            ).trim();
+            if (
 
-        }
+                Object.prototype
+                    .hasOwnProperty.call(
+                        row,
+                        key
+                    )
+
+            ) {
+
+                const value =
+                    row[key];
 
 
-        ticket =
-            getValue(
-                original,
-                ticketKeys
-            );
+                if (
+                    value !==
+                        undefined &&
+                    value !==
+                        null &&
+                    String(
+                        value
+                    ).trim() !==
+                        ""
+                ) {
 
+                    return String(
+                        value
+                    ).trim();
 
-        if (
-            ticket !== ""
-        ) {
+                }
 
-            return String(
-                ticket
-            ).trim();
+            }
 
         }
 
 
         /*
-         * Beberapa parser mungkin menyimpan
-         * TT Number dalam metadata.
+         * Fallback:
+         * pencarian key secara case-insensitive.
+         *
+         * Contoh:
+         * TT Number
+         * tt number
+         * TT_Number
+         * tt_number
+         * TTNumber
          */
 
-        const metadata =
-            row?.metadata ||
-            row?.meta ||
-            {};
+        const keys =
+            Object.keys(row);
 
 
-        ticket =
-            getValue(
-                metadata,
-                ticketKeys
+        for (
+            const key of keys
+        ) {
+
+            const normalizedKey =
+                String(key)
+                    .toLowerCase()
+                    .replace(
+                        /[\s_-]+/g,
+                        ""
+                    );
+
+
+            if (
+                normalizedKey ===
+                "ttnumber"
+            ) {
+
+                const value =
+                    row[key];
+
+
+                if (
+                    value !==
+                        undefined &&
+                    value !==
+                        null &&
+                    String(
+                        value
+                    ).trim() !==
+                        ""
+                ) {
+
+                    return String(
+                        value
+                    ).trim();
+
+                }
+
+            }
+
+        }
+
+
+        return "";
+
+    }
+
+
+    /* =====================================================
+       GET TT NUMBER
+       
+       INI ADALAH SATU-SATUNYA FUNGSI YANG DIPAKAI
+       OLEH SEMUA TABLE UNTUK MENAMPILKAN TICKET.
+       
+       Urutan pencarian:
+       
+       1. row.ttNumber
+       2. field TT Number pada row
+       3. originalRow
+       4. source
+       5. rowData
+       6. data
+       7. metadata / meta
+       8. array index 3 / kolom D
+       
+       TIDAK ADA Customer Ticket / Ref Ticket.
+    ===================================================== */
+
+    function getTicketNumber(
+        row
+    ) {
+
+        if (!row) {
+
+            return "-";
+
+        }
+
+
+        /*
+         * =================================================
+         * 1. Jika row langsung berupa array
+         * =================================================
+         */
+
+        if (
+            Array.isArray(row)
+        ) {
+
+            const direct =
+                getTTNumberFromArray(
+                    row
+                );
+
+
+            return direct ||
+                "-";
+
+        }
+
+
+        /*
+         * =================================================
+         * 2. Cari langsung pada result parser.
+         * =================================================
+         */
+
+        let ticket =
+            getTTNumberFromObject(
+                row
             );
 
 
+        if (ticket) {
+
+            return ticket;
+
+        }
+
+
+        /*
+         * =================================================
+         * 3. Cari pada originalRow.
+         * =================================================
+         */
+
+        const original =
+            row.originalRow;
+
+
         if (
-            ticket !== ""
+            Array.isArray(
+                original
+            )
         ) {
 
-            return String(
-                ticket
-            ).trim();
+            ticket =
+                getTTNumberFromArray(
+                    original
+                );
+
+
+            if (ticket) {
+
+                return ticket;
+
+            }
+
+        } else {
+
+            ticket =
+                getTTNumberFromObject(
+                    original
+                );
+
+
+            if (ticket) {
+
+                return ticket;
+
+            }
+
+        }
+
+
+        /*
+         * =================================================
+         * 4. Cari pada source.
+         * =================================================
+         */
+
+        const source =
+            row.source;
+
+
+        if (
+            Array.isArray(
+                source
+            )
+        ) {
+
+            ticket =
+                getTTNumberFromArray(
+                    source
+                );
+
+
+            if (ticket) {
+
+                return ticket;
+
+            }
+
+        } else {
+
+            ticket =
+                getTTNumberFromObject(
+                    source
+                );
+
+
+            if (ticket) {
+
+                return ticket;
+
+            }
+
+        }
+
+
+        /*
+         * =================================================
+         * 5. Cari pada rowData.
+         * =================================================
+         */
+
+        const rowData =
+            row.rowData;
+
+
+        if (
+            Array.isArray(
+                rowData
+            )
+        ) {
+
+            ticket =
+                getTTNumberFromArray(
+                    rowData
+                );
+
+
+            if (ticket) {
+
+                return ticket;
+
+            }
+
+        } else {
+
+            ticket =
+                getTTNumberFromObject(
+                    rowData
+                );
+
+
+            if (ticket) {
+
+                return ticket;
+
+            }
+
+        }
+
+
+        /*
+         * =================================================
+         * 6. Cari pada data.
+         * =================================================
+         */
+
+        const data =
+            row.data;
+
+
+        if (
+            Array.isArray(
+                data
+            )
+        ) {
+
+            ticket =
+                getTTNumberFromArray(
+                    data
+                );
+
+
+            if (ticket) {
+
+                return ticket;
+
+            }
+
+        } else {
+
+            ticket =
+                getTTNumberFromObject(
+                    data
+                );
+
+
+            if (ticket) {
+
+                return ticket;
+
+            }
+
+        }
+
+
+        /*
+         * =================================================
+         * 7. Cari metadata.
+         * =================================================
+         */
+
+        const metadata =
+            row.metadata ||
+            row.meta;
+
+
+        ticket =
+            getTTNumberFromObject(
+                metadata
+            );
+
+
+        if (ticket) {
+
+            return ticket;
+
+        }
+
+
+        /*
+         * =================================================
+         * 8. Fallback jika parser menyimpan
+         *    original row dalam properti lain.
+         *
+         *    Hanya ambil index 3 jika berupa array.
+         * =================================================
+         */
+
+        const possibleRowFields = [
+
+            "rawRow",
+
+            "excelRow",
+
+            "sourceRow",
+
+            "originalData"
+
+        ];
+
+
+        for (
+            const field of possibleRowFields
+        ) {
+
+            const candidate =
+                row[field];
+
+
+            if (
+                Array.isArray(
+                    candidate
+                )
+            ) {
+
+                ticket =
+                    getTTNumberFromArray(
+                        candidate
+                    );
+
+
+                if (ticket) {
+
+                    return ticket;
+
+                }
+
+            }
+
+
+            if (
+                candidate &&
+                typeof candidate ===
+                    "object"
+            ) {
+
+                ticket =
+                    getTTNumberFromObject(
+                        candidate
+                    );
+
+
+                if (ticket) {
+
+                    return ticket;
+
+                }
+
+            }
 
         }
 
@@ -1461,8 +1911,10 @@
 
 
                 const original =
-                    row.originalRow ||
-                    row.source ||
+                    row?.originalRow ||
+                    row?.source ||
+                    row?.rowData ||
+                    row?.data ||
                     {};
 
 
@@ -1621,8 +2073,10 @@
 
 
                 const original =
-                    row.originalRow ||
-                    row.source ||
+                    row?.originalRow ||
+                    row?.source ||
+                    row?.rowData ||
+                    row?.data ||
                     {};
 
 
@@ -1773,10 +2227,6 @@
 
         rows.forEach(
             function (row) {
-
-                /*
-                 * Ticket selalu dicari dari TT Number.
-                 */
 
                 const ticket =
                     getTicketNumber(
@@ -2117,9 +2567,6 @@
 
     /* =====================================================
        SEARCH
-       
-       Mendukung search input jika index.html
-       nantinya mempunyai input pencarian.
     ===================================================== */
 
     function setupSearch() {
@@ -3184,7 +3631,13 @@
                     ...state
                 };
 
-            }
+            },
+
+        /*
+         * Debug helper:
+         * cek TT Number yang akan ditampilkan UI.
+         */
+        getTicketNumber
 
     };
 
