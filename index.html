@@ -1330,7 +1330,7 @@ N/A
          JAVASCRIPT
     ====================================================== -->
 
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+ <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <script src="js/settings.js"></script>
 <script src="js/cir-parser.js"></script>
@@ -1338,6 +1338,38 @@ N/A
 <script src="js/validator.js"></script>
 <script src="js/excel.js"></script>
 <script src="js/app.js"></script>
+
+<script>
+function toggleSettingsPanel() {
+
+    const panel = document.getElementById("settingsPanel");
+    const button = document.getElementById("toggleSettingsBtn");
+
+    if (!panel) {
+        console.error("settingsPanel tidak ditemukan");
+        return;
+    }
+
+    if (panel.classList.contains("hidden")) {
+
+        panel.classList.remove("hidden");
+
+        button.textContent =
+            "Tutup Pengaturan";
+
+    } else {
+
+        panel.classList.add("hidden");
+
+        button.textContent =
+            "Buka Pengaturan";
+
+    }
+
+}
+</script>
+
+</body>
 
 
 
