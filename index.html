@@ -178,26 +178,30 @@
 
             <!-- PROCESSING -->
 
-            <div
-                id="processingStatus"
-                class="processing-status hidden"
-            >
+           <div
+    id="processingStatus"
+    class="processing-status hidden"
+>
+    <div class="spinner"></div>
 
-                <div class="spinner"></div>
+    <div>
+        <strong id="processingTitle">
+            Sedang memproses...
+        </strong>
 
-                <div>
+        <p id="processingText">
+            Membaca data Excel...
+        </p>
 
-                    <strong>
-                        Sedang memproses...
-                    </strong>
+        <div
+            id="processingProgress"
+            style="text-align:center; font-size:13px; margin-top:6px; color:#64748b;"
+        >
+            0%
+        </div>
+    </div>
+</div>
 
-                    <p id="processingText">
-                        Membaca data Excel...
-                    </p>
-
-                </div>
-
-            </div>
 
         </section>
 
