@@ -2,16 +2,30 @@
    REPORT CHECKER
    validator.js
 
-   Fungsi utama:
-   1. Membaca Datetime Receive dari Excel
-   2. Membaca TT Release dari CIR
-   3. Membandingkan tanggal release dengan tanggal receive
-   4. Menentukan SESUAI / TIDAK SESUAI
-   5. Mengambil waktu release
-   6. Memastikan setiap hasil mempunyai Ticket
-   7. Menyediakan data siap export
+   UPDATE:
+   1. Ticket utama WAJIB diambil dari kolom "TT Number"
+   2. Tidak lagi menggunakan Customer Ticket / Ref Ticket
+   3. Membaca Datetime Receive dari Excel
+   4. Membaca TT Release dari CIR
+   5. Membandingkan tanggal release dengan tanggal receive
+   6. Menentukan SESUAI / TIDAK SESUAI
+   7. Mengambil waktu release
+   8. Memastikan setiap hasil mempunyai TT Number
+   9. Menyediakan data siap export
 
-   ATURAN DEFAULT:
+   ATURAN:
+
+   TT Number:
+      - Ambil hanya dari kolom "TT Number"
+      - Jika kosong => INVALID
+
+   TT Release:
+      - Dicari di dalam CIR
+      - Case insensitive
+      - Format CIR fleksibel
+      - TT Release boleh berada satu baris dengan tanggal
+      - TT Release boleh berada sebelum / sesudah tanggal
+      - Jarak tanggal maksimal 3 baris
 
    Jika TT Release ditemukan:
       - tanggal sama dengan Datetime Receive
@@ -22,9 +36,6 @@
 
    Jika TT Release tidak ditemukan:
       => TIDAK SESUAI
-
-   Jika Ticket kosong:
-      => INVALID / NO TICKET
 ========================================================= */
 
 (function () {
@@ -40,19 +51,8 @@
 
         releaseKeywords: [
             "TT Release",
-            "TT release",
-            "TT RELEASE",
-            "TT Release :",
-            "TT Release:"
+            "Ticket Release"
         ],
-
-        /*
-         * Format tanggal yang didukung:
-         *
-         * 31/08/2026 11:43 TT Release
-         * 31-08-2026 11:43 TT Release
-         * 2026-08-31 11:43 TT Release
-         */
 
         timezone:
             "Asia/Jakarta"
@@ -210,10 +210,25 @@
                 1000;
 
 
-            return new Date(
-                excelEpoch.getTime() +
-                milliseconds
-            );
+            const result =
+                new Date(
+                    excelEpoch.getTime() +
+                    milliseconds
+                );
+
+
+            if (
+                isNaN(
+                    result.getTime()
+                )
+            ) {
+
+                return null;
+
+            }
+
+
+            return result;
 
         }
 
@@ -242,9 +257,9 @@
 
         if (match) {
 
-            return new Date(
+            return createValidDate(
                 Number(match[1]),
-                Number(match[2]) - 1,
+                Number(match[2]),
                 Number(match[3]),
                 Number(match[4] || 0),
                 Number(match[5] || 0),
@@ -266,9 +281,9 @@
 
         if (match) {
 
-            return new Date(
+            return createValidDate(
                 Number(match[3]),
-                Number(match[2]) - 1,
+                Number(match[2]),
                 Number(match[1]),
                 Number(match[4] || 0),
                 Number(match[5] || 0),
@@ -284,15 +299,15 @@
 
         match =
             text.match(
-                /^(\d{1,2})-(\d{1,2})-(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2})?)?)?/
+                /^(\d{1,2})-(\d{1,2})-(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/
             );
 
 
         if (match) {
 
-            return new Date(
+            return createValidDate(
                 Number(match[3]),
-                Number(match[2]) - 1,
+                Number(match[2]),
                 Number(match[1]),
                 Number(match[4] || 0),
                 Number(match[5] || 0),
@@ -322,6 +337,62 @@
 
 
         return null;
+
+    }
+
+
+    /* =====================================================
+       CREATE VALID DATE
+    ===================================================== */
+
+    function createValidDate(
+        year,
+        month,
+        day,
+        hour,
+        minute,
+        second
+    ) {
+
+        const date =
+            new Date(
+                year,
+                month - 1,
+                day,
+                hour,
+                minute,
+                second
+            );
+
+
+        if (
+            isNaN(
+                date.getTime()
+            )
+        ) {
+
+            return null;
+
+        }
+
+
+        /*
+         * Cegah tanggal invalid seperti:
+         * 31/02/2026
+         */
+
+        if (
+            date.getFullYear() !== year ||
+            date.getMonth() !== month - 1 ||
+            date.getDate() !== day
+        ) {
+
+            return null;
+
+        }
+
+
+        return date;
 
     }
 
@@ -436,16 +507,93 @@
 
 
     /* =====================================================
-       PARSE CIR RELEASE DATETIME
+       CHECK RELEASE KEYWORD
+    ===================================================== */
+
+    function hasReleaseKeyword(
+        text
+    ) {
+
+        const value =
+            normalizeLine(
+                text
+            );
+
+
+        if (!value) {
+
+            return false;
+
+        }
+
+
+        const settings =
+            getSettings();
+
+
+        const lowerText =
+            value.toLowerCase();
+
+
+        for (
+            const keyword of
+            settings.releaseKeywords || []
+        ) {
+
+            if (!keyword) {
+
+                continue;
+
+            }
+
+
+            const lowerKeyword =
+                String(keyword)
+                    .toLowerCase()
+                    .trim();
+
+
+            if (!lowerKeyword) {
+
+                continue;
+
+            }
+
+
+            if (
+                lowerText.includes(
+                    lowerKeyword
+                )
+            ) {
+
+                return true;
+
+            }
+
+        }
+
+
+        return false;
+
+    }
+
+
+    /* =====================================================
+       PARSE RELEASE FROM LINE
        
        Contoh:
 
        31/08/2026 11:43 TT Release
 
-       31/08/2026 11:43 TT Release
+       TT Release
+       31/08/2026 11:43
+
+       31/08/2026 11:43
        TT Release
 
-       31-08-2026 11:43 TT Release
+       TT RELEASE
+
+       31-08-2026 11:43 TT release
     ===================================================== */
 
     function parseReleaseFromLine(
@@ -465,40 +613,10 @@
         }
 
 
-        const settings =
-            getSettings();
-
-
-        let hasReleaseKeyword =
-            false;
-
-
-        for (
-            const keyword of
-            settings.releaseKeywords || []
-        ) {
-
-            if (
-                text
-                    .toLowerCase()
-                    .includes(
-                        String(keyword)
-                            .toLowerCase()
-                    )
-            ) {
-
-                hasReleaseKeyword =
-                    true;
-
-                break;
-
-            }
-
-        }
-
-
         if (
-            !hasReleaseKeyword
+            !hasReleaseKeyword(
+                text
+            )
         ) {
 
             return null;
@@ -521,9 +639,9 @@
             return {
 
                 date:
-                    new Date(
+                    createValidDate(
                         Number(match[3]),
-                        Number(match[2]) - 1,
+                        Number(match[2]),
                         Number(match[1]),
                         Number(match[4]),
                         Number(match[5]),
@@ -553,9 +671,9 @@
             return {
 
                 date:
-                    new Date(
+                    createValidDate(
                         Number(match[3]),
-                        Number(match[2]) - 1,
+                        Number(match[2]),
                         Number(match[1]),
                         Number(match[4]),
                         Number(match[5]),
@@ -585,9 +703,9 @@
             return {
 
                 date:
-                    new Date(
+                    createValidDate(
                         Number(match[1]),
-                        Number(match[2]) - 1,
+                        Number(match[2]),
                         Number(match[3]),
                         Number(match[4]),
                         Number(match[5]),
@@ -601,6 +719,11 @@
 
         }
 
+
+        /*
+         * TT Release ditemukan,
+         * tetapi tanggal tidak ada di baris ini.
+         */
 
         return {
 
@@ -617,6 +740,28 @@
 
     /* =====================================================
        FIND RELEASE IN CIR
+       
+       Mendukung format CIR fleksibel.
+
+       Contoh:
+
+       ====CIR====
+       21//08/2026 19:07 TT RELEASE
+
+       =====CIR=====
+       18/08/2026 19:35 TT release
+
+       =====CIR=====
+
+       12/08/2026 11:42 TT onsite
+
+       Prinsip:
+       - CIR harus ada
+       - Setelah CIR, cari TT Release
+       - Case insensitive
+       - Tanggal boleh sebelum / sesudah TT Release
+       - Jarak maksimal 3 baris
+       - Ambil release terakhir jika ada beberapa
     ===================================================== */
 
     function findReleaseInCir(
@@ -643,7 +788,10 @@
                     "",
 
                 line:
-                    ""
+                    "",
+
+                all:
+                    []
 
             };
 
@@ -654,12 +802,13 @@
             text.split("\n");
 
 
-        /*
-         * Cari semua release.
-         */
-
         const releases = [];
 
+
+        /*
+         * Cari semua baris yang mengandung
+         * TT Release.
+         */
 
         for (
             let i = 0;
@@ -667,14 +816,35 @@
             i++
         ) {
 
-            const parsed =
+            const line =
+                lines[i];
+
+
+            if (
+                !hasReleaseKeyword(
+                    line
+                )
+            ) {
+
+                continue;
+
+            }
+
+
+            /*
+             * Coba ambil tanggal dari
+             * baris TT Release itu sendiri.
+             */
+
+            let parsed =
                 parseReleaseFromLine(
-                    lines[i]
+                    line
                 );
 
 
             if (
-                parsed
+                parsed &&
+                parsed.date
             ) {
 
                 releases.push({
@@ -685,17 +855,175 @@
                         i,
 
                     line:
-                        lines[i]
+                        line
 
                 });
 
+                continue;
+
             }
+
+
+            /*
+             * Jika tanggal tidak berada di
+             * baris yang sama, cari sekitar
+             * TT Release.
+             *
+             * Maksimal 3 baris.
+             */
+
+
+            const maxDistance =
+                3;
+
+
+            let foundDate =
+                null;
+
+
+            /*
+             * Prioritas:
+             * 1. Setelah TT Release
+             */
+
+            for (
+                let offset = 1;
+                offset <= maxDistance;
+                offset++
+            ) {
+
+                const index =
+                    i + offset;
+
+
+                if (
+                    index >= lines.length
+                ) {
+
+                    break;
+
+                }
+
+
+                const candidate =
+                    parseExcelDate(
+                        lines[index]
+                    );
+
+
+                if (candidate) {
+
+                    foundDate = {
+
+                        date:
+                            candidate,
+
+                        sourceIndex:
+                            index,
+
+                        sourceLine:
+                            lines[index]
+
+                    };
+
+                    break;
+
+                }
+
+            }
+
+
+            /*
+             * 2. Kalau belum ketemu,
+             *    cari sebelum TT Release.
+             */
+
+            if (!foundDate) {
+
+                for (
+                    let offset = 1;
+                    offset <= maxDistance;
+                    offset++
+                ) {
+
+                    const index =
+                        i - offset;
+
+
+                    if (
+                        index < 0
+                    ) {
+
+                        break;
+
+                    }
+
+
+                    const candidate =
+                        parseExcelDate(
+                            lines[index]
+                        );
+
+
+                    if (candidate) {
+
+                        foundDate = {
+
+                            date:
+                                candidate,
+
+                            sourceIndex:
+                                index,
+
+                            sourceLine:
+                                lines[index]
+
+                        };
+
+                        break;
+
+                    }
+
+                }
+
+            }
+
+
+            releases.push({
+
+                date:
+                    foundDate
+                        ? foundDate.date
+                        : null,
+
+                raw:
+                    normalizeLine(
+                        line
+                    ),
+
+                lineIndex:
+                    i,
+
+                line:
+                    line,
+
+                dateSourceIndex:
+                    foundDate
+                        ? foundDate.sourceIndex
+                        : -1,
+
+                dateSourceLine:
+                    foundDate
+                        ? foundDate.sourceLine
+                        : ""
+
+            });
 
         }
 
 
         /*
-         * Tidak ditemukan.
+         * Tidak ada TT Release.
          */
 
         if (
@@ -725,11 +1053,7 @@
 
 
         /*
-         * Jika ada beberapa TT Release,
-         * gunakan release terakhir.
-         *
-         * Ini biasanya paling aman untuk report
-         * yang mengalami update berkali-kali.
+         * Ambil release terakhir.
          */
 
         const selected =
@@ -754,6 +1078,14 @@
 
             lineIndex:
                 selected.lineIndex,
+
+            dateSourceIndex:
+                selected.dateSourceIndex ??
+                selected.lineIndex,
+
+            dateSourceLine:
+                selected.dateSourceLine ||
+                selected.line,
 
             all:
                 releases
@@ -798,8 +1130,6 @@
 
     /* =====================================================
        COMPARE DATETIME
-       
-       Optional helper.
     ===================================================== */
 
     function compareDateTime(
@@ -826,6 +1156,53 @@
 
 
     /* =====================================================
+       GET TT NUMBER
+       
+       PENTING:
+       Ticket sekarang HANYA dari:
+       
+       "TT Number"
+
+       Tidak fallback ke:
+       - Customer Ticket
+       - Ref Ticket
+       - Ticket
+    ===================================================== */
+
+    function getTTNumber(
+        row
+    ) {
+
+        if (
+            !row
+        ) {
+
+            return "";
+
+        }
+
+
+        const value =
+            row["TT Number"];
+
+
+        if (
+            value === null ||
+            value === undefined
+        ) {
+
+            return "";
+
+        }
+
+
+        return String(value)
+            .trim();
+
+    }
+
+
+    /* =====================================================
        VALIDATE ONE ROW
     ===================================================== */
 
@@ -838,13 +1215,16 @@
             options || {};
 
 
+        /*
+         * =================================================
+         * TICKET = TT NUMBER
+         * =================================================
+         */
+
         const ticket =
-            String(
-                row?.["Customer Ticket"] ||
-                row?.["TT Number"] ||
-                row?.["Ticket"] ||
-                ""
-            ).trim();
+            getTTNumber(
+                row
+            );
 
 
         const cir =
@@ -859,7 +1239,19 @@
 
         const result = {
 
+            /*
+             * Ticket sekarang adalah TT Number
+             */
+
             ticket:
+                ticket,
+
+            /*
+             * Simpan juga secara eksplisit
+             * supaya mudah digunakan oleh app/export.
+             */
+
+            ttNumber:
                 ticket,
 
             datetimeReceive:
@@ -899,7 +1291,7 @@
 
 
         /* =================================================
-           TICKET CHECK
+           TT NUMBER CHECK
         ================================================= */
 
         if (!ticket) {
@@ -908,7 +1300,7 @@
                 "INVALID";
 
             result.reason =
-                "Ticket tidak ditemukan.";
+                "TT Number tidak ditemukan.";
 
             return result;
 
@@ -949,7 +1341,7 @@
 
 
         /* =================================================
-           FIND TT RELEASE
+           FIND TT RELEASE DI CIR
         ================================================= */
 
         const release =
@@ -999,6 +1391,10 @@
         }
 
 
+        /* =================================================
+           RELEASE ADA TAPI TANGGAL TIDAK ADA
+        ================================================= */
+
         if (!release.date) {
 
             result.status =
@@ -1013,7 +1409,7 @@
 
 
         /* =================================================
-           COMPARE
+           COMPARE DATE
         ================================================= */
 
         const dateSame =
@@ -1194,7 +1590,7 @@
     /* =====================================================
        CREATE EXPORT ROW
        
-       Dipakai nanti oleh Excel exporter.
+       Ticket = TT Number
     ===================================================== */
 
     function toExportRow(
@@ -1209,7 +1605,7 @@
 
 
         /*
-         * Jangan export data tanpa Ticket.
+         * Jangan export data tanpa TT Number.
          */
 
         if (
@@ -1226,7 +1622,7 @@
 
         return {
 
-            "Ticket":
+            "TT Number":
                 result.ticket,
 
             "Datetime Receive":
@@ -1353,66 +1749,84 @@
         /*
          * Main validation
          */
+
         validate:
             validateRow,
 
         /*
          * Multiple rows
          */
+
         validateRows:
             validateRows,
 
         /*
          * Cari TT Release
          */
+
         findRelease:
             findReleaseInCir,
 
         /*
          * Parse Excel date
          */
+
         parseDate:
             parseExcelDate,
 
         /*
          * Format date
          */
+
         formatDate:
             formatDate,
 
         /*
          * Format datetime
          */
+
         formatDateTime:
             formatDateTime,
 
         /*
          * Compare date
          */
+
         compareDate:
             compareDateOnly,
 
         /*
          * Compare datetime
          */
+
         compareDateTime:
             compareDateTime,
 
         /*
+         * Ambil TT Number
+         */
+
+        getTTNumber:
+            getTTNumber,
+
+        /*
          * Pisahkan hasil
          */
+
         split:
             splitResults,
 
         /*
          * Summary
          */
+
         summary:
             getSummary,
 
         /*
          * Export rows
          */
+
         exportSesuai:
             exportSesuaiRows,
 
@@ -1422,6 +1836,7 @@
         /*
          * Default settings
          */
+
         settings:
             DEFAULT_SETTINGS
 
