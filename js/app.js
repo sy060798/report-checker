@@ -4852,3 +4852,17 @@
 
 
 })();
+
+function updateProgress(percent, text) {
+    const progress = document.getElementById("processingProgress");
+    const processingText = document.getElementById("processingText");
+
+    if (progress) {
+        progress.textContent = `${percent}%`;
+    }
+
+    if (processingText && text) {
+        processingText.textContent = text;
+    }
+}
+
