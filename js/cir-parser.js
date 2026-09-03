@@ -2,37 +2,54 @@
    REPORT CHECKER
    cir-parser.js
 
-   RULE BARU:
+   RULE FINAL:
 
-   1. Cari tulisan CIR dalam bentuk apa pun.
-      Contoh:
+   1. Cari tulisan CIR dalam bentuk apa pun:
       ===CIR====
       ===== CIR =====
       CIR
       -----CIR-----
       === CIR ===
 
-   2. TT Release TIDAK harus mengandung tulisan
+   2. TT Release TIDAK membutuhkan tulisan
       "TT Release".
 
-   3. Setelah menemukan CIR, abaikan semua baris kosong /
-      spasi / separator.
+   3. Setelah menemukan CIR:
+      - Abaikan baris kosong
+      - Abaikan spasi
+      - Abaikan separator
+      - Abaikan margin kosong sebanyak apa pun
 
-   4. Cari TANGGAL + JAM PERTAMA yang muncul SETELAH CIR.
+   4. Cari TANGGAL + JAM PERTAMA yang muncul
+      setelah CIR.
 
-   5. Tanggal boleh menggunakan berbagai format:
-      26/08/2026 21.12
-      26/08/2026 21:12
-      26-08-2026 21.12
-      2026-08-26 21:12
-      26//08//2026 21.12
-      dll.
+   5. Begitu tanggal + jam pertama ditemukan:
+      - langsung digunakan sebagai TT Release
+      - pencarian LANGSUNG BERHENTI
+      - tanggal kedua dan seterusnya DIABAIKAN
 
    6. Tanggal pada baris CIR sendiri TIDAK dihitung.
 
-   7. TT Number tetap berasal dari kolom D / index 3.
+   7. Format tanggal yang didukung:
+      26/08/2026 21.12
+      26/08/2026 21:12
+      26-08-2026 21.12
+      26-08-2026 21:12
+      26.08.2026 21.12
+      2026-08-26 21:12
+      2026/08/26 21:12
+      26//08//2026 21.12
+      dll.
 
-   8. Ticket = TT Number.
+   8. TT Number tetap berasal dari kolom D / index 3.
+
+   9. Ticket = TT Number.
+
+   10. TIDAK mencari tanggal berdasarkan kata
+       "TT Release".
+
+   11. Tanggal pertama setelah CIR adalah PRIORITAS
+       MUTLAK.
 ========================================================= */
 
 (function () {
@@ -47,13 +64,7 @@
     const DEFAULT_TT_NUMBER_COLUMN_INDEX = 3;
 
     /*
-     * Default CIR = kolom AF
-     * A = 0
-     * B = 1
-     * C = 2
-     * D = 3
-     * ...
-     * AF = 31
+     * AF = index 31
      */
     const DEFAULT_CIR_COLUMN_INDEX = 31;
 
@@ -132,11 +143,9 @@
         }
 
 
-        /*
-         * Array
-         *
-         * Kolom D = index 3
-         */
+        /* =================================================
+           ARRAY
+        ================================================= */
 
         if (
             Array.isArray(row)
@@ -151,9 +160,9 @@
         }
 
 
-        /*
-         * Object
-         */
+        /* =================================================
+           OBJECT
+        ================================================= */
 
         const possibleFields = [
 
@@ -196,9 +205,9 @@
         }
 
 
-        /*
-         * Fallback case-insensitive.
-         */
+        /* =================================================
+           FALLBACK CASE-INSENSITIVE
+        ================================================= */
 
         const keys =
             Object.keys(row);
@@ -330,7 +339,7 @@
 
             /*
              * Jangan menganggap "-"
-             * sebagai NOT FOUND karena terlalu umum.
+             * sebagai NOT FOUND.
              */
 
             if (
@@ -365,10 +374,7 @@
 
        Sangat fleksibel.
 
-       Yang penting ada kata "CIR" sebagai bagian
-       dari baris section.
-
-       Contoh diterima:
+       Contoh:
 
        CIR
        ===CIR====
@@ -378,8 +384,14 @@
        **** CIR ****
        [CIR]
 
-       Tidak mengambil tanggal yang berada di baris
-       sebelum CIR.
+       Yang dicari adalah kata CIR sebagai token,
+       bukan bagian dari kata lain.
+
+       Contoh yang TIDAK dianggap CIR:
+
+       CIRCLE
+       DESCRIPTION
+       CIRCUIT
     ===================================================== */
 
     function findCIRHeader(lines) {
@@ -408,7 +420,7 @@
 
 
             /*
-             * Hilangkan separator umum di kiri dan kanan.
+             * Hilangkan separator di kiri dan kanan.
              */
 
             const cleaned =
@@ -425,18 +437,7 @@
 
 
             /*
-             * Harus berupa "CIR" atau diawali CIR
-             * sebagai nama section.
-             *
-             * Contoh:
-             *
-             * CIR
-             * CIR :
-             * CIR =====
-             * CIR DATA
-             *
-             * Tetapi tidak menganggap kata seperti
-             * "DESCRIPTION" sebagai CIR.
+             * CIR sebagai awal nama section.
              */
 
             if (
@@ -462,15 +463,7 @@
 
 
             /*
-             * Untuk kasus:
-             *
-             * XXXXXCIRXXXXX
-             *
-             * atau separator aneh yang masih
-             * jelas mengandung CIR.
-             *
-             * Tetapi hindari kata yang hanya
-             * mengandung huruf cir.
+             * CIR sebagai token.
              */
 
             if (
@@ -515,6 +508,18 @@
 
     /* =====================================================
        IS EMPTY / SEPARATOR LINE
+
+       Baris berikut dianggap tidak berisi data:
+
+       ""
+       "   "
+       "======"
+       "------"
+       "******"
+       "_____"
+       "::::::"
+       "......"
+       "||||||"
     ===================================================== */
 
     function isIgnorableLine(line) {
@@ -524,6 +529,10 @@
                 .trim();
 
 
+        /*
+         * Kosong.
+         */
+
         if (!value) {
 
             return true;
@@ -532,7 +541,7 @@
 
 
         /*
-         * Baris yang hanya separator.
+         * Hanya separator.
          */
 
         if (
@@ -554,7 +563,9 @@
     /* =====================================================
        PARSE DATE TIME
 
-       Mendukung:
+       HANYA tanggal + jam yang dianggap valid.
+
+       Didukung:
 
        DD/MM/YYYY HH:mm
        DD/MM/YYYY HH.mm
@@ -574,12 +585,17 @@
        YYYY/MM/DD HH:mm
        YYYY/MM/DD HH.mm
 
-       Juga dengan detik.
+       Dengan optional detik.
 
        Contoh:
-       26/08/2026 21.12
-       26/08/2026 21:12
-       2026-08-26 21:12:49
+
+       30/08/2026 15:08
+       30/08/2026 15.08
+       30-08-2026 15:08
+       2026-08-30 15:08
+       30//08//2026 15.08
+
+       Tanggal TANPA jam tidak diterima.
     ===================================================== */
 
     function parseDateTime(text) {
@@ -598,7 +614,14 @@
 
 
         /*
-         * Slash ganda menjadi slash tunggal.
+         * Slash ganda / triple slash
+         * dinormalisasi.
+         *
+         * Contoh:
+         * 30//08//2026
+         *
+         * menjadi:
+         * 30/08/2026
          */
 
         value =
@@ -608,18 +631,17 @@
             );
 
 
-        /*
-         * Cari tanggal + jam.
-
-         * Prioritas format YYYY-MM-DD
-         * agar tidak tertukar.
-         */
-
         let match;
 
 
         /* =================================================
+           FORMAT:
+
            YYYY-MM-DD HH:mm
+           YYYY/MM/DD HH:mm
+           YYYY.MM.DD HH:mm
+
+           Optional seconds.
         ================================================== */
 
         match =
@@ -645,7 +667,13 @@
 
 
         /* =================================================
-           DD-MM-YYYY / DD/MM/YYYY / DD.MM.YYYY HH:mm
+           FORMAT:
+
+           DD-MM-YYYY HH:mm
+           DD/MM/YYYY HH:mm
+           DD.MM.YYYY HH:mm
+
+           Optional seconds.
         ================================================== */
 
         match =
@@ -671,9 +699,7 @@
 
 
         /*
-         * Format tanpa jam tidak digunakan
-         * sebagai TT Release karena yang dicari
-         * wajib tanggal + jam.
+         * Tanggal tanpa jam sengaja tidak diterima.
          */
 
         return null;
@@ -737,7 +763,13 @@
 
 
         /*
-         * Pastikan tanggal valid.
+         * Pastikan tanggal benar-benar valid.
+
+         * Contoh:
+         * 31/02/2026
+         *
+         * tidak boleh berubah menjadi
+         * 03/03/2026.
          */
 
         if (
@@ -805,41 +837,43 @@
     /* =====================================================
        FIND FIRST DATE AFTER CIR
 
-       INI BAGIAN PALING PENTING.
+       ====================================================
 
-       Parser TIDAK LAGI MENCARI "TT RELEASE".
-
-       Setelah CIR ditemukan:
+       ATURAN MUTLAK:
 
        CIR
-       |
-       |-- baris kosong
-       |-- baris kosong
-       |-- separator
-       |-- tanggal pertama  <-- INI YANG DIAMBIL
-       |
-       |-- tanggal berikutnya
-       |-- dst
+       ↓
+       kosong
+       ↓
+       kosong
+       ↓
+       separator
+       ↓
+       separator
+       ↓
+       TANGGAL + JAM PERTAMA
+       ↓
+       STOP
 
-       Jadi:
-       
-       ===CIR====
+       Tanggal kedua TIDAK AKAN DIPERIKSA LAGI.
 
-       19/08/2026 09:39 TT Relase
+       Contoh:
 
-       hasil:
-       19/08/2026 09:39:00
-
-
-       Dan:
-
-       ===CIR====
+       =====CIR=====
 
 
-       21/08/2026 15.59 TT RELESAE
+       ----------------
 
-       hasil:
-       21/08/2026 15:59:00
+
+       30/08/2026 15:08 TT Release
+
+       30/08/2026 15:38 Team...
+
+       30/08/2026 16:08 Team...
+
+       HASIL:
+
+       30/08/2026 15:08
     ===================================================== */
 
     function findFirstDateAfterCIR(
@@ -848,32 +882,33 @@
     ) {
 
         /*
-         * Mulai SATU BARIS SETELAH CIR.
+         * PENTING:
          *
-         * Sangat penting agar tanggal yang ada
-         * pada baris CIR sendiri tidak ikut.
+         * Mulai dari cirIndex + 1.
+         *
+         * Jadi tanggal yang berada pada
+         * baris CIR sendiri TIDAK MUNGKIN
+         * ikut terbaca.
          */
 
         for (
-            let index =
-                cirIndex + 1;
-
+            let index = cirIndex + 1;
             index < lines.length;
-
             index++
         ) {
 
-            const line =
+            const rawLine =
                 lines[index];
 
 
             /*
-             * Baris kosong / separator dilewati.
+             * Lewati SEMUA baris kosong
+             * dan separator.
              */
 
             if (
                 isIgnorableLine(
-                    line
+                    rawLine
                 )
             ) {
 
@@ -883,14 +918,32 @@
 
 
             /*
-             * Cari tanggal + jam pada baris ini.
+             * Cari tanggal + jam
+             * pada baris ini.
+             *
+             * parseDateTime() hanya mengembalikan
+             * tanggal kalau ada tanggal + jam valid.
              */
 
             const date =
                 parseDateTime(
-                    line
+                    rawLine
                 );
 
+
+            /*
+             * =================================================
+             * LOCK POINT
+             * =================================================
+             *
+             * Begitu menemukan tanggal + jam PERTAMA:
+             *
+             * 1. Simpan
+             * 2. Return
+             * 3. STOP
+             *
+             * Tidak pernah lanjut ke tanggal berikutnya.
+             */
 
             if (date) {
 
@@ -903,7 +956,7 @@
                         date,
 
                     sourceLine:
-                        line,
+                        rawLine,
 
                     sourceIndex:
                         index
@@ -914,6 +967,11 @@
 
         }
 
+
+        /*
+         * Tidak ada tanggal + jam
+         * setelah CIR.
+         */
 
         return {
 
@@ -937,12 +995,18 @@
     /* =====================================================
        FIND RELEASE IN CIR
 
-       Nama fungsi lama tetap dipertahankan supaya
-       app.js lama tidak rusak.
+       Kompatibilitas dengan kode lama.
 
-       Sekarang definisinya:
+       Definisi RELEASE:
 
-       RELEASE = tanggal + jam PERTAMA setelah CIR.
+       = tanggal + jam PERTAMA
+         setelah CIR.
+
+       Tidak membutuhkan:
+       "TT Release"
+       "TT Relase"
+       "Ticket Release"
+       dll.
     ===================================================== */
 
     function findReleaseInCIR(
@@ -962,6 +1026,10 @@
                 lines
             );
 
+
+        /*
+         * CIR tidak ditemukan.
+         */
 
         if (
             !header.found
@@ -990,7 +1058,9 @@
 
 
         /*
-         * Cari tanggal pertama setelah CIR.
+         * =================================================
+         * CARI TANGGAL PERTAMA
+         * =================================================
          */
 
         const dateResult =
@@ -1001,8 +1071,8 @@
 
 
         /*
-         * Ambil seluruh bagian setelah CIR
-         * untuk keperluan pengecekan NOT FOUND.
+         * Ambil semua isi setelah CIR
+         * hanya untuk pengecekan NOT FOUND.
          */
 
         const afterCIRLines =
@@ -1018,8 +1088,7 @@
 
 
         /*
-         * Tetap buat object cirSection
-         * supaya kompatibel dengan kode lama.
+         * Compatibility object.
          */
 
         const cirSection = {
@@ -1042,9 +1111,20 @@
         };
 
 
+        /*
+         * Tidak ditemukan tanggal + jam.
+         */
+
         if (
             !dateResult.found
         ) {
+
+            const notFound =
+                containsNotFoundPhrase(
+                    cirSection.text,
+                    settings.notFoundPhrases
+                );
+
 
             return {
 
@@ -1069,8 +1149,12 @@
 
 
         /*
-         * Release line sekarang adalah baris
-         * tempat tanggal pertama ditemukan.
+         * =================================================
+         * RELEASE LINE
+         * =================================================
+         *
+         * Ini adalah BARIS PERTAMA yang memiliki
+         * tanggal + jam setelah CIR.
          */
 
         const releaseLine = {
@@ -1117,7 +1201,7 @@
 
     /* =====================================================
        MAIN PARSER
-       
+
        parse(CIR, TT Number)
     ===================================================== */
 
@@ -1215,8 +1299,8 @@
 
 
         /* =================================================
-           CARI CIR + TANGGAL PERTAMA
-        ================================================== */
+           CARI CIR
+        ================================================= */
 
         const searchResult =
             findReleaseInCIR(
@@ -1277,7 +1361,6 @@
 
                     : "Section CIR ditemukan tetapi tanggal/jam tidak ditemukan setelah CIR.";
 
-
             return result;
 
         }
@@ -1285,7 +1368,7 @@
 
         /* =================================================
            RELEASE LINE
-        ================================================== */
+        ================================================= */
 
         const releaseLine =
             searchResult.releaseLine;
@@ -1300,11 +1383,17 @@
 
 
         /*
-         * Tidak lagi bergantung pada tulisan
-         * TT RELEASE.
+         * Tidak bergantung pada:
          *
-         * Karena tanggal pertama setelah CIR
-         * dianggap sebagai TT Release.
+         * TT Release
+         * TT Relase
+         * TT RELESAE
+         *
+         * dll.
+         *
+         * Yang menentukan adalah:
+         *
+         * FIRST DATE + TIME AFTER CIR
          */
 
         result.matchedPhrase =
@@ -1312,8 +1401,8 @@
 
 
         /* =================================================
-           DATE
-        ================================================== */
+           RELEASE DATE
+        ================================================= */
 
         result.found =
             true;
@@ -1333,8 +1422,7 @@
 
 
         result.note =
-            "TT Release diambil dari tanggal dan jam pertama yang ditemukan setelah tulisan CIR.";
-
+            "TT Release dikunci ke tanggal + jam pertama yang ditemukan setelah CIR. Setelah tanggal pertama ditemukan, pencarian dihentikan.";
 
         return result;
 
@@ -1498,7 +1586,7 @@
 
     /* =====================================================
        PARSE ROW
-       
+
        D  = TT Number
        AF = CIR
     ===================================================== */
