@@ -34,7 +34,9 @@
 
             <div class="header-title">
 
-                <h1>Report Checker</h1>
+                <h1>
+                    Report Checker
+                </h1>
 
                 <p>
                     Validasi Ticket Release & Parsing Material
@@ -64,6 +66,7 @@
 
     <main class="container">
 
+
         <!-- =================================================
              UPLOAD EXCEL
         ================================================== -->
@@ -74,7 +77,9 @@
 
                 <div>
 
-                    <h2>Upload Excel</h2>
+                    <h2>
+                        Upload Excel
+                    </h2>
 
                     <p>
                         Upload file Excel dengan struktur kolom A sampai AF.
@@ -159,7 +164,13 @@
                     class="btn btn-primary"
                     disabled
                 >
-                    ⚙️ Proses Excel
+
+                    <span>
+                        ⚙️
+                    </span>
+
+                    Proses Excel
+
                 </button>
 
             </div>
@@ -239,9 +250,14 @@
             </div>
 
 
-            <!-- STATISTICS -->
+            <!-- =================================================
+                 STATISTICS
+            ================================================== -->
 
             <div class="stats-grid">
+
+
+                <!-- TOTAL DATA -->
 
                 <div class="stat-card">
 
@@ -264,6 +280,8 @@
                 </div>
 
 
+                <!-- VALID -->
+
                 <div class="stat-card success">
 
                     <div class="stat-icon green">
@@ -284,6 +302,8 @@
 
                 </div>
 
+
+                <!-- INVALID -->
 
                 <div class="stat-card danger">
 
@@ -306,6 +326,8 @@
                 </div>
 
 
+                <!-- MATERIAL -->
+
                 <div class="stat-card warning">
 
                     <div class="stat-icon orange">
@@ -326,6 +348,8 @@
 
                 </div>
 
+
+                <!-- MATERIAL ERROR -->
 
                 <div class="stat-card">
 
@@ -356,78 +380,114 @@
 
             <div class="card result-card">
 
-                <!-- TABS -->
+
+                <!-- =================================================
+                     TABS
+                ================================================== -->
 
                 <div class="tabs">
+
+
+                    <!-- TAB VALID -->
 
                     <button
                         type="button"
                         class="tab-button active"
                         data-tab="valid"
                     >
-                        ✓
+
+                        <span>
+                            ✓
+                        </span>
+
                         Sesuai
+
                         <span
                             id="validTabCount"
                             class="tab-count"
                         >
                             0
                         </span>
+
                     </button>
 
+
+                    <!-- TAB INVALID -->
 
                     <button
                         type="button"
                         class="tab-button"
                         data-tab="invalid"
                     >
-                        !
+
+                        <span>
+                            !
+                        </span>
+
                         Tidak Sesuai
+
                         <span
                             id="invalidTabCount"
                             class="tab-count"
                         >
                             0
                         </span>
+
                     </button>
 
+
+                    <!-- TAB MATERIAL -->
 
                     <button
                         type="button"
                         class="tab-button"
                         data-tab="material"
                     >
-                        📦
+
+                        <span>
+                            📦
+                        </span>
+
                         Material
+
                         <span
                             id="materialTabCount"
                             class="tab-count"
                         >
                             0
                         </span>
+
                     </button>
 
+
+                    <!-- TAB MATERIAL ERROR -->
 
                     <button
                         type="button"
                         class="tab-button"
                         data-tab="material-error"
                     >
-                        ⚠
+
+                        <span>
+                            ⚠
+                        </span>
+
                         Material Error
+
                         <span
                             id="materialErrorTabCount"
                             class="tab-count"
                         >
                             0
                         </span>
+
                     </button>
 
                 </div>
 
 
                 <!-- =================================================
-                     VALID
+                     TAB SESUAI
                 ================================================== -->
 
                 <div
@@ -470,17 +530,32 @@
 
                                 <tr>
 
-                                    <th>Ticket</th>
-                                    <th>Datetime Receive</th>
-                                    <th>TT Release</th>
-                                    <th>Status</th>
-                                    <th>Keterangan</th>
+                                    <th>
+                                        Ticket
+                                    </th>
+
+                                    <th>
+                                        Datetime Receive
+                                    </th>
+
+                                    <th>
+                                        TT Release
+                                    </th>
+
+                                    <th>
+                                        Status
+                                    </th>
+
+                                    <th>
+                                        Keterangan
+                                    </th>
 
                                 </tr>
 
                             </thead>
 
-                            <tbody id="validTableBody"></tbody>
+                            <tbody id="validTableBody">
+                            </tbody>
 
                         </table>
 
@@ -490,7 +565,9 @@
                             class="empty-state"
                         >
 
-                            <div>📋</div>
+                            <div>
+                                📋
+                            </div>
 
                             <h3>
                                 Belum ada data
@@ -504,6 +581,8 @@
 
                     </div>
 
+
+                    <!-- PAGINATION VALID -->
 
                     <div
                         id="validPagination"
@@ -520,13 +599,17 @@
 
                         <div class="pagination-info">
 
-                            <span>Halaman</span>
+                            <span>
+                                Halaman
+                            </span>
 
                             <strong id="validPageNumber">
                                 1
                             </strong>
 
-                            <span>dari</span>
+                            <span>
+                                dari
+                            </span>
 
                             <strong id="validPageTotal">
                                 1
@@ -548,7 +631,7 @@
 
 
                 <!-- =================================================
-                     INVALID
+                     TAB TIDAK SESUAI
                 ================================================== -->
 
                 <div
@@ -590,17 +673,32 @@
 
                                 <tr>
 
-                                    <th>Ticket</th>
-                                    <th>Datetime Receive</th>
-                                    <th>TT Release</th>
-                                    <th>Status</th>
-                                    <th>Keterangan</th>
+                                    <th>
+                                        Ticket
+                                    </th>
+
+                                    <th>
+                                        Datetime Receive
+                                    </th>
+
+                                    <th>
+                                        TT Release
+                                    </th>
+
+                                    <th>
+                                        Status
+                                    </th>
+
+                                    <th>
+                                        Keterangan
+                                    </th>
 
                                 </tr>
 
                             </thead>
 
-                            <tbody id="invalidTableBody"></tbody>
+                            <tbody id="invalidTableBody">
+                            </tbody>
 
                         </table>
 
@@ -610,7 +708,9 @@
                             class="empty-state"
                         >
 
-                            <div>✓</div>
+                            <div>
+                                ✓
+                            </div>
 
                             <h3>
                                 Tidak ada data bermasalah
@@ -624,6 +724,8 @@
 
                     </div>
 
+
+                    <!-- PAGINATION INVALID -->
 
                     <div
                         id="invalidPagination"
@@ -640,13 +742,17 @@
 
                         <div class="pagination-info">
 
-                            <span>Halaman</span>
+                            <span>
+                                Halaman
+                            </span>
 
                             <strong id="invalidPageNumber">
                                 1
                             </strong>
 
-                            <span>dari</span>
+                            <span>
+                                dari
+                            </span>
 
                             <strong id="invalidPageTotal">
                                 1
@@ -668,7 +774,7 @@
 
 
                 <!-- =================================================
-                     MATERIAL
+                     TAB MATERIAL
                 ================================================== -->
 
                 <div
@@ -685,8 +791,7 @@
                             </h3>
 
                             <p>
-                                Daftar nama material yang berhasil
-                                diparsing dari CIR.
+                                Setiap material wajib memiliki Ticket.
                             </p>
 
                         </div>
@@ -716,14 +821,27 @@
                                     </th>
 
                                     <th>
-                                        Nama Material
+                                        Material
+                                    </th>
+
+                                    <th>
+                                        Qty
+                                    </th>
+
+                                    <th>
+                                        Satuan
+                                    </th>
+
+                                    <th>
+                                        Kode
                                     </th>
 
                                 </tr>
 
                             </thead>
 
-                            <tbody id="materialTableBody"></tbody>
+                            <tbody id="materialTableBody">
+                            </tbody>
 
                         </table>
 
@@ -733,14 +851,16 @@
                             class="empty-state"
                         >
 
-                            <div>📦</div>
+                            <div>
+                                📦
+                            </div>
 
                             <h3>
                                 Belum ada material
                             </h3>
 
                             <p>
-                                Nama material yang berhasil diparsing
+                                Material yang berhasil diparsing
                                 akan muncul di sini.
                             </p>
 
@@ -748,6 +868,8 @@
 
                     </div>
 
+
+                    <!-- PAGINATION MATERIAL -->
 
                     <div
                         id="materialPagination"
@@ -764,13 +886,17 @@
 
                         <div class="pagination-info">
 
-                            <span>Halaman</span>
+                            <span>
+                                Halaman
+                            </span>
 
                             <strong id="materialPageNumber">
                                 1
                             </strong>
 
-                            <span>dari</span>
+                            <span>
+                                dari
+                            </span>
 
                             <strong id="materialPageTotal">
                                 1
@@ -792,7 +918,7 @@
 
 
                 <!-- =================================================
-                     MATERIAL ERROR
+                     TAB MATERIAL ERROR
                 ================================================== -->
 
                 <div
@@ -809,7 +935,8 @@
                             </h3>
 
                             <p>
-                                Material yang tidak berhasil diparsing.
+                                Material yang tidak memiliki Ticket
+                                atau gagal diparsing.
                             </p>
 
                         </div>
@@ -834,15 +961,36 @@
 
                                 <tr>
 
-                                    <th>Ticket</th>
-                                    <th>Material</th>
-                                    <th>Error</th>
+                                    <th>
+                                        Ticket
+                                    </th>
+
+                                    <th>
+                                        Material
+                                    </th>
+
+                                    <th>
+                                        Qty
+                                    </th>
+
+                                    <th>
+                                        Satuan
+                                    </th>
+
+                                    <th>
+                                        Kode
+                                    </th>
+
+                                    <th>
+                                        Error
+                                    </th>
 
                                 </tr>
 
                             </thead>
 
-                            <tbody id="materialErrorTableBody"></tbody>
+                            <tbody id="materialErrorTableBody">
+                            </tbody>
 
                         </table>
 
@@ -852,20 +1000,25 @@
                             class="empty-state"
                         >
 
-                            <div>✓</div>
+                            <div>
+                                ✓
+                            </div>
 
                             <h3>
                                 Tidak ada material error
                             </h3>
 
                             <p>
-                                Semua material berhasil diproses.
+                                Semua material memiliki Ticket
+                                dan berhasil diproses.
                             </p>
 
                         </div>
 
                     </div>
 
+
+                    <!-- PAGINATION MATERIAL ERROR -->
 
                     <div
                         id="materialErrorPagination"
@@ -882,13 +1035,17 @@
 
                         <div class="pagination-info">
 
-                            <span>Halaman</span>
+                            <span>
+                                Halaman
+                            </span>
 
                             <strong id="materialErrorPageNumber">
                                 1
                             </strong>
 
-                            <span>dari</span>
+                            <span>
+                                dari
+                            </span>
 
                             <strong id="materialErrorPageTotal">
                                 1
@@ -953,13 +1110,14 @@
                 class="settings-panel hidden"
             >
 
+
                 <!-- =================================================
-                     NAMA MATERIAL
+                     DAFTAR NAMA MATERIAL
                 ================================================== -->
 
                 <div class="setting-group">
 
-                    <label for="materialStartPhrases">
+                    <label for="materialList">
                         Daftar Nama Material
                     </label>
 
@@ -969,19 +1127,46 @@
                     </p>
 
                     <textarea
-                        id="materialStartPhrases"
-                        rows="10"
-                        placeholder="Contoh:
-Material A
-Material B
-Material C"
+                        id="materialList"
+                        rows="18"
+                        placeholder="Pigtail
+Patchcord
+Splitter 1:2
+Splitter 1:4
+Splitter 1:8
+Splitter 1:16
+2C (METER)
+12C (METER)
+24C (METER)
+48C (METER)
+96C (METER)
+DPFO
+12C DOME (UNIT)
+24C DOME (UNIT)
+48C DOME (UNIT)
+96C DOME (UNIT)
+144C DOME (UNIT)
+12C INLANE (UNIT)
+24C INLANE (UNIT)
+48C INLINE (UNIT)
+96C INLINE (UNIT)
+144C INLINE (UNIT)
+Fixing Slack
+Kaset JB
+Terminal Roset (Unit)
+Tiang 7 (Batang)
+Tiang 9 (Batang)
+Subduct
+Handhole 40 x 40
+Handhole 60 x 60
+Handhole 80 x 80"
                     ></textarea>
 
                 </div>
 
 
                 <!-- =================================================
-                     ACTION
+                     SETTINGS ACTION
                 ================================================== -->
 
                 <div class="settings-actions">
@@ -1004,6 +1189,8 @@ Material C"
 
                 </div>
 
+
+                <!-- SAVED MESSAGE -->
 
                 <div
                     id="settingsSavedMessage"
@@ -1039,15 +1226,10 @@ Material C"
 
 
     <!-- =====================================================
-         LIBRARY
+         JAVASCRIPT
     ====================================================== -->
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-
-
-    <!-- =====================================================
-         APP SCRIPTS
-    ====================================================== -->
 
     <script src="js/settings.js"></script>
     <script src="js/cir-parser.js"></script>
@@ -1063,52 +1245,70 @@ Material C"
 
     <script>
 
-        document.addEventListener("DOMContentLoaded", function () {
+        document.addEventListener(
+            "DOMContentLoaded",
+            function () {
 
-            const button =
-                document.getElementById("toggleSettingsBtn");
+                const toggleButton =
+                    document.getElementById(
+                        "toggleSettingsBtn"
+                    );
 
-            const panel =
-                document.getElementById("settingsPanel");
-
-
-            if (!button || !panel) {
-                console.error(
-                    "Element settings tidak ditemukan."
-                );
-                return;
-            }
+                const settingsPanel =
+                    document.getElementById(
+                        "settingsPanel"
+                    );
 
 
-            button.addEventListener("click", function (event) {
+                if (
+                    !toggleButton ||
+                    !settingsPanel
+                ) {
 
-                event.preventDefault();
-                event.stopPropagation();
+                    console.error(
+                        "Element pengaturan tidak ditemukan."
+                    );
 
-
-                const isHidden =
-                    panel.classList.contains("hidden");
-
-
-                if (isHidden) {
-
-                    panel.classList.remove("hidden");
-
-                    button.textContent =
-                        "Tutup Pengaturan";
-
-                } else {
-
-                    panel.classList.add("hidden");
-
-                    button.textContent =
-                        "Buka Pengaturan";
+                    return;
 
                 }
 
-            });
 
-        });
+                toggleButton.addEventListener(
+                    "click",
+                    function () {
+
+                        const isHidden =
+                            settingsPanel.classList.contains(
+                                "hidden"
+                            );
+
+
+                        if (isHidden) {
+
+                            settingsPanel.classList.remove(
+                                "hidden"
+                            );
+
+                            toggleButton.textContent =
+                                "Tutup Pengaturan";
+
+                        } else {
+
+                            settingsPanel.classList.add(
+                                "hidden"
+                            );
+
+                            toggleButton.textContent =
+                                "Buka Pengaturan";
+
+                        }
+
+                    }
+                );
+
+            }
+        );
 
     </script>
 
