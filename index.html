@@ -256,9 +256,6 @@
 
             <div class="stats-grid">
 
-
-                <!-- TOTAL DATA -->
-
                 <div class="stat-card">
 
                     <div class="stat-icon blue">
@@ -279,8 +276,6 @@
 
                 </div>
 
-
-                <!-- VALID -->
 
                 <div class="stat-card success">
 
@@ -303,8 +298,6 @@
                 </div>
 
 
-                <!-- INVALID -->
-
                 <div class="stat-card danger">
 
                     <div class="stat-icon red">
@@ -326,8 +319,6 @@
                 </div>
 
 
-                <!-- MATERIAL -->
-
                 <div class="stat-card warning">
 
                     <div class="stat-icon orange">
@@ -348,8 +339,6 @@
 
                 </div>
 
-
-                <!-- MATERIAL ERROR -->
 
                 <div class="stat-card">
 
@@ -380,15 +369,7 @@
 
             <div class="card result-card">
 
-
-                <!-- =================================================
-                     TABS
-                ================================================== -->
-
                 <div class="tabs">
-
-
-                    <!-- TAB VALID -->
 
                     <button
                         type="button"
@@ -396,9 +377,7 @@
                         data-tab="valid"
                     >
 
-                        <span>
-                            ✓
-                        </span>
+                        <span>✓</span>
 
                         Sesuai
 
@@ -412,17 +391,13 @@
                     </button>
 
 
-                    <!-- TAB INVALID -->
-
                     <button
                         type="button"
                         class="tab-button"
                         data-tab="invalid"
                     >
 
-                        <span>
-                            !
-                        </span>
+                        <span>!</span>
 
                         Tidak Sesuai
 
@@ -436,17 +411,13 @@
                     </button>
 
 
-                    <!-- TAB MATERIAL -->
-
                     <button
                         type="button"
                         class="tab-button"
                         data-tab="material"
                     >
 
-                        <span>
-                            📦
-                        </span>
+                        <span>📦</span>
 
                         Material
 
@@ -460,17 +431,13 @@
                     </button>
 
 
-                    <!-- TAB MATERIAL ERROR -->
-
                     <button
                         type="button"
                         class="tab-button"
                         data-tab="material-error"
                     >
 
-                        <span>
-                            ⚠
-                        </span>
+                        <span>⚠</span>
 
                         Material Error
 
@@ -487,7 +454,7 @@
 
 
                 <!-- =================================================
-                     TAB SESUAI
+                     TAB VALID
                 ================================================== -->
 
                 <div
@@ -530,32 +497,17 @@
 
                                 <tr>
 
-                                    <th>
-                                        Ticket
-                                    </th>
-
-                                    <th>
-                                        Datetime Receive
-                                    </th>
-
-                                    <th>
-                                        TT Release
-                                    </th>
-
-                                    <th>
-                                        Status
-                                    </th>
-
-                                    <th>
-                                        Keterangan
-                                    </th>
+                                    <th>Ticket</th>
+                                    <th>Datetime Receive</th>
+                                    <th>TT Release</th>
+                                    <th>Status</th>
+                                    <th>Keterangan</th>
 
                                 </tr>
 
                             </thead>
 
-                            <tbody id="validTableBody">
-                            </tbody>
+                            <tbody id="validTableBody"></tbody>
 
                         </table>
 
@@ -565,9 +517,7 @@
                             class="empty-state"
                         >
 
-                            <div>
-                                📋
-                            </div>
+                            <div>📋</div>
 
                             <h3>
                                 Belum ada data
@@ -581,8 +531,6 @@
 
                     </div>
 
-
-                    <!-- PAGINATION VALID -->
 
                     <div
                         id="validPagination"
@@ -599,17 +547,13 @@
 
                         <div class="pagination-info">
 
-                            <span>
-                                Halaman
-                            </span>
+                            <span>Halaman</span>
 
                             <strong id="validPageNumber">
                                 1
                             </strong>
 
-                            <span>
-                                dari
-                            </span>
+                            <span>dari</span>
 
                             <strong id="validPageTotal">
                                 1
@@ -631,7 +575,7 @@
 
 
                 <!-- =================================================
-                     TAB TIDAK SESUAI
+                     TAB INVALID
                 ================================================== -->
 
                 <div
@@ -673,32 +617,17 @@
 
                                 <tr>
 
-                                    <th>
-                                        Ticket
-                                    </th>
-
-                                    <th>
-                                        Datetime Receive
-                                    </th>
-
-                                    <th>
-                                        TT Release
-                                    </th>
-
-                                    <th>
-                                        Status
-                                    </th>
-
-                                    <th>
-                                        Keterangan
-                                    </th>
+                                    <th>Ticket</th>
+                                    <th>Datetime Receive</th>
+                                    <th>TT Release</th>
+                                    <th>Status</th>
+                                    <th>Keterangan</th>
 
                                 </tr>
 
                             </thead>
 
-                            <tbody id="invalidTableBody">
-                            </tbody>
+                            <tbody id="invalidTableBody"></tbody>
 
                         </table>
 
@@ -708,9 +637,7 @@
                             class="empty-state"
                         >
 
-                            <div>
-                                ✓
-                            </div>
+                            <div>✓</div>
 
                             <h3>
                                 Tidak ada data bermasalah
@@ -724,8 +651,6 @@
 
                     </div>
 
-
-                    <!-- PAGINATION INVALID -->
 
                     <div
                         id="invalidPagination"
@@ -742,17 +667,13 @@
 
                         <div class="pagination-info">
 
-                            <span>
-                                Halaman
-                            </span>
+                            <span>Halaman</span>
 
                             <strong id="invalidPageNumber">
                                 1
                             </strong>
 
-                            <span>
-                                dari
-                            </span>
+                            <span>dari</span>
 
                             <strong id="invalidPageTotal">
                                 1
@@ -791,7 +712,8 @@
                             </h3>
 
                             <p>
-                                Setiap material wajib memiliki Ticket.
+                                Material dikenali berdasarkan nama resmi
+                                dan frasa/kata kunci yang diatur.
                             </p>
 
                         </div>
@@ -816,32 +738,17 @@
 
                                 <tr>
 
-                                    <th>
-                                        Ticket
-                                    </th>
-
-                                    <th>
-                                        Material
-                                    </th>
-
-                                    <th>
-                                        Qty
-                                    </th>
-
-                                    <th>
-                                        Satuan
-                                    </th>
-
-                                    <th>
-                                        Kode
-                                    </th>
+                                    <th>Ticket</th>
+                                    <th>Material</th>
+                                    <th>Qty</th>
+                                    <th>Satuan</th>
+                                    <th>Kode</th>
 
                                 </tr>
 
                             </thead>
 
-                            <tbody id="materialTableBody">
-                            </tbody>
+                            <tbody id="materialTableBody"></tbody>
 
                         </table>
 
@@ -851,9 +758,7 @@
                             class="empty-state"
                         >
 
-                            <div>
-                                📦
-                            </div>
+                            <div>📦</div>
 
                             <h3>
                                 Belum ada material
@@ -868,8 +773,6 @@
 
                     </div>
 
-
-                    <!-- PAGINATION MATERIAL -->
 
                     <div
                         id="materialPagination"
@@ -886,17 +789,13 @@
 
                         <div class="pagination-info">
 
-                            <span>
-                                Halaman
-                            </span>
+                            <span>Halaman</span>
 
                             <strong id="materialPageNumber">
                                 1
                             </strong>
 
-                            <span>
-                                dari
-                            </span>
+                            <span>dari</span>
 
                             <strong id="materialPageTotal">
                                 1
@@ -935,8 +834,8 @@
                             </h3>
 
                             <p>
-                                Material yang tidak memiliki Ticket
-                                atau gagal diparsing.
+                                Material yang gagal dikenali berdasarkan
+                                nama resmi maupun frasa/kata kunci.
                             </p>
 
                         </div>
@@ -961,36 +860,18 @@
 
                                 <tr>
 
-                                    <th>
-                                        Ticket
-                                    </th>
-
-                                    <th>
-                                        Material
-                                    </th>
-
-                                    <th>
-                                        Qty
-                                    </th>
-
-                                    <th>
-                                        Satuan
-                                    </th>
-
-                                    <th>
-                                        Kode
-                                    </th>
-
-                                    <th>
-                                        Error
-                                    </th>
+                                    <th>Ticket</th>
+                                    <th>Material</th>
+                                    <th>Qty</th>
+                                    <th>Satuan</th>
+                                    <th>Kode</th>
+                                    <th>Error</th>
 
                                 </tr>
 
                             </thead>
 
-                            <tbody id="materialErrorTableBody">
-                            </tbody>
+                            <tbody id="materialErrorTableBody"></tbody>
 
                         </table>
 
@@ -1000,25 +881,20 @@
                             class="empty-state"
                         >
 
-                            <div>
-                                ✓
-                            </div>
+                            <div>✓</div>
 
                             <h3>
                                 Tidak ada material error
                             </h3>
 
                             <p>
-                                Semua material memiliki Ticket
-                                dan berhasil diproses.
+                                Semua material berhasil diproses.
                             </p>
 
                         </div>
 
                     </div>
 
-
-                    <!-- PAGINATION MATERIAL ERROR -->
 
                     <div
                         id="materialErrorPagination"
@@ -1035,17 +911,13 @@
 
                         <div class="pagination-info">
 
-                            <span>
-                                Halaman
-                            </span>
+                            <span>Halaman</span>
 
                             <strong id="materialErrorPageNumber">
                                 1
                             </strong>
 
-                            <span>
-                                dari
-                            </span>
+                            <span>dari</span>
 
                             <strong id="materialErrorPageTotal">
                                 1
@@ -1085,7 +957,8 @@
                     </h2>
 
                     <p>
-                        Pengaturan parser Material.
+                        Atur nama resmi material dan frasa/kata kunci
+                        yang boleh digunakan untuk mengenali material.
                     </p>
 
                 </div>
@@ -1101,10 +974,6 @@
             </div>
 
 
-            <!-- =================================================
-                 SETTINGS PANEL
-            ================================================== -->
-
             <div
                 id="settingsPanel"
                 class="settings-panel hidden"
@@ -1112,7 +981,7 @@
 
 
                 <!-- =================================================
-                     DAFTAR NAMA MATERIAL
+                     NAMA RESMI MATERIAL
                 ================================================== -->
 
                 <div class="setting-group">
@@ -1122,8 +991,10 @@
                     </label>
 
                     <p class="setting-help">
-                        Masukkan nama material yang digunakan
-                        dalam report. Satu nama material per baris.
+                        Nama resmi hasil akhir parser.
+                        Satu nama material per baris.
+                        Jika ditemukan frasa/typo, hasil tetap menggunakan
+                        nama resmi yang ada di daftar ini.
                     </p>
 
                     <textarea
@@ -1148,7 +1019,7 @@ DPFO
 144C DOME (UNIT)
 12C INLANE (UNIT)
 24C INLANE (UNIT)
-48C INLINE (UNIT)
+48C INLANE (UNIT)
 96C INLINE (UNIT)
 144C INLINE (UNIT)
 Fixing Slack
@@ -1161,6 +1032,100 @@ Handhole 40 x 40
 Handhole 60 x 60
 Handhole 80 x 80"
                     ></textarea>
+
+                </div>
+
+
+                <!-- =================================================
+                     FRASA / KATA KUNCI
+                ================================================== -->
+
+                <div class="setting-group">
+
+                    <label for="materialPhrases">
+                        Frasa / Kata Kunci Material
+                    </label>
+
+                    <p class="setting-help">
+                        Masukkan frasa yang mungkin muncul di CIR.
+                        Format:
+                        <strong>Nama Resmi : frasa1, frasa2, frasa3</strong>
+                    </p>
+
+                    <p class="setting-help">
+                        Contoh:
+                        <br>
+                        <code>Pigtail : pigtail, pigtal, pigtel</code>
+                        <br>
+                        <code>Patchcord : patchcord, patch cord, patchcords</code>
+                        <br>
+                        <code>Gembok : gembok, gembog, gembok pengaman</code>
+                    </p>
+
+                    <textarea
+                        id="materialPhrases"
+                        rows="14"
+                        placeholder="Pigtail : pigtail, pigtal, pigtel
+Patchcord : patchcord, patch cord, patchcords
+Splitter 1:2 : splitter 1:2, splitter 1 2
+Splitter 1:4 : splitter 1:4, splitter 1 4
+Splitter 1:8 : splitter 1:8, splitter 1 8
+Splitter 1:16 : splitter 1:16, splitter 1 16
+DPFO : dpfo, dpfo kabel
+Fixing Slack : fixing slack, fixing slak
+Kaset JB : kaset jb, kaset jb
+Terminal Roset (Unit) : terminal roset, terminal rosset
+Tiang 7 (Batang) : tiang 7, tiang 7 batang
+Tiang 9 (Batang) : tiang 9, tiang 9 batang
+Subduct : subduct, sub duk
+Handhole 40 x 40 : handhole 40x40, handhole 40 x 40
+Handhole 60 x 60 : handhole 60x60, handhole 60 x 60
+Handhole 80 x 80 : handhole 80x80, handhole 80 x 80"
+                    ></textarea>
+
+                    <div
+                        style="
+                            margin-top:10px;
+                            padding:12px;
+                            border-radius:8px;
+                            background:#f8fafc;
+                            border:1px solid #e2e8f0;
+                            color:#475569;
+                            font-size:13px;
+                            line-height:1.6;
+                        "
+                    >
+
+                        <strong>
+                            Cara kerja:
+                        </strong>
+
+                        <br>
+
+                        1. Parser membaca nama resmi dari
+                        <code>Daftar Nama Material</code>.
+
+                        <br>
+
+                        2. Parser membaca frasa dari
+                        <code>Frasa / Kata Kunci Material</code>.
+
+                        <br>
+
+                        3. Jika CIR menulis frasa yang cocok,
+                        hasil menggunakan nama resmi.
+
+                        <br>
+
+                        4. Jika ada typo ringan dan tidak ada frasa
+                        khusus, fuzzy matching tetap digunakan.
+
+                        <br>
+
+                        5. Qty, satuan, dan kode tetap diambil dari
+                        baris CIR.
+
+                    </div>
 
                 </div>
 
@@ -1189,8 +1154,6 @@ Handhole 80 x 80"
 
                 </div>
 
-
-                <!-- SAVED MESSAGE -->
 
                 <div
                     id="settingsSavedMessage"
