@@ -1,33 +1,40 @@
 /* =========================================================
-   MATERIAL PARSER
+   REPORT CHECKER
+   material-parser.js
+   VERSION: STABLE / COMPATIBLE
    ---------------------------------------------------------
    Fungsi:
-   - Mengambil daftar nama material dari settings.js
-   - Otomatis sinkron dengan pengaturan Material
-   - Mencari material di bagian CIR
-   - Mendukung nama material multi-baris
-   - Mengambil Qty, Satuan, dan Kode jika tersedia
-   - Material yang tidak cocok dimasukkan ke error
+   - Membaca material dari settings.js
+   - Sinkron dengan textarea #materialList / #materialNames
+   - Parsing material dari CIR
+   - Mendukung material multi-word / multi-line
+   - Mengambil Qty, Satuan, Kode
+   - Memisahkan material valid dan material error
+   - Menyediakan alias global untuk kompatibilitas
 ========================================================= */
 
 (function () {
 
     "use strict";
 
-
     /* =====================================================
-       HELPER
-    ====================================================== */
+       NORMALIZE TEXT
+    ===================================================== */
 
     function normalizeText(value) {
 
-        if (value === null || value === undefined) {
+        if (
+            value === null ||
+            value === undefined
+        ) {
             return "";
         }
 
         return String(value)
-            .replace(/\r/g, "")
             .replace(/\u00A0/g, " ")
+            .replace(/\r/g, "")
+            .replace(/\t/g, " ")
+            .replace(/[ ]+/g, " ")
             .trim();
 
     }
@@ -45,35 +52,40 @@
     function escapeRegex(value) {
 
         return String(value)
-            .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            .replace(
+                /[.*+?^${}()|[\]\\]/g,
+                "\\$&"
+            );
 
     }
 
 
+    /* =====================================================
+       SETTINGS
+    ====================================================== */
+
     function getSettings() {
 
         /*
-         * settings.js diharapkan menyediakan:
-         *
-         * getParserSettings()
-         *
-         * atau:
-         *
-         * PARSER_SETTINGS
-         *
-         * atau:
-         *
-         * parserSettings
+         * Prioritas:
+         * 1. getParserSettings()
+         * 2. window.getParserSettings()
+         * 3. PARSER_SETTINGS
+         * 4. parserSettings
          */
 
         try {
 
-            if (typeof getParserSettings === "function") {
+            if (
+                typeof getParserSettings ===
+                "function"
+            ) {
 
-                const settings = getParserSettings();
+                const result =
+                    getParserSettings();
 
-                if (settings) {
-                    return settings;
+                if (result) {
+                    return result;
                 }
 
             }
@@ -81,7 +93,7 @@
         } catch (error) {
 
             console.warn(
-                "Gagal membaca getParserSettings():",
+                "getParserSettings() error:",
                 error
             );
 
@@ -91,7 +103,33 @@
         try {
 
             if (
-                typeof window !== "undefined" &&
+                window &&
+                typeof window.getParserSettings ===
+                "function"
+            ) {
+
+                const result =
+                    window.getParserSettings();
+
+                if (result) {
+                    return result;
+                }
+
+            }
+
+        } catch (error) {
+
+            console.warn(
+                "window.getParserSettings() error:",
+                error
+            );
+
+        }
+
+
+        try {
+
+            if (
                 window.PARSER_SETTINGS
             ) {
 
@@ -102,7 +140,7 @@
         } catch (error) {
 
             console.warn(
-                "Gagal membaca PARSER_SETTINGS:",
+                "PARSER_SETTINGS error:",
                 error
             );
 
@@ -112,7 +150,6 @@
         try {
 
             if (
-                typeof window !== "undefined" &&
                 window.parserSettings
             ) {
 
@@ -123,7 +160,7 @@
         } catch (error) {
 
             console.warn(
-                "Gagal membaca parserSettings:",
+                "parserSettings error:",
                 error
             );
 
@@ -136,66 +173,121 @@
 
 
     /* =====================================================
-       AMBIL DAFTAR MATERIAL DARI SETTINGS
+       GET MATERIAL LIST
     ====================================================== */
 
     function getMaterialListFromSettings() {
 
-        const settings = getSettings();
+        const settings =
+            getSettings();
 
-        let materialList = [];
 
-
-        /*
-         * Format yang didukung:
-         *
-         * materialNames
-         * materials
-         * materialList
-         * materialNamesList
-         */
-
-        if (Array.isArray(settings.materialNames)) {
-
-            materialList = settings.materialNames;
-
-        } else if (Array.isArray(settings.materials)) {
-
-            materialList = settings.materials;
-
-        } else if (Array.isArray(settings.materialList)) {
-
-            materialList = settings.materialList;
-
-        } else if (Array.isArray(settings.materialNamesList)) {
-
-            materialList = settings.materialNamesList;
-
-        }
+        let list = [];
 
 
         /*
-         * Kalau settings menyimpan textarea sebagai string
+         * Array settings
          */
 
         if (
-            materialList.length === 0 &&
-            typeof settings.materialNames === "string"
+            Array.isArray(
+                settings.materialNames
+            )
         ) {
 
-            materialList =
-                settings.materialNames.split(/\r?\n/);
+            list =
+                settings.materialNames;
+
+        } else if (
+            Array.isArray(
+                settings.materials
+            )
+        ) {
+
+            list =
+                settings.materials;
+
+        } else if (
+            Array.isArray(
+                settings.materialList
+            )
+        ) {
+
+            list =
+                settings.materialList;
+
+        } else if (
+            Array.isArray(
+                settings.materialNamesList
+            )
+        ) {
+
+            list =
+                settings.materialNamesList;
 
         }
 
 
         /*
-         * Fallback langsung dari textarea HTML.
-         * Ini membuat parser tetap otomatis mengikuti
-         * isi "Daftar Nama Material".
+         * String settings
          */
 
-        if (materialList.length === 0) {
+        if (
+            !list.length &&
+            typeof settings.materialNames ===
+            "string"
+        ) {
+
+            list =
+                settings.materialNames
+                    .split(/\r?\n/);
+
+        }
+
+
+        if (
+            !list.length &&
+            typeof settings.materialList ===
+            "string"
+        ) {
+
+            list =
+                settings.materialList
+                    .split(/\r?\n/);
+
+        }
+
+
+        /*
+         * HTML textarea.
+         *
+         * index.html kamu menggunakan:
+         * id="materialList"
+         */
+
+        if (!list.length) {
+
+            const textarea =
+                document.getElementById(
+                    "materialList"
+                );
+
+            if (textarea) {
+
+                list =
+                    textarea.value
+                        .split(/\r?\n/);
+
+            }
+
+        }
+
+
+        /*
+         * Kompatibilitas dengan versi lama.
+         */
+
+        if (!list.length) {
 
             const textarea =
                 document.getElementById(
@@ -204,8 +296,9 @@
 
             if (textarea) {
 
-                materialList =
-                    textarea.value.split(/\r?\n/);
+                list =
+                    textarea.value
+                        .split(/\r?\n/);
 
             }
 
@@ -213,57 +306,68 @@
 
 
         /*
-         * Bersihkan daftar.
-         */
-
-        materialList = materialList
-            .map(item => normalizeText(item))
-            .filter(item => item !== "");
-
-
-        /*
-         * Hilangkan duplikat berdasarkan lowercase.
+         * Bersihkan
          */
 
         const unique = [];
         const seen = new Set();
 
-        materialList.forEach(material => {
 
-            const key =
-                normalizeMaterialName(material);
+        list.forEach(
+            function (item) {
 
-            if (!key) {
-                return;
-            }
+                const material =
+                    normalizeText(item);
 
-            if (!seen.has(key)) {
+
+                if (!material) {
+                    return;
+                }
+
+
+                const key =
+                    normalizeMaterialName(
+                        material
+                    );
+
+
+                if (!key) {
+                    return;
+                }
+
+
+                if (
+                    seen.has(key)
+                ) {
+                    return;
+                }
+
 
                 seen.add(key);
 
-                unique.push(material);
+                unique.push(
+                    material
+                );
 
             }
-
-        });
+        );
 
 
         /*
-         * Material lebih panjang diletakkan di depan.
-         *
-         * Contoh:
-         *
-         * Tiang 7
-         * Tiang 7 (Batang)
-         *
-         * Yang lebih spesifik dicoba terlebih dahulu.
+         * Yang paling panjang
+         * dicoba terlebih dahulu.
          */
 
-        unique.sort(function (a, b) {
+        unique.sort(
+            function (a, b) {
 
-            return b.length - a.length;
+                return (
+                    b.length -
+                    a.length
+                );
 
-        });
+            }
+        );
 
 
         return unique;
@@ -272,28 +376,14 @@
 
 
     /* =====================================================
-       BERSIHKAN NAMA MATERIAL MULTI BARIS
-    ====================================================== */
-
-    function cleanMaterialName(value) {
-
-        return normalizeText(value)
-            .replace(/\s+/g, " ")
-            .trim();
-
-    }
-
-
-    /* =====================================================
-       PARSE ANGKA
+       PARSE NUMBER
     ====================================================== */
 
     function parseNumber(value) {
 
         if (
             value === null ||
-            value === undefined ||
-            value === ""
+            value === undefined
         ) {
 
             return "";
@@ -307,13 +397,13 @@
                 .replace(/\s/g, "");
 
 
+        if (!text) {
+            return "";
+        }
+
+
         /*
-         * Format:
-         *
-         * 1.000
-         * 1,000
-         * 1.5
-         * 1,5
+         * 1.000,50
          */
 
         if (
@@ -321,23 +411,21 @@
             text.includes(",")
         ) {
 
-            /*
-             * Anggap titik ribuan dan koma desimal.
-             */
-
             text =
                 text
                     .replace(/\./g, "")
                     .replace(",", ".");
 
-        } else if (
+        }
+
+        /*
+         * 1,5
+         */
+
+        else if (
             text.includes(",") &&
             !text.includes(".")
         ) {
-
-            /*
-             * Koma desimal.
-             */
 
             text =
                 text.replace(",", ".");
@@ -349,20 +437,15 @@
             Number(text);
 
 
-        if (Number.isNaN(number)) {
-
-            return value;
-
-        }
-
-
-        return number;
+        return Number.isNaN(number)
+            ? value
+            : number;
 
     }
 
 
     /* =====================================================
-       CARI QTY
+       FIND QTY
     ====================================================== */
 
     function findQty(text) {
@@ -371,23 +454,53 @@
             normalizeText(text);
 
 
+        if (!value) {
+            return "";
+        }
+
+
         /*
-         * Contoh:
+         * Prioritas:
          *
-         * Pigtail 2
-         * Pigtail : 2
-         * Pigtail = 2
+         * Qty: 10
+         * Qty = 10
+         * Jumlah: 10
          */
 
-        const match =
+        let match =
             value.match(
-                /(?:qty|jumlah)?\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)/i
+                /(?:qty|quantity|jumlah)\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)/i
             );
 
 
         if (match) {
 
-            return parseNumber(match[1]);
+            return parseNumber(
+                match[1]
+            );
+
+        }
+
+
+        /*
+         * Contoh:
+         *
+         * Pigtail 2
+         * Pigtail - 2
+         * Pigtail : 2
+         */
+
+        match =
+            value.match(
+                /(?:^|\s|[:=-])(-?\d+(?:[.,]\d+)?)\s*(?:unit|pcs|pc|meter|m|batang|buah|set)?$/i
+            );
+
+
+        if (match) {
+
+            return parseNumber(
+                match[1]
+            );
 
         }
 
@@ -398,7 +511,7 @@
 
 
     /* =====================================================
-       CARI SATUAN
+       FIND UNIT
     ====================================================== */
 
     function findUnit(text) {
@@ -407,59 +520,83 @@
             normalizeText(text);
 
 
-        const units = [
-
-            "meter",
-            "m",
-            "unit",
-            "batang",
-            "pcs",
-            "pc",
-            "set",
-            "buah"
-
-        ];
-
-
-        for (const unit of units) {
-
-            const regex =
-                new RegExp(
-                    "\\b" +
-                    escapeRegex(unit) +
-                    "\\b",
-                    "i"
-                );
-
-
-            if (regex.test(value)) {
-
-                return unit;
-
-            }
-
+        if (!value) {
+            return "";
         }
 
 
         /*
-         * Beberapa nama material sudah memiliki
-         * satuan di dalam namanya.
+         * Prioritas dari teks explicit.
          */
+
+        const match =
+            value.match(
+                /\b(meter|unit|batang|pcs|pc|set|buah)\b/i
+            );
+
+
+        if (match) {
+
+            const unit =
+                match[1]
+                    .toLowerCase();
+
+
+            const map = {
+
+                meter: "Meter",
+
+                unit: "Unit",
+
+                batang: "Batang",
+
+                pcs: "Pcs",
+
+                pc: "Pc",
+
+                set: "Set",
+
+                buah: "Buah"
+
+            };
+
+
+            return (
+                map[unit] ||
+                match[1]
+            );
+
+        }
+
 
         const lower =
             value.toLowerCase();
 
 
-        if (lower.includes("meter")) {
+        if (
+            lower.includes("(meter)")
+        ) {
+
             return "Meter";
+
         }
 
-        if (lower.includes("(unit)")) {
+
+        if (
+            lower.includes("(unit)")
+        ) {
+
             return "Unit";
+
         }
 
-        if (lower.includes("(batang)")) {
+
+        if (
+            lower.includes("(batang)")
+        ) {
+
             return "Batang";
+
         }
 
 
@@ -469,7 +606,7 @@
 
 
     /* =====================================================
-       CARI KODE
+       FIND CODE
     ====================================================== */
 
     function findCode(text) {
@@ -478,13 +615,10 @@
             normalizeText(text);
 
 
-        /*
-         * Mendukung:
-         *
-         * Kode: ABC123
-         * Code: ABC123
-         * Kode = ABC123
-         */
+        if (!value) {
+            return "";
+        }
+
 
         const match =
             value.match(
@@ -492,51 +626,44 @@
             );
 
 
-        if (match) {
-
-            return match[1];
-
-        }
-
-
-        return "";
+        return match
+            ? match[1]
+            : "";
 
     }
 
 
     /* =====================================================
-       BUAT REGEX MATERIAL
+       CREATE MATERIAL REGEX
     ====================================================== */
 
-    function createMaterialRegex(materialName) {
-
-        /*
-         * Material bisa mempunyai line break.
-         *
-         * Contoh:
-         *
-         * Splitter
-         * 1:2
-         *
-         * akan tetap cocok dengan:
-         *
-         * Splitter 1:2
-         */
+    function createMaterialRegex(
+        materialName
+    ) {
 
         const parts =
             String(materialName)
+                .trim()
                 .split(/\s+/)
                 .filter(Boolean);
 
 
-        if (parts.length === 0) {
+        if (!parts.length) {
             return null;
         }
 
 
         const pattern =
             parts
-                .map(part => escapeRegex(part))
+                .map(
+                    function (part) {
+
+                        return escapeRegex(
+                            part
+                        );
+
+                    }
+                )
                 .join("\\s*");
 
 
@@ -551,7 +678,7 @@
 
 
     /* =====================================================
-       DETEKSI MATERIAL
+       DETECT MATERIAL
     ====================================================== */
 
     function detectMaterialInLine(
@@ -568,15 +695,15 @@
         }
 
 
-        /*
-         * Coba material yang paling panjang
-         * terlebih dahulu.
-         */
-
-        for (const material of materialList) {
+        for (
+            const material
+            of materialList
+        ) {
 
             const regex =
-                createMaterialRegex(material);
+                createMaterialRegex(
+                    material
+                );
 
 
             if (!regex) {
@@ -584,12 +711,18 @@
             }
 
 
-            if (regex.test(original)) {
+            if (
+                regex.test(
+                    original
+                )
+            ) {
 
                 return {
 
                     material:
-                        cleanMaterialName(material),
+                        normalizeText(
+                            material
+                        ),
 
                     raw:
                         original
@@ -607,7 +740,7 @@
 
 
     /* =====================================================
-       PARSE SATU BARIS MATERIAL
+       PARSE ONE LINE
     ====================================================== */
 
     function parseMaterialLine(
@@ -636,7 +769,8 @@
 
             return {
 
-                success: false,
+                success:
+                    false,
 
                 ticket:
                     ticket || "",
@@ -654,7 +788,10 @@
                     findCode(text),
 
                 error:
-                    "Nama material tidak ditemukan dalam daftar pengaturan."
+                    "Nama material tidak ditemukan dalam daftar pengaturan.",
+
+                raw:
+                    text
 
             };
 
@@ -663,7 +800,8 @@
 
         return {
 
-            success: true,
+            success:
+                true,
 
             ticket:
                 ticket || "",
@@ -671,17 +809,41 @@
             material:
                 detected.material,
 
+            originalMaterial:
+                detected.material,
+
             qty:
+                findQty(text),
+
+            quantity:
                 findQty(text),
 
             satuan:
                 findUnit(text),
 
+            unit:
+                findUnit(text),
+
             kode:
                 findCode(text),
 
+            code:
+                findCode(text),
+
             raw:
-                text
+                text,
+
+            sourceLine:
+                text,
+
+            type:
+                "OFFICIAL",
+
+            matchedAlias:
+                detected.material,
+
+            score:
+                100
 
         };
 
@@ -689,7 +851,7 @@
 
 
     /* =====================================================
-       PARSE BLOK MATERIAL
+       PARSE MATERIAL BLOCK
     ====================================================== */
 
     function parseMaterialBlock(
@@ -702,10 +864,6 @@
 
 
         if (!materialList.length) {
-
-            console.warn(
-                "Daftar Nama Material kosong."
-            );
 
             return {
 
@@ -725,7 +883,9 @@
                     kode: "",
 
                     error:
-                        "Daftar Nama Material belum diatur."
+                        "Daftar Nama Material belum diatur.",
+
+                    raw: ""
 
                 }]
 
@@ -734,11 +894,10 @@
         }
 
 
-        const text =
-            normalizeText(materialText);
-
-
-        if (!text) {
+        if (
+            materialText === null ||
+            materialText === undefined
+        ) {
 
             return {
 
@@ -751,38 +910,43 @@
         }
 
 
-        /*
-         * Pecah berdasarkan baris.
-         */
+        const source =
+            String(materialText)
+                .replace(/\r/g, "");
+
+
+        if (!source.trim()) {
+
+            return {
+
+                materials: [],
+
+                errors: []
+
+            };
+
+        }
+
 
         const lines =
-            String(materialText)
-                .replace(/\r/g, "")
-                .split("\n");
+            source.split("\n");
 
 
         const materials = [];
         const errors = [];
 
 
-        /*
-         * Tangani material multi-line.
-         *
-         * Contoh:
-         *
-         * Splitter
-         * 1:2
-         *
-         * akan digabung sementara.
-         */
-
         let i = 0;
 
 
-        while (i < lines.length) {
+        while (
+            i < lines.length
+        ) {
 
             let current =
-                normalizeText(lines[i]);
+                normalizeText(
+                    lines[i]
+                );
 
 
             if (!current) {
@@ -795,7 +959,7 @@
 
 
             /*
-             * Coba langsung.
+             * Coba satu baris.
              */
 
             let parsed =
@@ -807,8 +971,12 @@
 
 
             /*
-             * Kalau belum ketemu,
-             * gabungkan dengan baris berikutnya.
+             * Coba gabung 2 baris.
+             *
+             * Contoh:
+             *
+             * Splitter
+             * 1:2
              */
 
             if (
@@ -817,63 +985,87 @@
                 i + 1 < lines.length
             ) {
 
-                const combined =
+                const next =
                     normalizeText(
-                        current +
-                        " " +
                         lines[i + 1]
                     );
 
 
-                const combinedParsed =
-                    parseMaterialLine(
-                        combined,
-                        materialList,
-                        ticket
-                    );
+                if (next) {
+
+                    const combined =
+                        current +
+                        " " +
+                        next;
 
 
-                if (
-                    combinedParsed &&
-                    combinedParsed.success
-                ) {
+                    const combinedParsed =
+                        parseMaterialLine(
+                            combined,
+                            materialList,
+                            ticket
+                        );
 
-                    parsed =
-                        combinedParsed;
 
-                    i += 1;
+                    if (
+                        combinedParsed &&
+                        combinedParsed.success
+                    ) {
+
+                        parsed =
+                            combinedParsed;
+
+                        i++;
+
+                    }
 
                 }
 
             }
 
 
-            if (parsed) {
+            /*
+             * Kalau berhasil
+             */
 
-                if (parsed.success) {
+            if (
+                parsed &&
+                parsed.success
+            ) {
 
-                    materials.push(parsed);
+                materials.push(
+                    parsed
+                );
 
-                } else {
+            }
 
-                    /*
-                     * Jangan langsung memasukkan semua
-                     * baris biasa sebagai error.
-                     *
-                     * Hanya masukkan jika baris terlihat
-                     * seperti data material.
-                     */
+            /*
+             * Kalau gagal, jangan anggap
+             * seluruh teks CIR sebagai error.
+             *
+             * Hanya baris yang terlihat
+             * seperti data material.
+             */
 
-                    const looksLikeMaterial =
-                        /\d/.test(current) ||
-                        /qty|jumlah|kode|code|unit|pcs|meter|batang/i.test(current);
+            else if (
+                parsed &&
+                !parsed.success
+            ) {
+
+                const looksLikeMaterial =
+                    /\d/.test(current) ||
+                    /\b(qty|quantity|jumlah|kode|code|unit|pcs|pc|meter|batang|buah|set)\b/i.test(
+                        current
+                    );
 
 
-                    if (looksLikeMaterial) {
+                if (
+                    looksLikeMaterial
+                ) {
 
-                        errors.push(parsed);
-
-                    }
+                    errors.push(
+                        parsed
+                    );
 
                 }
 
@@ -887,9 +1079,11 @@
 
         return {
 
-            materials,
+            materials:
+                materials,
 
-            errors
+            errors:
+                errors
 
         };
 
@@ -897,7 +1091,24 @@
 
 
     /* =====================================================
-       PARSE DARI ARRAY BARIS
+       PARSE FROM CIR
+    ====================================================== */
+
+    function parseMaterialsFromCIR(
+        cirText,
+        ticket
+    ) {
+
+        return parseMaterialBlock(
+            cirText,
+            ticket
+        );
+
+    }
+
+
+    /* =====================================================
+       PARSE FROM LINES
     ====================================================== */
 
     function parseMaterialsFromLines(
@@ -905,7 +1116,9 @@
         ticket
     ) {
 
-        if (!Array.isArray(lines)) {
+        if (
+            !Array.isArray(lines)
+        ) {
 
             return {
 
@@ -927,49 +1140,166 @@
 
 
     /* =====================================================
-       PARSE DARI CIR
+       FLATTEN
+    ===================================================== */
+
+    function flatten(
+        results
+    ) {
+
+        const output = [];
+
+
+        /*
+         * Bisa menerima:
+         *
+         * [
+         *   {
+         *      materials: [...]
+         *   }
+         * ]
+         *
+         * atau langsung:
+         *
+         * {
+         *    materials: [...]
+         * }
+         */
+
+        const list =
+            Array.isArray(results)
+                ? results
+                : [results];
+
+
+        list.forEach(
+            function (result) {
+
+                if (!result) {
+                    return;
+                }
+
+
+                const materials =
+                    Array.isArray(
+                        result.materials
+                    )
+                        ? result.materials
+                        : [];
+
+
+                materials.forEach(
+                    function (item) {
+
+                        if (!item) {
+                            return;
+                        }
+
+
+                        output.push({
+
+                            ticket:
+                                item.ticket ||
+                                "",
+
+                            material:
+                                item.material ||
+                                "",
+
+                            originalMaterial:
+                                item.originalMaterial ||
+                                item.material ||
+                                "",
+
+                            quantity:
+                                item.quantity ??
+                                item.qty ??
+                                "",
+
+                            unit:
+                                item.unit ||
+                                item.satuan ||
+                                "",
+
+                            code:
+                                item.code ||
+                                item.kode ||
+                                "",
+
+                            type:
+                                item.type ||
+                                "OFFICIAL",
+
+                            matchedAlias:
+                                item.matchedAlias ||
+                                "",
+
+                            score:
+                                item.score ??
+                                100,
+
+                            raw:
+                                item.raw ||
+                                item.sourceLine ||
+                                ""
+
+                        });
+
+                    }
+                );
+
+            }
+        );
+
+
+        return output;
+
+    }
+
+
+    /* =====================================================
+       MAIN PARSE ALIAS
     ====================================================== */
 
-    function parseMaterialsFromCIR(
+    function parse(
         cirText,
         ticket
     ) {
 
-        if (
-            cirText === null ||
-            cirText === undefined
-        ) {
-
-            return {
-
-                materials: [],
-
-                errors: []
-
-            };
-
-        }
+        const result =
+            parseMaterialBlock(
+                cirText,
+                ticket
+            );
 
 
-        return parseMaterialBlock(
-            String(cirText),
-            ticket
-        );
+        /*
+         * Compatibility:
+         *
+         * excel.js versi lama mengharapkan
+         * array hasil parser.
+         *
+         * excel.js versi baru juga bisa
+         * membaca array.
+         */
+
+        return result.materials;
 
     }
 
 
     /* =====================================================
-       ALIAS FUNCTION
+       FULL PARSE
+       Untuk kebutuhan lanjutan.
     ====================================================== */
 
-    function parseMaterial(
-        materialText,
+    function parseDetailed(
+        cirText,
         ticket
     ) {
 
         return parseMaterialBlock(
-            materialText,
+            cirText,
             ticket
         );
 
@@ -977,16 +1307,19 @@
 
 
     /* =====================================================
-       EXPORT GLOBAL
+       PUBLIC API
     ====================================================== */
 
-    window.MaterialParser = {
+    const api = {
 
         parse:
-            parseMaterialBlock,
+            parse,
+
+        parseDetailed:
+            parseDetailed,
 
         parseMaterial:
-            parseMaterial,
+            parseMaterialBlock,
 
         parseMaterials:
             parseMaterialBlock,
@@ -1004,20 +1337,41 @@
             getMaterialListFromSettings,
 
         normalize:
-            normalizeMaterialName
+            normalizeMaterialName,
+
+        flatten:
+            flatten
 
     };
 
 
     /*
-     * Alias supaya kode lama tetap bisa bekerja.
+     * Nama utama.
+     */
+
+    window.MaterialParser =
+        api;
+
+
+    /*
+     * Nama yang dicari excel.js.
+     */
+
+    window.ReportCheckerMaterial =
+        api;
+
+
+    /*
+     * Alias global lama.
      */
 
     window.parseMaterial =
-        parseMaterial;
+        parseMaterialBlock;
+
 
     window.parseMaterials =
         parseMaterialBlock;
+
 
     window.getMaterialList =
         getMaterialListFromSettings;
@@ -1028,8 +1382,9 @@
     ====================================================== */
 
     console.log(
-        "Material Parser aktif. Daftar material:",
-        getMaterialListFromSettings()
+        "Report Checker Material Parser aktif.",
+        "Jumlah material:",
+        getMaterialListFromSettings().length
     );
 
 
