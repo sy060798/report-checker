@@ -2,8 +2,6 @@
    REPORT CHECKER
    app.js - FULL UPDATE
 
-   TANPA exporter.js
-
    Integrasi:
    - settings.js
    - cir-parser.js
@@ -16,10 +14,12 @@
    - Klik Drop Zone
    - Upload Excel
    - XLSX / XLS / XLSM
-   - Multi worksheet
+   - Multi Worksheet
    - Validasi TT Number
    - Datetime Receive
    - CIR
+   - LOCK SISTEM CIR
+   - TANGGAL CIR = TANGGAL PERTAMA DI BAWAH CIR
    - Parsing Material
    - Material Error
    - Pagination
@@ -30,7 +30,6 @@
 
     "use strict";
 
-
     /* =====================================================
        STATE
     ===================================================== */
@@ -38,43 +37,52 @@
     const state = {
 
         workbook: null,
-
         worksheet: null,
 
         rows: [],
-
         results: [],
 
         materialRows: [],
-
         materialErrorRows: [],
-
         combinedRows: [],
 
         headers: [],
 
         file: null,
-
         fileName: "",
-
         fileSize: 0,
 
         sheetName: "",
-
         sheetNames: [],
 
         initialized: false,
-
         processed: false,
+
+        /* =================================================
+           CIR LOCK
+        ================================================= */
+
+        cirLocked: true,
+
+        cirDateRequired: true,
+
+        cirDateField: "CIR Date",
+
+        cirSource: "FIRST_DATE_BELOW_CIR",
+
+        cirErrors: [],
+
+        cirWarnings: [],
+
+        cirParsedRows: [],
+
+        cirDateMap: new Map(),
 
         pagination: {
 
             valid: 1,
-
             invalid: 1,
-
             material: 1,
-
             materialError: 1
 
         },
@@ -105,180 +113,82 @@
     }
 
 
-    function findElement(selectors) {
-
-        for (const selector of selectors) {
-
-            const element =
-                document.querySelector(selector);
-
-            if (element) {
-                return element;
-            }
-
-        }
-
-        return null;
-    }
-
-
     /* =====================================================
-       UI ELEMENTS
+       UI
     ===================================================== */
 
     function getUI() {
 
         return {
 
-            dropZone:
-                byId("dropZone"),
+            dropZone: byId("dropZone"),
+            fileInput: byId("excelFile"),
 
-            fileInput:
-                byId("excelFile"),
+            selectedFile: byId("selectedFile"),
+            fileName: byId("fileName"),
+            fileSize: byId("fileSize"),
+            removeFileBtn: byId("removeFileBtn"),
 
-            selectedFile:
-                byId("selectedFile"),
+            processBtn: byId("processBtn"),
 
-            fileName:
-                byId("fileName"),
+            processingStatus: byId("processingStatus"),
+            processingText: byId("processingText"),
+            processingProgress: byId("processingProgress"),
 
-            fileSize:
-                byId("fileSize"),
+            systemStatus: byId("systemStatus"),
 
-            removeFileBtn:
-                byId("removeFileBtn"),
+            dashboardSection: byId("dashboardSection"),
+            resultSummary: byId("resultSummary"),
 
-            processBtn:
-                byId("processBtn"),
+            resetBtn: byId("resetBtn"),
 
-            processingStatus:
-                byId("processingStatus"),
+            totalCount: byId("totalCount"),
+            validCount: byId("validCount"),
+            invalidCount: byId("invalidCount"),
+            materialCount: byId("materialCount"),
+            materialErrorCount: byId("materialErrorCount"),
 
-            processingText:
-                byId("processingText"),
+            validTabCount: byId("validTabCount"),
+            invalidTabCount: byId("invalidTabCount"),
+            materialTabCount: byId("materialTabCount"),
+            materialErrorTabCount: byId("materialErrorTabCount"),
 
-            systemStatus:
-                byId("systemStatus"),
+            validTable: byId("validTable"),
+            validTableBody: byId("validTableBody"),
+            validEmpty: byId("validEmpty"),
 
-            dashboardSection:
-                byId("dashboardSection"),
+            invalidTable: byId("invalidTable"),
+            invalidTableBody: byId("invalidTableBody"),
+            invalidEmpty: byId("invalidEmpty"),
 
-            resultSummary:
-                byId("resultSummary"),
+            materialTable: byId("materialTable"),
+            materialTableBody: byId("materialTableBody"),
+            materialEmpty: byId("materialEmpty"),
 
-            resetBtn:
-                byId("resetBtn"),
+            materialErrorTable: byId("materialErrorTable"),
+            materialErrorTableBody: byId("materialErrorTableBody"),
+            materialErrorEmpty: byId("materialErrorEmpty"),
 
-            totalCount:
-                byId("totalCount"),
-
-            validCount:
-                byId("validCount"),
-
-            invalidCount:
-                byId("invalidCount"),
-
-            materialCount:
-                byId("materialCount"),
-
-            materialErrorCount:
-                byId("materialErrorCount"),
-
-            validTabCount:
-                byId("validTabCount"),
-
-            invalidTabCount:
-                byId("invalidTabCount"),
-
-            materialTabCount:
-                byId("materialTabCount"),
-
-            materialErrorTabCount:
-                byId("materialErrorTabCount"),
-
-            validTable:
-                byId("validTable"),
-
-            validTableBody:
-                byId("validTableBody"),
-
-            validEmpty:
-                byId("validEmpty"),
-
-            invalidTable:
-                byId("invalidTable"),
-
-            invalidTableBody:
-                byId("invalidTableBody"),
-
-            invalidEmpty:
-                byId("invalidEmpty"),
-
-            materialTable:
-                byId("materialTable"),
-
-            materialTableBody:
-                byId("materialTableBody"),
-
-            materialEmpty:
-                byId("materialEmpty"),
-
-            materialErrorTable:
-                byId("materialErrorTable"),
-
-            materialErrorTableBody:
-                byId("materialErrorTableBody"),
-
-            materialErrorEmpty:
-                byId("materialErrorEmpty"),
-
-            validPagination:
-                byId("validPagination"),
-
-            invalidPagination:
-                byId("invalidPagination"),
-
-            materialPagination:
-                byId("materialPagination"),
-
+            validPagination: byId("validPagination"),
+            invalidPagination: byId("invalidPagination"),
+            materialPagination: byId("materialPagination"),
             materialErrorPagination:
                 byId("materialErrorPagination"),
 
-            validPrevBtn:
-                byId("validPrevBtn"),
+            validPrevBtn: byId("validPrevBtn"),
+            validNextBtn: byId("validNextBtn"),
+            validPageNumber: byId("validPageNumber"),
+            validPageTotal: byId("validPageTotal"),
 
-            validNextBtn:
-                byId("validNextBtn"),
+            invalidPrevBtn: byId("invalidPrevBtn"),
+            invalidNextBtn: byId("invalidNextBtn"),
+            invalidPageNumber: byId("invalidPageNumber"),
+            invalidPageTotal: byId("invalidPageTotal"),
 
-            validPageNumber:
-                byId("validPageNumber"),
-
-            validPageTotal:
-                byId("validPageTotal"),
-
-            invalidPrevBtn:
-                byId("invalidPrevBtn"),
-
-            invalidNextBtn:
-                byId("invalidNextBtn"),
-
-            invalidPageNumber:
-                byId("invalidPageNumber"),
-
-            invalidPageTotal:
-                byId("invalidPageTotal"),
-
-            materialPrevBtn:
-                byId("materialPrevBtn"),
-
-            materialNextBtn:
-                byId("materialNextBtn"),
-
-            materialPageNumber:
-                byId("materialPageNumber"),
-
-            materialPageTotal:
-                byId("materialPageTotal"),
+            materialPrevBtn: byId("materialPrevBtn"),
+            materialNextBtn: byId("materialNextBtn"),
+            materialPageNumber: byId("materialPageNumber"),
+            materialPageTotal: byId("materialPageTotal"),
 
             materialErrorPrevBtn:
                 byId("materialErrorPrevBtn"),
@@ -328,10 +238,7 @@
        STATUS
     ===================================================== */
 
-    function setSystemStatus(
-        text,
-        type
-    ) {
+    function setSystemStatus(text, type) {
 
         const ui = getUI();
 
@@ -352,10 +259,7 @@
     }
 
 
-    function setProcessing(
-        active,
-        text
-    ) {
+    function setProcessing(active, text) {
 
         const ui = getUI();
 
@@ -369,11 +273,10 @@
                 "hidden"
             );
 
-            if (ui.processingText) {
+            if (ui.processingText && text) {
 
                 ui.processingText.textContent =
-                    text ||
-                    "Sedang memproses...";
+                    text;
 
             }
 
@@ -389,14 +292,37 @@
 
 
     /* =====================================================
+       PROGRESS
+    ===================================================== */
+
+    function updateProgress(percent, text) {
+
+        const ui = getUI();
+
+        if (ui.processingProgress) {
+
+            ui.processingProgress.textContent =
+                `${percent}%`;
+
+        }
+
+        if (ui.processingText && text) {
+
+            ui.processingText.textContent =
+                text;
+
+        }
+
+    }
+
+
+    /* =====================================================
        DEPENDENCY CHECK
     ===================================================== */
 
     function checkDependencies() {
 
-        if (
-            typeof XLSX === "undefined"
-        ) {
+        if (typeof XLSX === "undefined") {
 
             console.error(
                 "SheetJS XLSX tidak ditemukan."
@@ -408,12 +334,10 @@
             );
 
             return false;
+
         }
 
-
-        if (
-            !window.ReportCheckerValidator
-        ) {
+        if (!window.ReportCheckerValidator) {
 
             console.warn(
                 "validator.js belum tersedia."
@@ -421,10 +345,7 @@
 
         }
 
-
-        if (
-            !window.ReportCheckerMaterial
-        ) {
+        if (!window.ReportCheckerMaterial) {
 
             console.warn(
                 "material-parser.js belum tersedia."
@@ -432,6 +353,14 @@
 
         }
 
+        if (!window.ReportCheckerCIR) {
+
+            console.warn(
+                "cir-parser.js belum tersedia. " +
+                "Fallback CIR parser akan digunakan."
+            );
+
+        }
 
         return true;
 
@@ -439,19 +368,17 @@
 
 
     /* =====================================================
-       FORMAT FILE SIZE
+       FILE SIZE
     ===================================================== */
 
-    function formatFileSize(
-        bytes
-    ) {
+    function formatFileSize(bytes) {
 
         if (!bytes) {
             return "0 KB";
         }
 
         if (bytes < 1024) {
-            return bytes + " B";
+            return `${bytes} B`;
         }
 
         if (bytes < 1024 * 1024) {
@@ -475,9 +402,7 @@
        FILE VALIDATION
     ===================================================== */
 
-    function isExcelFile(
-        file
-    ) {
+    function isExcelFile(file) {
 
         if (!file) {
             return false;
@@ -497,79 +422,65 @@
 
 
     /* =====================================================
-       NORMALIZE HEADER
+       NORMALIZE
     ===================================================== */
 
-    function normalizeHeader(
-        value
-    ) {
+    function normalizeHeader(value) {
 
         if (
             value === null ||
             value === undefined
         ) {
-
             return "";
-
         }
 
         return String(value)
-
             .replace(/\u00A0/g, " ")
-
             .replace(/\s+/g, " ")
-
             .trim()
-
             .toLowerCase();
 
     }
 
 
-    /* =====================================================
-       FIND HEADER
-    ===================================================== */
-
-    function findHeader(
-        headers,
-        names
-    ) {
+    function normalizeText(value) {
 
         if (
-            !Array.isArray(headers)
+            value === null ||
+            value === undefined
         ) {
+            return "";
+        }
 
+        return String(value)
+            .replace(/\u00A0/g, " ")
+            .replace(/\r/g, "")
+            .trim();
+
+    }
+
+
+    function findHeader(headers, names) {
+
+        if (!Array.isArray(headers)) {
             return null;
-
         }
 
         const wanted =
-            names.map(
-                normalizeHeader
-            );
+            names.map(normalizeHeader);
 
-
-        for (
-            const header of headers
-        ) {
+        for (const header of headers) {
 
             const normalized =
-                normalizeHeader(
-                    header
-                );
+                normalizeHeader(header);
 
             if (
-                wanted.includes(
-                    normalized
-                )
+                wanted.includes(normalized)
             ) {
-
                 return header;
-
             }
 
         }
-
 
         return null;
 
@@ -580,9 +491,7 @@
        DETECT COLUMNS
     ===================================================== */
 
-    function detectColumns(
-        rows
-    ) {
+    function detectColumns(rows) {
 
         if (
             !Array.isArray(rows) ||
@@ -592,21 +501,15 @@
             return {
 
                 ttNumber: null,
-
                 datetimeReceive: null,
-
                 cir: null
 
             };
 
         }
 
-
         const headers =
-            Object.keys(
-                rows[0] || {}
-            );
-
+            Object.keys(rows[0] || {});
 
         return {
 
@@ -620,8 +523,7 @@
                         "TT_Number",
                         "TTNumber",
                         "Ticket",
-                        "Ticket Number",
-                        "Ticket Number "
+                        "Ticket Number"
                     ]
                 ),
 
@@ -657,69 +559,47 @@
 
 
     /* =====================================================
-       NORMALIZE ROW
+       NORMALIZE INPUT
     ===================================================== */
 
-    function normalizeInputRow(
-        row,
-        columns
-    ) {
+    function normalizeInputRow(row, columns) {
 
         const result = {
 
             "TT Number": "",
-
             "Datetime Receive": "",
-
             "CIR": "",
+
+            "CIR Date": "",
 
             originalRow: row
 
         };
 
-
         if (!row) {
             return result;
         }
 
-
-        if (
-            columns.ttNumber
-        ) {
+        if (columns.ttNumber) {
 
             result["TT Number"] =
-                row[
-                    columns.ttNumber
-                ];
+                row[columns.ttNumber];
 
         }
 
+        if (columns.datetimeReceive) {
 
-        if (
-            columns.datetimeReceive
-        ) {
-
-            result[
-                "Datetime Receive"
-            ] =
-                row[
-                    columns.datetimeReceive
-                ];
+            result["Datetime Receive"] =
+                row[columns.datetimeReceive];
 
         }
 
-
-        if (
-            columns.cir
-        ) {
+        if (columns.cir) {
 
             result["CIR"] =
-                row[
-                    columns.cir
-                ];
+                row[columns.cir];
 
         }
-
 
         return result;
 
@@ -727,18 +607,655 @@
 
 
     /* =====================================================
-       READ EXCEL FILE
+       EXCEL DATE
     ===================================================== */
 
-    function readExcelFile(
-        file
+    function excelSerialToDate(value) {
+
+        if (
+            typeof value !== "number" ||
+            !Number.isFinite(value)
+        ) {
+            return null;
+        }
+
+        if (value < 1) {
+            return null;
+        }
+
+        const excelEpoch =
+            Date.UTC(1899, 11, 30);
+
+        const milliseconds =
+            value * 86400000;
+
+        const date =
+            new Date(
+                excelEpoch + milliseconds
+            );
+
+        return isNaN(date.getTime())
+            ? null
+            : date;
+
+    }
+
+
+    function dateToISO(date) {
+
+        if (!(date instanceof Date)) {
+            return "";
+        }
+
+        if (isNaN(date.getTime())) {
+            return "";
+        }
+
+        const y =
+            date.getFullYear();
+
+        const m =
+            String(
+                date.getMonth() + 1
+            ).padStart(2, "0");
+
+        const d =
+            String(
+                date.getDate()
+            ).padStart(2, "0");
+
+        return `${y}-${m}-${d}`;
+
+    }
+
+
+    function formatDateDisplay(value) {
+
+        if (!value) {
+            return "";
+        }
+
+        let date = null;
+
+        if (value instanceof Date) {
+
+            date = value;
+
+        }
+        else if (
+            typeof value === "number"
+        ) {
+
+            date =
+                excelSerialToDate(
+                    value
+                );
+
+        }
+        else {
+
+            const text =
+                normalizeText(value);
+
+            const match =
+                text.match(
+                    /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/
+                );
+
+            if (match) {
+
+                const d =
+                    Number(match[1]);
+
+                const m =
+                    Number(match[2]) - 1;
+
+                const y =
+                    Number(match[3]);
+
+                date =
+                    new Date(
+                        y,
+                        m,
+                        d
+                    );
+
+            }
+            else {
+
+                const parsed =
+                    new Date(text);
+
+                if (
+                    !isNaN(
+                        parsed.getTime()
+                    )
+                ) {
+                    date = parsed;
+                }
+
+            }
+
+        }
+
+        if (!date) {
+            return "";
+        }
+
+        const d =
+            String(
+                date.getDate()
+            ).padStart(2, "0");
+
+        const m =
+            String(
+                date.getMonth() + 1
+            ).padStart(2, "0");
+
+        const y =
+            date.getFullYear();
+
+        return `${d}/${m}/${y}`;
+
+    }
+
+
+    /* =====================================================
+       DATE DETECTION
+       
+       LOCK RULE:
+       HANYA tanggal pertama yang ditemukan
+       pada baris pertama setelah CIR/header CIR.
+    ===================================================== */
+
+    function isDateValue(value) {
+
+        if (
+            value instanceof Date &&
+            !isNaN(value.getTime())
+        ) {
+
+            return true;
+
+        }
+
+        if (
+            typeof value === "number"
+        ) {
+
+            return !!excelSerialToDate(value);
+
+        }
+
+        const text =
+            normalizeText(value);
+
+        if (!text) {
+            return false;
+        }
+
+        const patterns = [
+
+            /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/,
+
+            /^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/,
+
+            /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}\s+\d{1,2}:\d{2}/,
+
+            /^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}\s+\d{1,2}:\d{2}/
+
+        ];
+
+        return patterns.some(
+            pattern =>
+                pattern.test(text)
+        );
+
+    }
+
+
+    function extractDateFromValue(value) {
+
+        if (!isDateValue(value)) {
+            return "";
+        }
+
+        return formatDateDisplay(
+            value
+        );
+
+    }
+
+
+    /* =====================================================
+       STRICT CIR DATE PARSER
+    ===================================================== */
+
+    function getFirstDateBelowCIR(
+        cirValue
     ) {
 
-        return new Promise(
-            function (
-                resolve,
-                reject
+        const text =
+            normalizeText(cirValue);
+
+        if (!text) {
+
+            return {
+
+                date: "",
+                error:
+                    "CIR kosong"
+
+            };
+
+        }
+
+        /*
+         * Pecah CIR menjadi baris.
+         */
+
+        const lines =
+            text
+                .split("\n")
+                .map(
+                    line =>
+                        normalizeText(line)
+                );
+
+        /*
+         * Buang baris kosong di awal.
+         */
+
+        while (
+            lines.length &&
+            !lines[0]
+        ) {
+            lines.shift();
+        }
+
+        /*
+         * Cari posisi header/label CIR.
+         */
+
+        let cirIndex = -1;
+
+        for (
+            let i = 0;
+            i < lines.length;
+            i++
+        ) {
+
+            const normalized =
+                normalizeHeader(
+                    lines[i]
+                );
+
+            if (
+                normalized === "cir" ||
+                normalized.startsWith("cir ")
             ) {
+
+                cirIndex = i;
+                break;
+
+            }
+
+        }
+
+        /*
+         * Jika CIR sendiri tidak memiliki
+         * header terpisah, mulai dari baris pertama.
+         */
+
+        const startIndex =
+            cirIndex >= 0
+                ? cirIndex + 1
+                : 0;
+
+        /*
+         * LOCK:
+         * hanya BARIS PERTAMA setelah CIR
+         * yang boleh menjadi tanggal.
+         */
+
+        if (
+            startIndex >= lines.length
+        ) {
+
+            return {
+
+                date: "",
+                error:
+                    "Tanggal pertama di bawah CIR tidak ditemukan"
+
+            };
+
+        }
+
+        const firstLine =
+            lines[startIndex];
+
+        /*
+         * Jika baris pertama kosong,
+         * jangan lompat ke tanggal berikutnya.
+         *
+         * Ini sengaja dibuat STRICT.
+         */
+
+        if (!firstLine) {
+
+            return {
+
+                date: "",
+                error:
+                    "Baris pertama di bawah CIR kosong"
+
+            };
+
+        }
+
+        /*
+         * Tanggal harus berada pada baris pertama.
+         */
+
+        const match =
+            firstLine.match(
+                /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}|\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/
+            );
+
+        if (!match) {
+
+            return {
+
+                date: "",
+                error:
+                    "Tanggal pertama di bawah CIR tidak valid"
+
+            };
+
+        }
+
+        const formatted =
+            formatDateDisplay(
+                match[1]
+            );
+
+        if (!formatted) {
+
+            return {
+
+                date: "",
+                error:
+                    "Tanggal pertama di bawah CIR gagal diparse"
+
+            };
+
+        }
+
+        return {
+
+            date: formatted,
+            error: ""
+
+        };
+
+    }
+
+
+    /* =====================================================
+       CIR PARSER INTEGRATION
+       
+       Kalau cir-parser.js mempunyai API sendiri,
+       kita gunakan API tersebut terlebih dahulu.
+       Tetapi tanggal tetap dikunci.
+    ===================================================== */
+
+    function parseCIR(row) {
+
+        const cir =
+            row
+                ? row.CIR
+                : "";
+
+        /*
+         * Coba API parser terbaru.
+         */
+
+        if (
+            window.ReportCheckerCIR
+        ) {
+
+            const parser =
+                window.ReportCheckerCIR;
+
+            try {
+
+                if (
+                    typeof parser.parseRow ===
+                    "function"
+                ) {
+
+                    const parsed =
+                        parser.parseRow(
+                            row
+                        );
+
+                    if (
+                        parsed &&
+                        typeof parsed ===
+                        "object"
+                    ) {
+
+                        return applyCIRDateLock(
+                            row,
+                            parsed
+                        );
+
+                    }
+
+                }
+
+                if (
+                    typeof parser.parse ===
+                    "function"
+                ) {
+
+                    const parsed =
+                        parser.parse(
+                            cir,
+                            row
+                        );
+
+                    if (
+                        parsed &&
+                        typeof parsed ===
+                        "object"
+                    ) {
+
+                        return applyCIRDateLock(
+                            row,
+                            parsed
+                        );
+
+                    }
+
+                }
+
+            }
+            catch (error) {
+
+                console.warn(
+                    "CIR parser error. " +
+                    "Fallback digunakan:",
+                    error
+                );
+
+            }
+
+        }
+
+        /*
+         * Fallback.
+         */
+
+        return applyCIRDateLock(
+            row,
+            {}
+        );
+
+    }
+
+
+    function applyCIRDateLock(
+        sourceRow,
+        parsed
+    ) {
+
+        const result =
+            parsed || {};
+
+        /*
+         * Jangan mempercayai tanggal hasil parser
+         * apabila bukan tanggal pertama di bawah CIR.
+         */
+
+        const locked =
+            getFirstDateBelowCIR(
+                sourceRow.CIR
+            );
+
+        result["CIR Date"] =
+            locked.date;
+
+        result.cirDate =
+            locked.date;
+
+        result.cirDateFormatted =
+            locked.date;
+
+        result.cirDateSource =
+            "FIRST_DATE_BELOW_CIR";
+
+        result.cirDateLocked =
+            true;
+
+        result.cirDateError =
+            locked.error || "";
+
+        return result;
+
+    }
+
+
+    /* =====================================================
+       APPLY CIR TO ROWS
+    ===================================================== */
+
+    function processCIRRows(
+        normalizedRows
+    ) {
+
+        const output = [];
+
+        state.cirErrors = [];
+        state.cirWarnings = [];
+        state.cirParsedRows = [];
+        state.cirDateMap =
+            new Map();
+
+        normalizedRows.forEach(
+            function (row, index) {
+
+                const parsed =
+                    parseCIR(row);
+
+                const cirDate =
+                    parsed["CIR Date"] ||
+                    parsed.cirDate ||
+                    "";
+
+                const ticket =
+                    normalizeText(
+                        row["TT Number"]
+                    );
+
+                const cirResult = {
+
+                    index: index,
+
+                    ticket: ticket,
+
+                    date: cirDate,
+
+                    error:
+                        parsed.cirDateError ||
+                        "",
+
+                    parsed: parsed
+
+                };
+
+                state.cirParsedRows.push(
+                    cirResult
+                );
+
+                if (
+                    cirResult.error
+                ) {
+
+                    state.cirErrors.push(
+                        {
+                            ticket: ticket,
+                            error:
+                                cirResult.error
+                        }
+                    );
+
+                }
+
+                if (ticket) {
+
+                    state.cirDateMap.set(
+                        ticket,
+                        cirDate
+                    );
+
+                }
+
+                output.push({
+
+                    ...row,
+
+                    "CIR Date":
+                        cirDate,
+
+                    cirDate:
+                        cirDate,
+
+                    cirDateError:
+                        cirResult.error,
+
+                    cirLocked:
+                        true
+
+                });
+
+            }
+        );
+
+        return output;
+
+    }
+
+
+    /* =====================================================
+       EXCEL READ
+    ===================================================== */
+
+    function readExcelFile(file) {
+
+        return new Promise(
+            function (resolve, reject) {
 
                 if (!file) {
 
@@ -752,10 +1269,8 @@
 
                 }
 
-
                 const reader =
                     new FileReader();
-
 
                 reader.onload =
                     function (event) {
@@ -767,24 +1282,17 @@
                                     event.target.result
                                 );
 
-
                             const workbook =
                                 XLSX.read(
                                     data,
                                     {
                                         type: "array",
-
                                         cellDates: true,
-
                                         cellNF: false,
-
                                         cellText: false,
-
                                         raw: true
-
                                     }
                                 );
-
 
                             resolve(
                                 workbook
@@ -793,14 +1301,11 @@
                         }
                         catch (error) {
 
-                            reject(
-                                error
-                            );
+                            reject(error);
 
                         }
 
                     };
-
 
                 reader.onerror =
                     function () {
@@ -813,7 +1318,6 @@
 
                     };
 
-
                 reader.readAsArrayBuffer(
                     file
                 );
@@ -825,7 +1329,7 @@
 
 
     /* =====================================================
-       WORKSHEET TO JSON
+       WORKSHEET JSON
     ===================================================== */
 
     function worksheetToJSON(
@@ -836,15 +1340,12 @@
             return [];
         }
 
-
         return XLSX.utils.sheet_to_json(
             worksheet,
             {
 
                 defval: "",
-
                 raw: true,
-
                 blankrows: false
 
             }
@@ -854,10 +1355,7 @@
 
 
     /* =====================================================
-       POPULATE SHEETS
-       
-       Kalau index.html belum punya sheet selector,
-       kita buat otomatis di bawah drop zone.
+       SHEET SELECTOR
     ===================================================== */
 
     function getOrCreateSheetSelector() {
@@ -865,25 +1363,21 @@
         let select =
             byId("sheetSelect");
 
-
         if (select) {
             return select;
         }
 
-
-        const ui = getUI();
-
+        const ui =
+            getUI();
 
         if (!ui.selectedFile) {
             return null;
         }
 
-
         select =
             document.createElement(
                 "select"
             );
-
 
         select.id =
             "sheetSelect";
@@ -891,12 +1385,10 @@
         select.className =
             "sheet-select";
 
-
         const label =
             document.createElement(
                 "label"
             );
-
 
         label.textContent =
             "Worksheet:";
@@ -910,7 +1402,6 @@
         label.style.marginBottom =
             "6px";
 
-
         ui.selectedFile
             .parentNode
             .insertBefore(
@@ -918,14 +1409,12 @@
                 ui.selectedFile
             );
 
-
         ui.selectedFile
             .parentNode
             .insertBefore(
                 select,
                 ui.selectedFile
             );
-
 
         select.addEventListener(
             "change",
@@ -937,7 +1426,6 @@
 
             }
         );
-
 
         return select;
 
@@ -954,24 +1442,17 @@
                 workbook.SheetNames
             )
         ) {
-
             return;
-
         }
-
 
         const select =
             getOrCreateSheetSelector();
-
 
         if (!select) {
             return;
         }
 
-
-        select.innerHTML =
-            "";
-
+        select.innerHTML = "";
 
         workbook.SheetNames.forEach(
             function (
@@ -984,19 +1465,16 @@
                         "option"
                     );
 
-
                 option.value =
                     sheetName;
 
                 option.textContent =
                     sheetName;
 
-
                 if (index === 0) {
                     option.selected =
                         true;
                 }
-
 
                 select.appendChild(
                     option
@@ -1004,7 +1482,6 @@
 
             }
         );
-
 
         select.disabled =
             workbook.SheetNames.length <= 1;
@@ -1020,20 +1497,14 @@
         sheetName
     ) {
 
-        if (
-            !state.workbook
-        ) {
-
+        if (!state.workbook) {
             return false;
-
         }
-
 
         const worksheet =
             state.workbook.Sheets[
                 sheetName
             ];
-
 
         if (!worksheet) {
 
@@ -1046,12 +1517,10 @@
 
         }
 
-
         const rows =
             worksheetToJSON(
                 worksheet
             );
-
 
         state.worksheet =
             worksheet;
@@ -1069,6 +1538,8 @@
                 )
                 : [];
 
+        state.processed =
+            false;
 
         console.log(
             "Worksheet loaded:",
@@ -1079,27 +1550,23 @@
             state.headers
         );
 
-
         return true;
 
     }
 
 
     /* =====================================================
-       SHOW SELECTED FILE
+       SHOW FILE
     ===================================================== */
 
-    function showSelectedFile(
-        file
-    ) {
+    function showSelectedFile(file) {
 
-        const ui = getUI();
-
+        const ui =
+            getUI();
 
         if (!file) {
             return;
         }
-
 
         if (ui.selectedFile) {
 
@@ -1109,14 +1576,12 @@
 
         }
 
-
         if (ui.fileName) {
 
             ui.fileName.textContent =
                 file.name;
 
         }
-
 
         if (ui.fileSize) {
 
@@ -1127,14 +1592,12 @@
 
         }
 
-
         if (ui.processBtn) {
 
             ui.processBtn.disabled =
                 false;
 
         }
-
 
         if (ui.dropZone) {
 
@@ -1147,14 +1610,10 @@
     }
 
 
-    /* =====================================================
-       HIDE SELECTED FILE
-    ===================================================== */
-
     function hideSelectedFile() {
 
-        const ui = getUI();
-
+        const ui =
+            getUI();
 
         if (ui.selectedFile) {
 
@@ -1164,26 +1623,17 @@
 
         }
 
-
         if (ui.fileName) {
-            ui.fileName.textContent =
-                "-";
+            ui.fileName.textContent = "-";
         }
-
 
         if (ui.fileSize) {
-            ui.fileSize.textContent =
-                "-";
+            ui.fileSize.textContent = "-";
         }
-
 
         if (ui.processBtn) {
-
-            ui.processBtn.disabled =
-                true;
-
+            ui.processBtn.disabled = true;
         }
-
 
         if (ui.dropZone) {
 
@@ -1200,14 +1650,11 @@
        SET FILE
     ===================================================== */
 
-    function setFile(
-        file
-    ) {
+    function setFile(file) {
 
         if (!file) {
             return false;
         }
-
 
         if (!isExcelFile(file)) {
 
@@ -1216,16 +1663,13 @@
                 "offline"
             );
 
-
             alert(
                 "Silakan pilih file Excel (.xlsx, .xls, atau .xlsm)."
             );
 
-
             return false;
 
         }
-
 
         state.file =
             file;
@@ -1239,39 +1683,26 @@
         state.processed =
             false;
 
+        state.cirErrors = [];
+        state.cirWarnings = [];
 
-        showSelectedFile(
-            file
-        );
-
+        showSelectedFile(file);
 
         setSystemStatus(
             "File dipilih",
             "online"
         );
 
-
         return true;
 
     }
 
 
-    /* =====================================================
-       HANDLE FILE
-    ===================================================== */
+    async function handleFile(file) {
 
-    async function handleFile(
-        file
-    ) {
-
-        if (
-            !setFile(file)
-        ) {
-
+        if (!setFile(file)) {
             return;
-
         }
-
 
         await readAndPrepareFile(
             file
@@ -1281,24 +1712,25 @@
 
 
     /* =====================================================
-       READ AND PREPARE
+       READ PREPARE
     ===================================================== */
 
-    async function readAndPrepareFile(
-        file
-    ) {
+    async function readAndPrepareFile(file) {
 
         setProcessing(
             true,
             "Membaca file Excel..."
         );
 
+        updateProgress(
+            5,
+            "Membaca file Excel..."
+        );
 
         setSystemStatus(
             "Membaca...",
             "online"
         );
-
 
         try {
 
@@ -1306,7 +1738,6 @@
                 await readExcelFile(
                     file
                 );
-
 
             if (
                 !workbook.SheetNames ||
@@ -1319,22 +1750,18 @@
 
             }
 
-
             state.workbook =
                 workbook;
 
             state.sheetNames =
                 workbook.SheetNames.slice();
 
-
             populateSheetSelect(
                 workbook
             );
 
-
             const firstSheet =
                 workbook.SheetNames[0];
-
 
             if (
                 !loadSheet(
@@ -1348,33 +1775,18 @@
 
             }
 
+            updateProgress(
+                10,
+                "File Excel siap."
+            );
 
             setSystemStatus(
                 "File siap",
                 "online"
             );
 
-
             setProcessing(
                 false
-            );
-
-
-            console.log(
-                "Excel berhasil dibaca.",
-                {
-                    file:
-                        file.name,
-
-                    sheets:
-                        workbook.SheetNames,
-
-                    rows:
-                        state.rows.length,
-
-                    headers:
-                        state.headers
-                }
             );
 
         }
@@ -1385,17 +1797,12 @@
                 error
             );
 
-
-            setProcessing(
-                false
-            );
-
+            setProcessing(false);
 
             setSystemStatus(
                 "Gagal membaca",
                 "offline"
             );
-
 
             alert(
                 error.message ||
@@ -1411,15 +1818,10 @@
        VALIDATE COLUMNS
     ===================================================== */
 
-    function validateColumns(
-        rows
-    ) {
+    function validateColumns(rows) {
 
         const columns =
-            detectColumns(
-                rows
-            );
-
+            detectColumns(rows);
 
         if (!columns.ttNumber) {
 
@@ -1436,7 +1838,6 @@
 
         }
 
-
         if (!columns.datetimeReceive) {
 
             return {
@@ -1451,7 +1852,6 @@
             };
 
         }
-
 
         if (!columns.cir) {
 
@@ -1468,13 +1868,10 @@
 
         }
 
-
         return {
 
             valid: true,
-
             error: "",
-
             columns
 
         };
@@ -1500,10 +1897,8 @@
 
         }
 
-
         const validator =
             window.ReportCheckerValidator;
-
 
         if (
             typeof validator.validateRows ===
@@ -1516,7 +1911,6 @@
 
         }
 
-
         if (
             typeof validator.validate ===
             "function"
@@ -1527,7 +1921,6 @@
             );
 
         }
-
 
         throw new Error(
             "Fungsi validator tidak ditemukan."
@@ -1540,9 +1933,7 @@
        MATERIAL PARSER
     ===================================================== */
 
-    function parseMaterial(
-        row
-    ) {
+    function parseMaterial(row) {
 
         if (
             !window.ReportCheckerMaterial
@@ -1552,10 +1943,8 @@
 
         }
 
-
         const parser =
             window.ReportCheckerMaterial;
-
 
         try {
 
@@ -1564,13 +1953,45 @@
                 "function"
             ) {
 
-                return parser.buildRows(
-                    row,
-                    "CIR"
-                ) || [];
+                return (
+                    parser.buildRows(
+                        row,
+                        "CIR"
+                    ) || []
+                );
 
             }
 
+            if (
+                typeof parser.parseRow ===
+                "function"
+            ) {
+
+                const parsed =
+                    parser.parseRow(
+                        row
+                    );
+
+                if (
+                    Array.isArray(parsed)
+                ) {
+
+                    return parsed;
+
+                }
+
+                if (
+                    parsed &&
+                    Array.isArray(
+                        parsed.rows
+                    )
+                ) {
+
+                    return parsed.rows;
+
+                }
+
+            }
 
             if (
                 typeof parser.parse ===
@@ -1579,9 +2000,9 @@
 
                 const parsed =
                     parser.parse(
-                        row.CIR
+                        row.CIR,
+                        row
                     );
-
 
                 if (
                     Array.isArray(parsed)
@@ -1614,7 +2035,6 @@
 
         }
 
-
         return [];
 
     }
@@ -1632,15 +2052,14 @@
         const row =
             material || {};
 
-
         const ticket =
             row.ticket ||
             row.Ticket ||
             row["TT Number"] ||
             row.ttNumber ||
             row.tt_number ||
+            sourceRow["TT Number"] ||
             "";
-
 
         const materialName =
             row.material ||
@@ -1649,14 +2068,12 @@
             row.materialName ||
             "";
 
-
         const quantity =
             row.quantity ??
             row.qty ??
             row.Qty ??
             row.Quantity ??
             "";
-
 
         const unit =
             row.unit ||
@@ -1665,7 +2082,6 @@
             row.Satuan ||
             "";
 
-
         const code =
             row.code ||
             row.kode ||
@@ -1673,12 +2089,10 @@
             row.materialCode ||
             "";
 
-
         const score =
             row.score ??
             row.Score ??
             "";
-
 
         const error =
             row.error ||
@@ -1686,32 +2100,23 @@
             row.message ||
             "";
 
-
         return {
 
-            ticket:
-                ticket,
+            ticket,
+            material: materialName,
+            quantity,
+            unit,
+            code,
+            score,
+            error,
 
-            material:
-                materialName,
+            cir:
+                sourceRow.CIR || "",
 
-            quantity:
-                quantity,
+            cirDate:
+                sourceRow["CIR Date"] || "",
 
-            unit:
-                unit,
-
-            code:
-                code,
-
-            score:
-                score,
-
-            error:
-                error,
-
-            sourceRow:
-                sourceRow
+            sourceRow
 
         };
 
@@ -1719,49 +2124,39 @@
 
 
     /* =====================================================
-       MATERIAL ERROR DETECTION
+       MATERIAL ERROR
     ===================================================== */
 
-    function isMaterialError(
-        row
-    ) {
+    function isMaterialError(row) {
 
         if (!row) {
             return true;
         }
 
-
         if (
             row.error &&
             String(row.error).trim()
         ) {
-
             return true;
-
         }
-
 
         const ticket =
             String(
                 row.ticket || ""
             ).trim();
 
-
         if (!ticket) {
             return true;
         }
-
 
         const material =
             String(
                 row.material || ""
             ).trim();
 
-
         if (!material) {
             return true;
         }
-
 
         return false;
 
@@ -1774,9 +2169,7 @@
 
     function processData() {
 
-        if (
-            !state.rows.length
-        ) {
+        if (!state.rows.length) {
 
             throw new Error(
                 "Worksheet tidak memiliki data."
@@ -1784,16 +2177,12 @@
 
         }
 
-
         const columnCheck =
             validateColumns(
                 state.rows
             );
 
-
-        if (
-            !columnCheck.valid
-        ) {
+        if (!columnCheck.valid) {
 
             throw new Error(
                 columnCheck.error
@@ -1801,6 +2190,9 @@
 
         }
 
+        /*
+         * Normalize.
+         */
 
         const normalizedRows =
             state.rows.map(
@@ -1814,34 +2206,133 @@
                 }
             );
 
+        /*
+         * =================================================
+         * CIR LOCK
+         * =================================================
+         */
 
-        console.log(
-            "Normalized rows:",
-            normalizedRows.slice(
-                0,
-                3
-            )
-        );
-
-
-        const results =
-            runValidator(
+        const cirRows =
+            processCIRRows(
                 normalizedRows
             );
 
+        /*
+         * Tanggal CIR WAJIB.
+         *
+         * Jika tanggal pertama di bawah CIR
+         * tidak ditemukan, row tetap diteruskan
+         * tetapi validator akan menerima CIR Date
+         * kosong + error.
+         */
+
+        cirRows.forEach(
+            function (row) {
+
+                if (
+                    !row["CIR Date"] &&
+                    state.cirDateRequired
+                ) {
+
+                    row.cirDateRequired =
+                        true;
+
+                    row.cirLockedError =
+                        row.cirDateError ||
+                        "Tanggal CIR wajib diisi.";
+
+                }
+
+            }
+        );
+
+        /*
+         * =================================================
+         * VALIDATOR
+         * =================================================
+         */
+
+        const results =
+            runValidator(
+                cirRows
+            );
 
         state.results =
             Array.isArray(results)
                 ? results
                 : [];
 
+        /*
+         * Pastikan hasil validator membawa
+         * CIR Date yang sudah dikunci.
+         */
+
+        state.results =
+            state.results.map(
+                function (
+                    result,
+                    index
+                ) {
+
+                    const ticket =
+                        getResultTicket(
+                            result
+                        );
+
+                    const cirDate =
+                        state.cirDateMap.get(
+                            String(
+                                ticket
+                            ).trim()
+                        ) || "";
+
+                    const cirError =
+                        state.cirParsedRows[
+                            index
+                        ]
+                            ? state.cirParsedRows[
+                                index
+                            ].error
+                            : "";
+
+                    return {
+
+                        ...result,
+
+                        "CIR Date":
+                            cirDate ||
+                            result["CIR Date"] ||
+                            result.cirDate ||
+                            "",
+
+                        cirDate:
+                            cirDate ||
+                            result.cirDate ||
+                            "",
+
+                        cirLocked:
+                            true,
+
+                        cirDateError:
+                            cirError ||
+                            result.cirDateError ||
+                            ""
+
+                    };
+
+                }
+            );
+
+        /*
+         * =================================================
+         * MATERIAL
+         * =================================================
+         */
 
         const materialRows = [];
-
         const materialErrorRows = [];
 
-
-        normalizedRows.forEach(
+        cirRows.forEach(
             function (row) {
 
                 const parsed =
@@ -1849,28 +2340,31 @@
                         row
                     );
 
-
                 if (
                     !Array.isArray(parsed) ||
                     !parsed.length
                 ) {
 
+                    /*
+                     * Jangan otomatis dianggap
+                     * material error.
+                     *
+                     * CIR tanpa material bisa saja
+                     * merupakan valid condition.
+                     */
+
                     return;
 
                 }
 
-
                 parsed.forEach(
-                    function (
-                        material
-                    ) {
+                    function (material) {
 
                         const normalized =
                             normalizeMaterialRow(
                                 material,
                                 row
                             );
-
 
                         if (
                             isMaterialError(
@@ -1882,7 +2376,8 @@
                                 normalized
                             );
 
-                        } else {
+                        }
+                        else {
 
                             materialRows.push(
                                 normalized
@@ -1896,26 +2391,27 @@
             }
         );
 
-
         state.materialRows =
             materialRows;
-
 
         state.materialErrorRows =
             materialErrorRows;
 
+        /*
+         * =================================================
+         * COMBINED
+         * =================================================
+         */
 
         state.combinedRows =
             buildCombinedRows(
-                normalizedRows,
+                cirRows,
                 state.results,
                 materialRows
             );
 
-
         state.processed =
             true;
-
 
         return state.results;
 
@@ -1923,23 +2419,21 @@
 
 
     /* =====================================================
-       GET TICKET
+       RESULT TICKET
     ===================================================== */
 
-    function getResultTicket(
-        result
-    ) {
+    function getResultTicket(result) {
 
         if (!result) {
             return "";
         }
-
 
         return (
             result.ticket ||
             result.Ticket ||
             result["TT Number"] ||
             result.ttNumber ||
+            result.tt_number ||
             ""
         );
 
@@ -1947,7 +2441,7 @@
 
 
     /* =====================================================
-       BUILD COMBINED ROWS
+       COMBINED
     ===================================================== */
 
     function buildCombinedRows(
@@ -1958,10 +2452,8 @@
 
         const output = [];
 
-
         const sourceByTicket =
             new Map();
-
 
         sourceRows.forEach(
             function (row) {
@@ -1970,7 +2462,6 @@
                     String(
                         row["TT Number"] || ""
                     ).trim();
-
 
                 if (ticket) {
 
@@ -1984,6 +2475,32 @@
             }
         );
 
+        const materialsByTicket =
+            new Map();
+
+        materialRows.forEach(
+            function (material) {
+
+                const ticket =
+                    String(
+                        material.ticket || ""
+                    ).trim();
+
+                if (!materialsByTicket.has(ticket)) {
+
+                    materialsByTicket.set(
+                        ticket,
+                        []
+                    );
+
+                }
+
+                materialsByTicket
+                    .get(ticket)
+                    .push(material);
+
+            }
+        );
 
         validationResults.forEach(
             function (validation) {
@@ -1993,34 +2510,69 @@
                         validation
                     );
 
-
                 const ticketKey =
                     String(
                         ticket
                     ).trim();
-
 
                 const source =
                     sourceByTicket.get(
                         ticketKey
                     ) || {};
 
-
                 const matching =
-                    materialRows.filter(
-                        function (material) {
+                    materialsByTicket.get(
+                        ticketKey
+                    ) || [];
 
-                            return (
-                                String(
-                                    material.ticket ||
-                                    ""
-                                ).trim() ===
-                                ticketKey
-                            );
+                const cirDate =
+                    source["CIR Date"] ||
+                    validation["CIR Date"] ||
+                    validation.cirDate ||
+                    "";
 
-                        }
-                    );
+                const base = {
 
+                    "TT Number":
+                        ticket,
+
+                    "Datetime Receive":
+                        validation
+                            .receiveDateFormatted ||
+                        validation
+                            .receiveDate ||
+                        source[
+                            "Datetime Receive"
+                        ] ||
+                        "",
+
+                    "CIR Date":
+                        cirDate,
+
+                    "TT Release":
+                        validation
+                            .releaseDateTime ||
+                        validation
+                            .releaseDate ||
+                        "",
+
+                    "Status":
+                        validation.status ||
+                        "",
+
+                    "Keterangan":
+                        validation.reason ||
+                        "",
+
+                    "CIR":
+                        source.CIR ||
+                        "",
+
+                    "Release Raw":
+                        validation.releaseRaw ||
+                        ""
+
+                };
 
                 if (matching.length) {
 
@@ -2031,35 +2583,7 @@
 
                             output.push({
 
-                                "TT Number":
-                                    ticket,
-
-                                "Datetime Receive":
-                                    validation
-                                        .receiveDateFormatted ||
-                                    validation
-                                        .receiveDate ||
-                                    source[
-                                        "Datetime Receive"
-                                    ] ||
-                                    "",
-
-                                "TT Release":
-                                    validation
-                                        .releaseDateTime ||
-                                    validation
-                                        .releaseDate ||
-                                    "",
-
-                                "Status":
-                                    validation
-                                        .status ||
-                                    "",
-
-                                "Keterangan":
-                                    validation
-                                        .reason ||
-                                    "",
+                                ...base,
 
                                 "Material":
                                     material.material,
@@ -2074,79 +2598,25 @@
                                     material.code,
 
                                 "Material Score":
-                                    material.score,
-
-                                "CIR":
-                                    source.CIR ||
-                                    "",
-
-                                "Release Raw":
-                                    validation
-                                        .releaseRaw ||
-                                    ""
+                                    material.score
 
                             });
 
                         }
                     );
 
-                } else {
+                }
+                else {
 
                     output.push({
 
-                        "TT Number":
-                            ticket,
+                        ...base,
 
-                        "Datetime Receive":
-                            validation
-                                .receiveDateFormatted ||
-                            validation
-                                .receiveDate ||
-                            source[
-                                "Datetime Receive"
-                            ] ||
-                            "",
-
-                        "TT Release":
-                            validation
-                                .releaseDateTime ||
-                            validation
-                                .releaseDate ||
-                            "",
-
-                        "Status":
-                            validation
-                                .status ||
-                            "",
-
-                        "Keterangan":
-                            validation
-                                .reason ||
-                            "",
-
-                        "Material":
-                            "",
-
-                        "Quantity":
-                            "",
-
-                        "Satuan":
-                            "",
-
-                        "Kode":
-                            "",
-
-                        "Material Score":
-                            "",
-
-                        "CIR":
-                            source.CIR ||
-                            "",
-
-                        "Release Raw":
-                            validation
-                                .releaseRaw ||
-                            ""
+                        "Material": "",
+                        "Quantity": "",
+                        "Satuan": "",
+                        "Kode": "",
+                        "Material Score": ""
 
                     });
 
@@ -2154,7 +2624,6 @@
 
             }
         );
-
 
         return output;
 
@@ -2165,9 +2634,7 @@
        SUMMARY
     ===================================================== */
 
-    function calculateSummary(
-        results
-    ) {
+    function calculateSummary(results) {
 
         const summary = {
 
@@ -2185,7 +2652,6 @@
 
         };
 
-
         results.forEach(
             function (result) {
 
@@ -2195,7 +2661,6 @@
                     )
                         .trim()
                         .toUpperCase();
-
 
                 if (
                     status === "SESUAI" ||
@@ -2221,15 +2686,12 @@
             }
         );
 
-
         return summary;
 
     }
 
 
-    function getSummary(
-        results
-    ) {
+    function getSummary(results) {
 
         if (
             window.ReportCheckerValidator &&
@@ -2255,7 +2717,6 @@
 
         }
 
-
         return calculateSummary(
             results
         );
@@ -2264,35 +2725,32 @@
 
 
     /* =====================================================
-       RENDER DASHBOARD
+       DASHBOARD
     ===================================================== */
 
     function renderDashboard() {
 
-        const ui = getUI();
-
+        const ui =
+            getUI();
 
         const summary =
             getSummary(
                 state.results
             );
 
-
-        const validCount =
+        const valid =
             Number(
                 summary.sesuai ??
                 summary.valid ??
                 0
             );
 
-
-        const invalidCount =
+        const invalid =
             Number(
                 summary.tidakSesuai ??
                 summary.invalid ??
                 0
             );
-
 
         const total =
             Number(
@@ -2300,68 +2758,60 @@
                 state.results.length
             );
 
-
         if (ui.totalCount) {
             ui.totalCount.textContent =
                 total;
         }
 
-
         if (ui.validCount) {
             ui.validCount.textContent =
-                validCount;
+                valid;
         }
-
 
         if (ui.invalidCount) {
             ui.invalidCount.textContent =
-                invalidCount;
+                invalid;
         }
-
 
         if (ui.materialCount) {
             ui.materialCount.textContent =
                 state.materialRows.length;
         }
 
-
         if (ui.materialErrorCount) {
             ui.materialErrorCount.textContent =
                 state.materialErrorRows.length;
         }
 
-
         if (ui.validTabCount) {
             ui.validTabCount.textContent =
-                validCount;
+                valid;
         }
-
 
         if (ui.invalidTabCount) {
             ui.invalidTabCount.textContent =
-                invalidCount;
+                invalid;
         }
-
 
         if (ui.materialTabCount) {
             ui.materialTabCount.textContent =
                 state.materialRows.length;
         }
 
-
         if (ui.materialErrorTabCount) {
             ui.materialErrorTabCount.textContent =
                 state.materialErrorRows.length;
         }
 
-
         if (ui.resultSummary) {
 
             ui.resultSummary.textContent =
-                `Total ${total} data • ${validCount} sesuai • ${invalidCount} tidak sesuai • ${state.materialRows.length} material`;
+                `Total ${total} data • ` +
+                `${valid} sesuai • ` +
+                `${invalid} tidak sesuai • ` +
+                `${state.materialRows.length} material`;
 
         }
-
 
         if (ui.dashboardSection) {
 
@@ -2378,46 +2828,21 @@
        ESCAPE HTML
     ===================================================== */
 
-    function escapeHTML(
-        value
-    ) {
+    function escapeHTML(value) {
 
         if (
             value === null ||
             value === undefined
         ) {
-
             return "";
-
         }
 
-
         return String(value)
-
-            .replace(
-                /&/g,
-                "&amp;"
-            )
-
-            .replace(
-                /</g,
-                "&lt;"
-            )
-
-            .replace(
-                />/g,
-                "&gt;"
-            )
-
-            .replace(
-                /"/g,
-                "&quot;"
-            )
-
-            .replace(
-                /'/g,
-                "&#039;"
-            );
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
 
     }
 
@@ -2426,9 +2851,7 @@
        STATUS CLASS
     ===================================================== */
 
-    function statusClass(
-        status
-    ) {
+    function statusClass(status) {
 
         const value =
             String(
@@ -2436,7 +2859,6 @@
             )
                 .trim()
                 .toUpperCase();
-
 
         if (
             value === "SESUAI" ||
@@ -2447,7 +2869,6 @@
 
         }
 
-
         if (
             value === "TIDAK SESUAI"
         ) {
@@ -2456,14 +2877,13 @@
 
         }
 
-
         return "invalid";
 
     }
 
 
     /* =====================================================
-       FILTER RESULTS
+       FILTER
     ===================================================== */
 
     function getValidResults() {
@@ -2477,7 +2897,6 @@
                     )
                         .trim()
                         .toUpperCase();
-
 
                 return (
                     status === "SESUAI" ||
@@ -2502,7 +2921,6 @@
                         .trim()
                         .toUpperCase();
 
-
                 return !(
                     status === "SESUAI" ||
                     status === "VALID"
@@ -2515,13 +2933,10 @@
 
 
     /* =====================================================
-       PAGINATION HELPER
+       PAGINATION
     ===================================================== */
 
-    function paginate(
-        rows,
-        page
-    ) {
+    function paginate(rows, page) {
 
         const totalPages =
             Math.max(
@@ -2532,7 +2947,6 @@
                 )
             );
 
-
         const safePage =
             Math.min(
                 Math.max(
@@ -2542,13 +2956,11 @@
                 totalPages
             );
 
-
         const start =
             (
                 safePage - 1
             ) *
             state.pageSize;
-
 
         return {
 
@@ -2571,7 +2983,7 @@
 
 
     /* =====================================================
-       UPDATE PAGINATION UI
+       PAGINATION UI
     ===================================================== */
 
     function updatePaginationUI(
@@ -2580,67 +2992,42 @@
         totalPages
     ) {
 
-        const ui = getUI();
-
+        const ui =
+            getUI();
 
         let prev;
         let next;
         let number;
         let total;
 
-
         if (type === "valid") {
 
-            prev =
-                ui.validPrevBtn;
-
-            next =
-                ui.validNextBtn;
-
-            number =
-                ui.validPageNumber;
-
-            total =
-                ui.validPageTotal;
+            prev = ui.validPrevBtn;
+            next = ui.validNextBtn;
+            number = ui.validPageNumber;
+            total = ui.validPageTotal;
 
         }
 
+        else if (type === "invalid") {
 
-        if (type === "invalid") {
-
-            prev =
-                ui.invalidPrevBtn;
-
-            next =
-                ui.invalidNextBtn;
-
-            number =
-                ui.invalidPageNumber;
-
-            total =
-                ui.invalidPageTotal;
+            prev = ui.invalidPrevBtn;
+            next = ui.invalidNextBtn;
+            number = ui.invalidPageNumber;
+            total = ui.invalidPageTotal;
 
         }
 
+        else if (type === "material") {
 
-        if (type === "material") {
-
-            prev =
-                ui.materialPrevBtn;
-
-            next =
-                ui.materialNextBtn;
-
-            number =
-                ui.materialPageNumber;
-
-            total =
-                ui.materialPageTotal;
+            prev = ui.materialPrevBtn;
+            next = ui.materialNextBtn;
+            number = ui.materialPageNumber;
+            total = ui.materialPageTotal;
 
         }
 
-
-        if (type === "materialError") {
+        else if (type === "materialError") {
 
             prev =
                 ui.materialErrorPrevBtn;
@@ -2656,24 +3043,20 @@
 
         }
 
-
         if (number) {
             number.textContent =
                 page;
         }
-
 
         if (total) {
             total.textContent =
                 totalPages;
         }
 
-
         if (prev) {
             prev.disabled =
                 page <= 1;
         }
-
 
         if (next) {
             next.disabled =
@@ -2684,16 +3067,16 @@
 
 
     /* =====================================================
-       RENDER VALID TABLE
+       RENDER VALID
     ===================================================== */
 
     function renderValidTable() {
 
-        const ui = getUI();
+        const ui =
+            getUI();
 
         const rows =
             getValidResults();
-
 
         const pageData =
             paginate(
@@ -2701,16 +3084,13 @@
                 state.pagination.valid
             );
 
-
         state.pagination.valid =
             pageData.page;
-
 
         if (ui.validTableBody) {
 
             ui.validTableBody.innerHTML =
                 "";
-
 
             pageData.rows.forEach(
                 function (result) {
@@ -2719,7 +3099,6 @@
                         document.createElement(
                             "tr"
                         );
-
 
                     tr.innerHTML = `
 
@@ -2737,6 +3116,15 @@
                                     .receiveDateFormatted ||
                                 result
                                     .receiveDate ||
+                                ""
+                            )}
+                        </td>
+
+                        <td>
+                            ${escapeHTML(
+                                result
+                                    ["CIR Date"] ||
+                                result.cirDate ||
                                 ""
                             )}
                         </td>
@@ -2769,7 +3157,6 @@
 
                     `;
 
-
                     ui.validTableBody.appendChild(
                         tr
                     );
@@ -2778,7 +3165,6 @@
             );
 
         }
-
 
         if (ui.validEmpty) {
 
@@ -2789,7 +3175,6 @@
 
         }
 
-
         if (ui.validTable) {
 
             ui.validTable.style.display =
@@ -2798,7 +3183,6 @@
                     : "none";
 
         }
-
 
         updatePaginationUI(
             "valid",
@@ -2810,16 +3194,16 @@
 
 
     /* =====================================================
-       RENDER INVALID TABLE
+       RENDER INVALID
     ===================================================== */
 
     function renderInvalidTable() {
 
-        const ui = getUI();
+        const ui =
+            getUI();
 
         const rows =
             getInvalidResults();
-
 
         const pageData =
             paginate(
@@ -2827,16 +3211,13 @@
                 state.pagination.invalid
             );
 
-
         state.pagination.invalid =
             pageData.page;
-
 
         if (ui.invalidTableBody) {
 
             ui.invalidTableBody.innerHTML =
                 "";
-
 
             pageData.rows.forEach(
                 function (result) {
@@ -2845,7 +3226,6 @@
                         document.createElement(
                             "tr"
                         );
-
 
                     tr.innerHTML = `
 
@@ -2863,6 +3243,15 @@
                                     .receiveDateFormatted ||
                                 result
                                     .receiveDate ||
+                                ""
+                            )}
+                        </td>
+
+                        <td>
+                            ${escapeHTML(
+                                result
+                                    ["CIR Date"] ||
+                                result.cirDate ||
                                 ""
                             )}
                         </td>
@@ -2895,7 +3284,6 @@
 
                     `;
 
-
                     ui.invalidTableBody.appendChild(
                         tr
                     );
@@ -2904,7 +3292,6 @@
             );
 
         }
-
 
         if (ui.invalidEmpty) {
 
@@ -2915,7 +3302,6 @@
 
         }
 
-
         if (ui.invalidTable) {
 
             ui.invalidTable.style.display =
@@ -2924,7 +3310,6 @@
                     : "none";
 
         }
-
 
         updatePaginationUI(
             "invalid",
@@ -2936,16 +3321,16 @@
 
 
     /* =====================================================
-       RENDER MATERIAL TABLE
+       RENDER MATERIAL
     ===================================================== */
 
     function renderMaterialTable() {
 
-        const ui = getUI();
+        const ui =
+            getUI();
 
         const rows =
             state.materialRows;
-
 
         const pageData =
             paginate(
@@ -2953,16 +3338,13 @@
                 state.pagination.material
             );
 
-
         state.pagination.material =
             pageData.page;
-
 
         if (ui.materialTableBody) {
 
             ui.materialTableBody.innerHTML =
                 "";
-
 
             pageData.rows.forEach(
                 function (row) {
@@ -2971,7 +3353,6 @@
                         document.createElement(
                             "tr"
                         );
-
 
                     tr.innerHTML = `
 
@@ -3007,7 +3388,6 @@
 
                     `;
 
-
                     ui.materialTableBody.appendChild(
                         tr
                     );
@@ -3016,7 +3396,6 @@
             );
 
         }
-
 
         if (ui.materialEmpty) {
 
@@ -3027,7 +3406,6 @@
 
         }
 
-
         if (ui.materialTable) {
 
             ui.materialTable.style.display =
@@ -3036,7 +3414,6 @@
                     : "none";
 
         }
-
 
         updatePaginationUI(
             "material",
@@ -3048,16 +3425,16 @@
 
 
     /* =====================================================
-       RENDER MATERIAL ERROR TABLE
+       RENDER MATERIAL ERROR
     ===================================================== */
 
     function renderMaterialErrorTable() {
 
-        const ui = getUI();
+        const ui =
+            getUI();
 
         const rows =
             state.materialErrorRows;
-
 
         const pageData =
             paginate(
@@ -3065,16 +3442,13 @@
                 state.pagination.materialError
             );
 
-
         state.pagination.materialError =
             pageData.page;
-
 
         if (ui.materialErrorTableBody) {
 
             ui.materialErrorTableBody.innerHTML =
                 "";
-
 
             pageData.rows.forEach(
                 function (row) {
@@ -3083,7 +3457,6 @@
                         document.createElement(
                             "tr"
                         );
-
 
                     tr.innerHTML = `
 
@@ -3126,7 +3499,6 @@
 
                     `;
 
-
                     ui.materialErrorTableBody.appendChild(
                         tr
                     );
@@ -3135,7 +3507,6 @@
             );
 
         }
-
 
         if (ui.materialErrorEmpty) {
 
@@ -3146,7 +3517,6 @@
 
         }
 
-
         if (ui.materialErrorTable) {
 
             ui.materialErrorTable.style.display =
@@ -3155,7 +3525,6 @@
                     : "none";
 
         }
-
 
         updatePaginationUI(
             "materialError",
@@ -3172,32 +3541,20 @@
 
     function renderAll() {
 
-        state.pagination.valid =
-            1;
-
-        state.pagination.invalid =
-            1;
-
-        state.pagination.material =
-            1;
-
-        state.pagination.materialError =
-            1;
-
+        state.pagination.valid = 1;
+        state.pagination.invalid = 1;
+        state.pagination.material = 1;
+        state.pagination.materialError = 1;
 
         renderDashboard();
 
         renderValidTable();
-
         renderInvalidTable();
-
         renderMaterialTable();
-
         renderMaterialErrorTable();
 
-
-        const ui = getUI();
-
+        const ui =
+            getUI();
 
         if (ui.downloadValidBtn) {
 
@@ -3206,7 +3563,6 @@
 
         }
 
-
         if (ui.downloadInvalidBtn) {
 
             ui.downloadInvalidBtn.disabled =
@@ -3214,14 +3570,12 @@
 
         }
 
-
         if (ui.downloadMaterialBtn) {
 
             ui.downloadMaterialBtn.disabled =
                 state.materialRows.length === 0;
 
         }
-
 
         if (ui.downloadMaterialErrorBtn) {
 
@@ -3239,164 +3593,215 @@
 
     async function runProcess() {
 
-    if (!checkDependencies()) {
-        return;
-    }
-
-    if (!state.file) {
-        alert(
-            "Silakan pilih file Excel terlebih dahulu."
-        );
-        return;
-    }
-
-    if (!state.workbook) {
-        updateProgress(10, "Membaca file Excel...");
-
-        await readAndPrepareFile(
-            state.file
-        );
-
-        if (!state.workbook) {
+        if (!checkDependencies()) {
             return;
         }
-    }
 
-    setProcessing(
-        true,
-        "Sedang memproses..."
-    );
+        if (!state.file) {
 
-    updateProgress(
-        20,
-        "Mempersiapkan data..."
-    );
-
-    setSystemStatus(
-        "Memproses...",
-        "online"
-    );
-
-    try {
-
-        if (state.sheetName) {
-
-            loadSheet(
-                state.sheetName
+            alert(
+                "Silakan pilih file Excel terlebih dahulu."
             );
+
+            return;
 
         }
 
-        updateProgress(
-            35,
-            "Memvalidasi data Excel..."
-        );
+        if (!state.workbook) {
 
-        await new Promise(
-            resolve => setTimeout(resolve, 20)
-        );
-
-        updateProgress(
-            55,
-            "Memeriksa TT Number..."
-        );
-
-        const results =
-            processData();
-
-        updateProgress(
-            80,
-            "Memproses material..."
-        );
-
-        await new Promise(
-            resolve => setTimeout(resolve, 20)
-        );
-
-        renderAll();
-
-        updateProgress(
-            100,
-            "Selesai memproses data"
-        );
-
-        const summary =
-            getSummary(
-                results
+            updateProgress(
+                10,
+                "Membaca file Excel..."
             );
 
-        const sesuai =
-            Number(
-                summary.sesuai ??
-                summary.valid ??
-                0
+            await readAndPrepareFile(
+                state.file
             );
 
-        const tidakSesuai =
-            Number(
-                summary.tidakSesuai ??
-                0
-            );
+            if (!state.workbook) {
+                return;
+            }
+
+        }
+
+        setProcessing(
+            true,
+            "Sedang memproses..."
+        );
+
+        updateProgress(
+            20,
+            "Mempersiapkan data..."
+        );
 
         setSystemStatus(
-            "Selesai",
+            "Memproses...",
             "online"
         );
 
-        console.log(
-            "Report Checker result:",
-            {
-                total:
-                    results.length,
+        try {
 
-                sesuai:
-                    sesuai,
+            if (state.sheetName) {
 
-                tidakSesuai:
-                    tidakSesuai,
+                loadSheet(
+                    state.sheetName
+                );
 
-                material:
-                    state.materialRows.length,
-
-                materialError:
-                    state.materialErrorRows.length
             }
-        );
 
-        setTimeout(
-            function () {
-                setProcessing(false);
-            },
-            500
+            updateProgress(
+                30,
+                "Mendeteksi kolom..."
+            );
+
+            await delay(20);
+
+            updateProgress(
+                40,
+                "Mengunci tanggal CIR..."
+            );
+
+            await delay(20);
+
+            updateProgress(
+                55,
+                "Memvalidasi TT Number..."
+            );
+
+            const results =
+                processData();
+
+            updateProgress(
+                75,
+                "Memproses material..."
+            );
+
+            await delay(20);
+
+            updateProgress(
+                90,
+                "Menampilkan hasil..."
+            );
+
+            renderAll();
+
+            updateProgress(
+                100,
+                "Selesai memproses data"
+            );
+
+            const summary =
+                getSummary(
+                    results
+                );
+
+            const sesuai =
+                Number(
+                    summary.sesuai ??
+                    summary.valid ??
+                    0
+                );
+
+            const tidakSesuai =
+                Number(
+                    summary.tidakSesuai ??
+                    summary.invalid ??
+                    0
+                );
+
+            setSystemStatus(
+                state.cirErrors.length
+                    ? "Selesai dengan warning CIR"
+                    : "Selesai",
+                state.cirErrors.length
+                    ? "warning"
+                    : "online"
+            );
+
+            console.log(
+                "Report Checker result:",
+                {
+
+                    total:
+                        results.length,
+
+                    sesuai:
+                        sesuai,
+
+                    tidakSesuai:
+                        tidakSesuai,
+
+                    material:
+                        state.materialRows.length,
+
+                    materialError:
+                        state.materialErrorRows.length,
+
+                    cirErrors:
+                        state.cirErrors,
+
+                    cirLocked:
+                        state.cirLocked,
+
+                    cirDateSource:
+                        state.cirSource
+
+                }
+            );
+
+            setTimeout(
+                function () {
+
+                    setProcessing(
+                        false
+                    );
+
+                },
+                500
+            );
+
+        }
+        catch (error) {
+
+            console.error(
+                "Process error:",
+                error
+            );
+
+            setProcessing(
+                false
+            );
+
+            setSystemStatus(
+                "Error",
+                "offline"
+            );
+
+            alert(
+                error.message ||
+                "Terjadi kesalahan saat memproses Excel."
+            );
+
+        }
+
+    }
+
+
+    function delay(ms) {
+
+        return new Promise(
+            resolve =>
+                setTimeout(
+                    resolve,
+                    ms
+                )
         );
 
     }
-    catch (error) {
 
-        console.error(
-            "Process error:",
-            error
-        );
-
-        setProcessing(
-            false
-        );
-
-        setSystemStatus(
-            "Error",
-            "offline"
-        );
-
-        alert(
-            error.message ||
-            "Terjadi kesalahan saat memproses Excel."
-        );
-
-    }
-}
 
     /* =====================================================
-       EXPORT HELPERS
+       EXPORT
     ===================================================== */
 
     function exportRows(
@@ -3417,7 +3822,6 @@
 
         }
 
-
         if (
             !Array.isArray(rows) ||
             !rows.length
@@ -3431,7 +3835,6 @@
 
         }
 
-
         try {
 
             const worksheet =
@@ -3439,10 +3842,8 @@
                     rows
                 );
 
-
             const workbook =
                 XLSX.utils.book_new();
-
 
             XLSX.utils.book_append_sheet(
                 workbook,
@@ -3450,7 +3851,6 @@
                 sheetName ||
                 "Report"
             );
-
 
             XLSX.writeFile(
                 workbook,
@@ -3464,7 +3864,6 @@
                 "Export error:",
                 error
             );
-
 
             alert(
                 "Gagal membuat file Excel."
@@ -3481,52 +3880,54 @@
 
     function exportValid() {
 
-        const rows =
-            getValidResults();
-
-
         const output =
-            rows.map(
-                function (result) {
+            getValidResults()
+                .map(
+                    function (result) {
 
-                    return {
+                        return {
 
-                        "TT Number":
-                            getResultTicket(
+                            "TT Number":
+                                getResultTicket(
+                                    result
+                                ),
+
+                            "Datetime Receive":
                                 result
-                            ),
+                                    .receiveDateFormatted ||
+                                result
+                                    .receiveDate ||
+                                "",
 
-                        "Datetime Receive":
-                            result
-                                .receiveDateFormatted ||
-                            result
-                                .receiveDate ||
-                            "",
+                            "CIR Date":
+                                result
+                                    ["CIR Date"] ||
+                                result.cirDate ||
+                                "",
 
-                        "TT Release":
-                            result
-                                .releaseDateTime ||
-                            result
-                                .releaseDate ||
-                            "",
+                            "TT Release":
+                                result
+                                    .releaseDateTime ||
+                                result
+                                    .releaseDate ||
+                                "",
 
-                        "Status":
-                            result.status ||
-                            "",
+                            "Status":
+                                result.status ||
+                                "",
 
-                        "Keterangan":
-                            result.reason ||
-                            "",
+                            "Keterangan":
+                                result.reason ||
+                                "",
 
-                        "Release Raw":
-                            result.releaseRaw ||
-                            ""
+                            "Release Raw":
+                                result.releaseRaw ||
+                                ""
 
-                    };
+                        };
 
-                }
-            );
-
+                    }
+                );
 
         exportRows(
             output,
@@ -3545,52 +3946,54 @@
 
     function exportInvalid() {
 
-        const rows =
-            getInvalidResults();
-
-
         const output =
-            rows.map(
-                function (result) {
+            getInvalidResults()
+                .map(
+                    function (result) {
 
-                    return {
+                        return {
 
-                        "TT Number":
-                            getResultTicket(
+                            "TT Number":
+                                getResultTicket(
+                                    result
+                                ),
+
+                            "Datetime Receive":
                                 result
-                            ),
+                                    .receiveDateFormatted ||
+                                result
+                                    .receiveDate ||
+                                "",
 
-                        "Datetime Receive":
-                            result
-                                .receiveDateFormatted ||
-                            result
-                                .receiveDate ||
-                            "",
+                            "CIR Date":
+                                result
+                                    ["CIR Date"] ||
+                                result.cirDate ||
+                                "",
 
-                        "TT Release":
-                            result
-                                .releaseDateTime ||
-                            result
-                                .releaseDate ||
-                            "",
+                            "TT Release":
+                                result
+                                    .releaseDateTime ||
+                                result
+                                    .releaseDate ||
+                                "",
 
-                        "Status":
-                            result.status ||
-                            "",
+                            "Status":
+                                result.status ||
+                                "",
 
-                        "Keterangan":
-                            result.reason ||
-                            "",
+                            "Keterangan":
+                                result.reason ||
+                                "",
 
-                        "Release Raw":
-                            result.releaseRaw ||
-                            ""
+                            "Release Raw":
+                                result.releaseRaw ||
+                                ""
 
-                    };
+                        };
 
-                }
-            );
-
+                    }
+                );
 
         exportRows(
             output,
@@ -3618,6 +4021,9 @@
                         "TT Number":
                             row.ticket,
 
+                        "CIR Date":
+                            row.cirDate,
+
                         "Material":
                             row.material,
 
@@ -3637,7 +4043,6 @@
 
                 }
             );
-
 
         exportRows(
             output,
@@ -3665,6 +4070,9 @@
                         "TT Number":
                             row.ticket,
 
+                        "CIR Date":
+                            row.cirDate,
+
                         "Material":
                             row.material,
 
@@ -3685,7 +4093,6 @@
 
                 }
             );
-
 
         exportRows(
             output,
@@ -3719,21 +4126,17 @@
        FILENAME
     ===================================================== */
 
-    function makeFilename(
-        suffix
-    ) {
+    function makeFilename(suffix) {
 
         let base =
             state.fileName ||
             "report-checker";
-
 
         base =
             base.replace(
                 /\.[^.]+$/,
                 ""
             );
-
 
         return (
             base +
@@ -3751,76 +4154,45 @@
 
     function resetApp() {
 
-        state.workbook =
-            null;
+        state.workbook = null;
+        state.worksheet = null;
 
-        state.worksheet =
-            null;
+        state.rows = [];
+        state.results = [];
 
-        state.rows =
-            [];
+        state.materialRows = [];
+        state.materialErrorRows = [];
+        state.combinedRows = [];
 
-        state.results =
-            [];
+        state.headers = [];
 
-        state.materialRows =
-            [];
+        state.file = null;
+        state.fileName = "";
+        state.fileSize = 0;
 
-        state.materialErrorRows =
-            [];
+        state.sheetName = "";
+        state.sheetNames = [];
 
-        state.combinedRows =
-            [];
+        state.processed = false;
 
-        state.headers =
-            [];
+        state.cirErrors = [];
+        state.cirWarnings = [];
+        state.cirParsedRows = [];
+        state.cirDateMap = new Map();
 
-        state.file =
-            null;
-
-        state.fileName =
-            "";
-
-        state.fileSize =
-            0;
-
-        state.sheetName =
-            "";
-
-        state.sheetNames =
-            [];
-
-        state.processed =
-            false;
-
-
-        state.pagination.valid =
-            1;
-
-        state.pagination.invalid =
-            1;
-
-        state.pagination.material =
-            1;
-
-        state.pagination.materialError =
-            1;
-
+        state.pagination.valid = 1;
+        state.pagination.invalid = 1;
+        state.pagination.material = 1;
+        state.pagination.materialError = 1;
 
         const ui =
             getUI();
 
-
         if (ui.fileInput) {
-
-            ui.fileInput.value =
-                "";
-
+            ui.fileInput.value = "";
         }
 
-
         hideSelectedFile();
-
 
         if (ui.dashboardSection) {
 
@@ -3830,43 +4202,40 @@
 
         }
 
-
         if (ui.validTableBody) {
-
-            ui.validTableBody.innerHTML =
-                "";
-
+            ui.validTableBody.innerHTML = "";
         }
-
 
         if (ui.invalidTableBody) {
-
-            ui.invalidTableBody.innerHTML =
-                "";
-
+            ui.invalidTableBody.innerHTML = "";
         }
-
 
         if (ui.materialTableBody) {
-
-            ui.materialTableBody.innerHTML =
-                "";
-
+            ui.materialTableBody.innerHTML = "";
         }
-
 
         if (ui.materialErrorTableBody) {
+            ui.materialErrorTableBody.innerHTML = "";
+        }
 
-            ui.materialErrorTableBody.innerHTML =
-                "";
+        const sheetSelect =
+            byId("sheetSelect");
+
+        if (sheetSelect) {
+
+            sheetSelect.innerHTML = "";
+
+            sheetSelect.disabled =
+                true;
 
         }
 
+        setProcessing(false);
 
-        setProcessing(
-            false
+        updateProgress(
+            0,
+            ""
         );
-
 
         setSystemStatus(
             "Ready",
@@ -3888,42 +4257,30 @@
         state.pagination[type] +=
             direction;
 
-
         if (
             state.pagination[type] < 1
         ) {
 
-            state.pagination[type] =
-                1;
+            state.pagination[type] = 1;
 
         }
-
 
         if (type === "valid") {
-
             renderValidTable();
-
         }
 
-
-        if (type === "invalid") {
-
+        else if (type === "invalid") {
             renderInvalidTable();
-
         }
 
-
-        if (type === "material") {
-
+        else if (type === "material") {
             renderMaterialTable();
-
         }
 
-
-        if (type === "materialError") {
-
+        else if (
+            type === "materialError"
+        ) {
             renderMaterialErrorTable();
-
         }
 
     }
@@ -3936,16 +4293,10 @@
     function setupTabs() {
 
         const buttons =
-            $$(
-                ".tab-button"
-            );
-
+            $$(".tab-button");
 
         const contents =
-            $$(
-                ".tab-content"
-            );
-
+            $$(".tab-content");
 
         buttons.forEach(
             function (button) {
@@ -3957,7 +4308,6 @@
                         const tab =
                             button.dataset.tab;
 
-
                         buttons.forEach(
                             function (item) {
 
@@ -3967,7 +4317,6 @@
 
                             }
                         );
-
 
                         contents.forEach(
                             function (content) {
@@ -3979,18 +4328,15 @@
                             }
                         );
 
-
                         button.classList.add(
                             "active"
                         );
-
 
                         const target =
                             byId(
                                 "tab-" +
                                 tab
                             );
-
 
                         if (target) {
 
@@ -4018,7 +4364,6 @@
         const ui =
             getUI();
 
-
         if (
             ui.toggleSettingsBtn &&
             ui.settingsPanel
@@ -4032,12 +4377,10 @@
                         "hidden"
                     );
 
-
                     const opened =
                         !ui.settingsPanel.classList.contains(
                             "hidden"
                         );
-
 
                     ui.toggleSettingsBtn.textContent =
                         opened
@@ -4048,7 +4391,6 @@
             );
 
         }
-
 
         if (
             ui.saveSettingsBtn
@@ -4070,7 +4412,6 @@
 
                         }
 
-
                         if (
                             ui.settingsSavedMessage
                         ) {
@@ -4078,7 +4419,6 @@
                             ui.settingsSavedMessage.classList.remove(
                                 "hidden"
                             );
-
 
                             setTimeout(
                                 function () {
@@ -4107,7 +4447,6 @@
             );
 
         }
-
 
         if (
             ui.resetSettingsBtn
@@ -4148,9 +4487,7 @@
 
 
     /* =====================================================
-       DRAG & DROP
-       
-       INI BAGIAN PENTING UNTUK MASALAH DROP.
+       DROP ZONE
     ===================================================== */
 
     function setupDropZone() {
@@ -4158,59 +4495,33 @@
         const ui =
             getUI();
 
-
         if (!ui.dropZone) {
 
             console.error(
-                "dropZone tidak ditemukan."
+                "#dropZone tidak ditemukan."
             );
 
             return;
 
         }
 
-
-        console.log(
-            "Drop zone initialized."
-        );
-
-
-        /*
-         * Klik drop zone
-         */
-
         ui.dropZone.addEventListener(
             "click",
             function (event) {
-
-                /*
-                 * Jangan trigger kalau yang diklik
-                 * adalah input file itu sendiri.
-                 */
 
                 if (
                     event.target ===
                     ui.fileInput
                 ) {
-
                     return;
-
                 }
 
-
                 if (ui.fileInput) {
-
                     ui.fileInput.click();
-
                 }
 
             }
         );
-
-
-        /*
-         * Keyboard accessibility
-         */
 
         ui.dropZone.addEventListener(
             "keydown",
@@ -4223,11 +4534,8 @@
 
                     event.preventDefault();
 
-
                     if (ui.fileInput) {
-
                         ui.fileInput.click();
-
                     }
 
                 }
@@ -4235,19 +4543,12 @@
             }
         );
 
-
-        /*
-         * Drag enter
-         */
-
         ui.dropZone.addEventListener(
             "dragenter",
             function (event) {
 
                 event.preventDefault();
-
                 event.stopPropagation();
-
 
                 ui.dropZone.classList.add(
                     "drag-over"
@@ -4256,19 +4557,12 @@
             }
         );
 
-
-        /*
-         * Drag over
-         */
-
         ui.dropZone.addEventListener(
             "dragover",
             function (event) {
 
                 event.preventDefault();
-
                 event.stopPropagation();
-
 
                 if (
                     event.dataTransfer
@@ -4279,7 +4573,6 @@
 
                 }
 
-
                 ui.dropZone.classList.add(
                     "drag-over"
                 );
@@ -4287,24 +4580,12 @@
             }
         );
 
-
-        /*
-         * Drag leave
-         */
-
         ui.dropZone.addEventListener(
             "dragleave",
             function (event) {
 
                 event.preventDefault();
-
                 event.stopPropagation();
-
-
-                /*
-                 * Jangan langsung hapus class
-                 * kalau pindah ke child element.
-                 */
 
                 if (
                     event.relatedTarget &&
@@ -4317,7 +4598,6 @@
 
                 }
 
-
                 ui.dropZone.classList.remove(
                     "drag-over"
                 );
@@ -4325,54 +4605,30 @@
             }
         );
 
-
-        /*
-         * DROP
-         */
-
         ui.dropZone.addEventListener(
             "drop",
             function (event) {
 
                 event.preventDefault();
-
                 event.stopPropagation();
-
 
                 ui.dropZone.classList.remove(
                     "drag-over"
                 );
 
-
                 const files =
                     event.dataTransfer &&
                     event.dataTransfer.files;
-
 
                 if (
                     !files ||
                     !files.length
                 ) {
-
                     return;
-
                 }
 
-
-                const file =
-                    files[0];
-
-
-                console.log(
-                    "Dropped file:",
-                    file.name,
-                    file.type,
-                    file.size
-                );
-
-
                 handleFile(
-                    file
+                    files[0]
                 );
 
             }
@@ -4390,7 +4646,6 @@
         const ui =
             getUI();
 
-
         if (!ui.fileInput) {
 
             console.error(
@@ -4401,7 +4656,6 @@
 
         }
 
-
         ui.fileInput.addEventListener(
             "change",
             function (event) {
@@ -4410,13 +4664,8 @@
                     event.target.files &&
                     event.target.files[0];
 
-
                 if (file) {
-
-                    handleFile(
-                        file
-                    );
-
+                    handleFile(file);
                 }
 
             }
@@ -4426,18 +4675,13 @@
 
 
     /* =====================================================
-       BUTTON EVENTS
+       BUTTONS
     ===================================================== */
 
     function setupButtons() {
 
         const ui =
             getUI();
-
-
-        /*
-         * Proses
-         */
 
         if (ui.processBtn) {
 
@@ -4448,28 +4692,14 @@
 
         }
 
-
-        /*
-         * Hapus file
-         */
-
         if (ui.removeFileBtn) {
 
             ui.removeFileBtn.addEventListener(
                 "click",
-                function () {
-
-                    resetApp();
-
-                }
+                resetApp
             );
 
         }
-
-
-        /*
-         * Reset
-         */
 
         if (ui.resetBtn) {
 
@@ -4480,11 +4710,6 @@
 
         }
 
-
-        /*
-         * Download sesuai
-         */
-
         if (ui.downloadValidBtn) {
 
             ui.downloadValidBtn.addEventListener(
@@ -4493,11 +4718,6 @@
             );
 
         }
-
-
-        /*
-         * Download tidak sesuai
-         */
 
         if (ui.downloadInvalidBtn) {
 
@@ -4508,11 +4728,6 @@
 
         }
 
-
-        /*
-         * Download material
-         */
-
         if (ui.downloadMaterialBtn) {
 
             ui.downloadMaterialBtn.addEventListener(
@@ -4521,11 +4736,6 @@
             );
 
         }
-
-
-        /*
-         * Download material error
-         */
 
         if (ui.downloadMaterialErrorBtn) {
 
@@ -4540,14 +4750,13 @@
 
 
     /* =====================================================
-       PAGINATION BUTTON EVENTS
+       PAGINATION BUTTONS
     ===================================================== */
 
     function setupPagination() {
 
         const ui =
             getUI();
-
 
         if (ui.validPrevBtn) {
 
@@ -4565,7 +4774,6 @@
 
         }
 
-
         if (ui.validNextBtn) {
 
             ui.validNextBtn.addEventListener(
@@ -4581,7 +4789,6 @@
             );
 
         }
-
 
         if (ui.invalidPrevBtn) {
 
@@ -4599,7 +4806,6 @@
 
         }
 
-
         if (ui.invalidNextBtn) {
 
             ui.invalidNextBtn.addEventListener(
@@ -4615,7 +4821,6 @@
             );
 
         }
-
 
         if (ui.materialPrevBtn) {
 
@@ -4633,7 +4838,6 @@
 
         }
 
-
         if (ui.materialNextBtn) {
 
             ui.materialNextBtn.addEventListener(
@@ -4650,7 +4854,6 @@
 
         }
 
-
         if (ui.materialErrorPrevBtn) {
 
             ui.materialErrorPrevBtn.addEventListener(
@@ -4666,7 +4869,6 @@
             );
 
         }
-
 
         if (ui.materialErrorNextBtn) {
 
@@ -4688,10 +4890,7 @@
 
 
     /* =====================================================
-       GLOBAL DRAG PREVENT
-       
-       Supaya browser tidak membuka file saat
-       drop terjadi di luar drop zone.
+       GLOBAL DRAG PROTECTION
     ===================================================== */
 
     function setupGlobalDragProtection() {
@@ -4705,14 +4904,13 @@
             }
         );
 
-
         document.addEventListener(
             "drop",
             function (event) {
 
                 /*
-                 * Hanya cegah default.
-                 * Drop zone sendiri sudah punya handler.
+                 * Jangan stopPropagation di sini.
+                 * Handler dropZone harus tetap menerima drop.
                  */
 
                 event.preventDefault();
@@ -4729,50 +4927,49 @@
 
     function init() {
 
-        if (
-            state.initialized
-        ) {
-
+        if (state.initialized) {
             return;
-
         }
-
 
         state.initialized =
             true;
-
 
         console.log(
             "ReportChecker initializing..."
         );
 
-
         checkDependencies();
 
-
         setupDropZone();
-
         setupFileInput();
-
         setupButtons();
-
         setupPagination();
-
         setupTabs();
-
         setupSettings();
-
         setupGlobalDragProtection();
-
 
         setSystemStatus(
             "Ready",
             "offline"
         );
 
+        updateProgress(
+            0,
+            ""
+        );
 
         console.log(
-            "ReportChecker app.js loaded. exporter.js dependency removed."
+            "ReportChecker app.js loaded."
+        );
+
+        console.log(
+            "CIR LOCK:",
+            state.cirLocked
+        );
+
+        console.log(
+            "CIR DATE SOURCE:",
+            state.cirSource
         );
 
     }
@@ -4784,8 +4981,7 @@
 
     window.ReportCheckerApp = {
 
-        state:
-            state,
+        state: state,
 
         loadFile:
             handleFile,
@@ -4802,6 +4998,9 @@
         reset:
             resetApp,
 
+        render:
+            renderAll,
+
         exportValid:
             exportValid,
 
@@ -4817,8 +5016,11 @@
         exportDetail:
             exportDetail,
 
-        render:
-            renderAll,
+        parseCIR:
+            parseCIR,
+
+        getFirstDateBelowCIR:
+            getFirstDateBelowCIR,
 
         debug:
             function () {
@@ -4827,7 +5029,6 @@
                     "ReportChecker state:",
                     state
                 );
-
 
                 return state;
 
@@ -4857,19 +5058,4 @@
 
     }
 
-
 })();
-
-function updateProgress(percent, text) {
-    const progress = document.getElementById("processingProgress");
-    const processingText = document.getElementById("processingText");
-
-    if (progress) {
-        progress.textContent = `${percent}%`;
-    }
-
-    if (processingText && text) {
-        processingText.textContent = text;
-    }
-}
-
