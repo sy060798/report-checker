@@ -1,32 +1,21 @@
 /* =========================================================
-   REPORT CHECKER
-   settings.js - FULL UPDATE
+   SETTINGS.JS
+   Pengaturan Parser Material
+   =========================================================
 
-   Fokus:
-   - Master nama material
-   - Parser material mencari berdasarkan nama material
-   - Tidak bergantung pada tulisan:
-       Material:
-       Material :
-       material
-       matrial
-       MATERIAL
-       dll.
+   Fungsi utama:
 
-   Contoh CIR:
+   1. Menyimpan daftar nama material
+   2. Memuat daftar material saat aplikasi dibuka
+   3. Menyediakan daftar material untuk material-parser.js
+   4. Otomatis membersihkan baris kosong
+   5. Menghapus duplikat material
+   6. Tetap menyimpan format tulisan asli material
+   7. Bisa mengambil perubahan terbaru langsung dari textarea
 
-   matrial
-   protek:1
-   pigtail:1
+   Sumber utama:
+   #materialList
 
-   Hasil:
-   - Pigtail = 1
-   - protek diabaikan karena tidak ada di master material
-
-   Catatan:
-   - Pencocokan nama material tidak case-sensitive.
-   - Spasi berlebih / line break akan dinormalisasi.
-   - Hanya material yang ada di daftar master yang boleh diambil.
 ========================================================= */
 
 (function () {
@@ -35,473 +24,138 @@
 
 
     /* =====================================================
-       DEFAULT SETTINGS
-    ===================================================== */
-
-    const DEFAULT_SETTINGS = {
-
-        /*
-         * =================================================
-         * MASTER NAMA MATERIAL
-         * =================================================
-         *
-         * Parser material HARUS menggunakan daftar ini
-         * sebagai acuan.
-         *
-         * Material di luar daftar akan diabaikan.
-         *
-         * Contoh:
-         *
-         * pigtail:1
-         *
-         * akan dikenali sebagai:
-         *
-         * Pigtail = 1
-         *
-         * walaupun tulisan di CIR menggunakan huruf kecil.
-         */
-
-        materialKeywords: [
-
-            "Pigtail",
-
-            "Patchcord",
-
-            "Splitter 1:2",
-
-            "Splitter 1:4",
-
-            "Splitter 1:8",
-
-            "Splitter 1:16",
-
-            "2C (METER)",
-
-            "12C (METER)",
-
-            "24C (METER)",
-
-            "48C (METER)",
-
-            "96C (METER)",
-
-            "DPFO",
-
-            "12C DOME (UNIT)",
-
-            "24C DOME (UNIT)",
-
-            "48C DOME (UNIT)",
-
-            "96C DOME (UNIT)",
-
-            "144C DOME (UNIT)",
-
-            "12C INLANE (UNIT)",
-
-            "24C INLANE (UNIT)",
-
-            "48C INLINE (UNIT)",
-
-            "96C INLINE (UNIT)",
-
-            "144C INLINE (UNIT)",
-
-            "Fixing Slack",
-
-            "Kaset JB",
-
-            "Terminal Roset (Unit)",
-
-            "Tiang 7 (Batang)",
-
-            "Tiang 9 (Batang)",
-
-            "Subduct",
-
-            "Handhole 40 x 40",
-
-            "Handhole 60 x 60",
-
-            "Handhole 80 x 80",
-
-            "Dead end"
-
-        ],
-
-
-        /*
-         * =================================================
-         * FRASA AWAL MATERIAL
-         * =================================================
-         *
-         * TIDAK lagi menjadi syarat utama pencarian
-         * material.
-         *
-         * Tetap disimpan untuk kompatibilitas dengan
-         * parser lama / parser lain.
-         */
-
-        materialStartPhrases: [
-
-            "Material :",
-
-            "Material:",
-
-            "Material",
-
-            "MATERIAL :",
-
-            "MATERIAL:",
-
-            "MATERIAL",
-
-            "Matrial :",
-
-            "Matrial:",
-
-            "Matrial",
-
-            "MATRIAL :",
-
-            "MATRIAL:",
-
-            "MATRIAL",
-
-            "Material yang digunakan :",
-
-            "Material yang digunakan:",
-
-            "Material digunakan :",
-
-            "Material digunakan:",
-
-            "List Material :",
-
-            "List Material:"
-
-        ],
-
-
-        /*
-         * =================================================
-         * FRASA AKHIR MATERIAL
-         * =================================================
-         */
-
-        materialEndPhrases: [
-
-            "Tim qn",
-
-            "Team QN",
-
-            "TEAM QN",
-
-            "Tim QN",
-
-            "PIC FS",
-
-            "PIC fs",
-
-            "PIC FS:",
-
-            "RFO",
-
-            "RFO:",
-
-            "Action",
-
-            "Action:",
-
-            "Act",
-
-            "Act:",
-
-            "===CIR===",
-
-            "==="
-
-        ],
-
-
-        /*
-         * =================================================
-         * FRASA TT RELEASE
-         * =================================================
-         */
-
-        releasePhrases: [
-
-            "TT Release",
-
-            "TT release",
-
-            "TT RELEASE",
-
-            "Ticket Release",
-
-            "Ticket release",
-
-            "TICKET RELEASE"
-
-        ],
-
-
-        /*
-         * =================================================
-         * FRASA DATA TIDAK TERSEDIA
-         * =================================================
-         */
-
-        notFoundPhrases: [
-
-            "NOT YET",
-
-            "Not Yet",
-
-            "not yet",
-
-            "NOT FOUND",
-
-            "Not Found",
-
-            "not found",
-
-            "Belum ada",
-
-            "belum ada",
-
-            "Belum tersedia",
-
-            "belum tersedia",
-
-            "Pending",
-
-            "pending",
-
-            "N/A",
-
-            "n/a",
-
-            "-"
-
-        ],
-
-
-        /*
-         * =================================================
-         * VALIDASI TANGGAL
-         * =================================================
-         */
-
-        validationType:
-            "release-after-receive",
-
-
-        /*
-         * =================================================
-         * MAX SELISIH RELEASE
-         * =================================================
-         *
-         * 0 = tidak menggunakan batas maksimal.
-         */
-
-        maxReleaseMinutes:
-            0
-
-    };
-
-
-    /* =====================================================
        STORAGE KEY
     ===================================================== */
 
     const STORAGE_KEY =
-        "reportCheckerSettings";
+        "reportChecker_materialSettings";
 
 
     /* =====================================================
-       UTILITY
+       DEFAULT MATERIAL
     ===================================================== */
 
-    function cloneDefaultSettings() {
+    const DEFAULT_MATERIALS = [
+        "Pigtail",
+        "Patchcord",
+        "Splitter 1:2",
+        "Splitter 1:4",
+        "Splitter 1:8",
+        "Splitter 1:16",
+        "2C (METER)",
+        "12C (METER)",
+        "24C (METER)",
+        "48C (METER)",
+        "96C (METER)",
+        "DPFO",
+        "12C DOME (UNIT)",
+        "24C DOME (UNIT)",
+        "48C DOME (UNIT)",
+        "96C DOME (UNIT)",
+        "144C DOME (UNIT)",
+        "12C INLANE (UNIT)",
+        "24C INLANE (UNIT)",
+        "48C INLINE (UNIT)",
+        "96C INLINE (UNIT)",
+        "144C INLINE (UNIT)",
+        "Fixing Slack",
+        "Kaset JB",
+        "Terminal Roset (Unit)",
+        "Tiang 7 (Batang)",
+        "Tiang 9 (Batang)",
+        "Subduct",
+        "Handhole 40 x 40",
+        "Handhole 60 x 60",
+        "Handhole 80 x 80"
+    ];
 
-        return JSON.parse(
-            JSON.stringify(
-                DEFAULT_SETTINGS
-            )
+
+    /* =====================================================
+       GET ELEMENT
+    ===================================================== */
+
+    function getMaterialElement() {
+
+        return document.getElementById(
+            "materialList"
         );
 
     }
 
 
-    /*
-     * Membersihkan array setting.
-     */
-
-    function cleanPhraseArray(value) {
-
-        if (!Array.isArray(value)) {
-
-            return [];
-
-        }
-
-
-        return value
-
-            .map(function (item) {
-
-                return String(item)
-                    .trim();
-
-            })
-
-            .filter(function (item) {
-
-                return item.length > 0;
-
-            });
-
-    }
-
-
-    /*
-     * Normalisasi nama material.
-     *
-     * Tujuannya agar:
-     *
-     * Pigtail
-     * PIGTAIL
-     * pigtail
-     *
-     * dianggap sama.
-     *
-     * Juga menangani line break:
-     *
-     * Handhole
-     * 40 x 40
-     *
-     * menjadi:
-     *
-     * handhole 40 x 40
-     */
+    /* =====================================================
+       NORMALIZE MATERIAL
+    ===================================================== */
 
     function normalizeMaterialName(value) {
 
-        if (
-            value === null ||
-            value === undefined
-        ) {
-
+        if (value === null || value === undefined) {
             return "";
-
         }
 
-
         return String(value)
-
-            .replace(
-                /\u00A0/g,
-                " "
-            )
-
-            .replace(
-                /[\r\n\t]+/g,
-                " "
-            )
-
-            .replace(
-                /\s+/g,
-                " "
-            )
-
-            .trim()
-
-            .toLowerCase();
+            .replace(/\r/g, "")
+            .replace(/\t/g, " ")
+            .replace(/[ ]+/g, " ")
+            .trim();
 
     }
 
 
-    /*
-     * Bersihkan daftar material.
-     */
+    /* =====================================================
+       GET MATERIAL LIST FROM TEXTAREA
+    ===================================================== */
 
-    function cleanMaterialKeywords(value) {
+    function getMaterialList() {
 
-        if (!Array.isArray(value)) {
+        const textarea =
+            getMaterialElement();
 
+        if (!textarea) {
             return [];
-
         }
 
 
+        const lines =
+            textarea.value
+                .replace(/\r/g, "")
+                .split("\n");
+
+
         const result = [];
+        const exists = new Set();
 
 
-        value.forEach(
-            function (item) {
+        lines.forEach(function (line) {
 
-                const material =
-                    String(item || "")
-                        .replace(
-                            /\u00A0/g,
-                            " "
-                        )
-                        .replace(
-                            /[\r\n\t]+/g,
-                            " "
-                        )
-                        .replace(
-                            /\s+/g,
-                            " "
-                        )
-                        .trim();
+            const material =
+                normalizeMaterialName(line);
 
 
-                if (!material) {
-
-                    return;
-
-                }
-
-
-                /*
-                 * Hindari duplicate berdasarkan
-                 * nama yang sudah dinormalisasi.
-                 */
-
-                const normalized =
-                    normalizeMaterialName(
-                        material
-                    );
-
-
-                const exists =
-                    result.some(
-                        function (existing) {
-
-                            return (
-                                normalizeMaterialName(
-                                    existing
-                                ) ===
-                                normalized
-                            );
-
-                        }
-                    );
-
-
-                if (!exists) {
-
-                    result.push(
-                        material
-                    );
-
-                }
-
+            if (!material) {
+                return;
             }
-        );
+
+
+            /*
+             * Digunakan untuk pengecekan duplikat
+             * tanpa membedakan huruf besar/kecil.
+             */
+
+            const compareKey =
+                material.toLowerCase();
+
+
+            if (exists.has(compareKey)) {
+                return;
+            }
+
+
+            exists.add(compareKey);
+
+            result.push(material);
+
+        });
 
 
         return result;
@@ -510,10 +164,139 @@
 
 
     /* =====================================================
+       SET MATERIAL LIST
+    ===================================================== */
+
+    function setMaterialList(materials) {
+
+        const textarea =
+            getMaterialElement();
+
+        if (!textarea) {
+            return;
+        }
+
+
+        if (!Array.isArray(materials)) {
+            materials = [];
+        }
+
+
+        const cleaned = [];
+        const exists = new Set();
+
+
+        materials.forEach(function (item) {
+
+            const material =
+                normalizeMaterialName(item);
+
+
+            if (!material) {
+                return;
+            }
+
+
+            const key =
+                material.toLowerCase();
+
+
+            if (exists.has(key)) {
+                return;
+            }
+
+
+            exists.add(key);
+
+            cleaned.push(material);
+
+        });
+
+
+        textarea.value =
+            cleaned.join("\n");
+
+    }
+
+
+    /* =====================================================
+       SAVE SETTINGS
+    ===================================================== */
+
+    function saveMaterialSettings(showMessage) {
+
+        const materials =
+            getMaterialList();
+
+
+        const data = {
+            materials: materials,
+            updatedAt: new Date().toISOString()
+        };
+
+
+        try {
+
+            localStorage.setItem(
+                STORAGE_KEY,
+                JSON.stringify(data)
+            );
+
+        } catch (error) {
+
+            console.error(
+                "Gagal menyimpan pengaturan material:",
+                error
+            );
+
+        }
+
+
+        /*
+         * Pastikan textarea menggunakan
+         * data yang sudah dibersihkan.
+         */
+
+        setMaterialList(materials);
+
+
+        if (showMessage !== false) {
+
+            showSavedMessage();
+
+        }
+
+
+        /*
+         * Event untuk memberi tahu parser
+         * bahwa daftar material berubah.
+         */
+
+        window.dispatchEvent(
+            new CustomEvent(
+                "materialSettingsChanged",
+                {
+                    detail: {
+                        materials: materials
+                    }
+                }
+            )
+        );
+
+
+        return materials;
+
+    }
+
+
+    /* =====================================================
        LOAD SETTINGS
     ===================================================== */
 
-    function loadSettings() {
+    function loadMaterialSettings() {
+
+        let materials = null;
+
 
         try {
 
@@ -523,182 +306,81 @@
                 );
 
 
-            if (!saved) {
+            if (saved) {
 
-                return cloneDefaultSettings();
+                const data =
+                    JSON.parse(saved);
+
+
+                if (
+                    data &&
+                    Array.isArray(data.materials)
+                ) {
+
+                    materials =
+                        data.materials;
+
+                }
 
             }
 
-
-            const parsed =
-                JSON.parse(
-                    saved
-                );
-
-
-            const settings = {
-
-                ...cloneDefaultSettings(),
-
-                ...parsed
-
-            };
-
-
-            /*
-             * Master material
-             */
-
-            settings.materialKeywords =
-                cleanMaterialKeywords(
-                    settings.materialKeywords
-                );
-
-
-            /*
-             * Setting kompatibilitas parser
-             */
-
-            settings.materialStartPhrases =
-                cleanPhraseArray(
-                    settings.materialStartPhrases
-                );
-
-
-            settings.materialEndPhrases =
-                cleanPhraseArray(
-                    settings.materialEndPhrases
-                );
-
-
-            settings.releasePhrases =
-                cleanPhraseArray(
-                    settings.releasePhrases
-                );
-
-
-            settings.notFoundPhrases =
-                cleanPhraseArray(
-                    settings.notFoundPhrases
-                );
-
-
-            settings.maxReleaseMinutes =
-                Number(
-                    settings.maxReleaseMinutes
-                ) || 0;
-
-
-            return settings;
-
-        }
-        catch (error) {
+        } catch (error) {
 
             console.error(
-                "Gagal membaca settings:",
+                "Gagal membaca pengaturan material:",
                 error
             );
 
+        }
 
-            return cloneDefaultSettings();
+
+        /*
+         * Jika belum ada setting,
+         * gunakan default material.
+         */
+
+        if (
+            !Array.isArray(materials) ||
+            materials.length === 0
+        ) {
+
+            materials =
+                DEFAULT_MATERIALS.slice();
 
         }
+
+
+        setMaterialList(materials);
+
+
+        return materials;
 
     }
 
 
     /* =====================================================
-       SAVE SETTINGS
+       RESET DEFAULT
     ===================================================== */
 
-    function saveSettings(settings) {
+    function resetMaterialSettings() {
 
-        try {
-
-            const normalized = {
-
-                ...cloneDefaultSettings(),
-
-                ...(settings || {})
-
-            };
-
-
-            /*
-             * Master material
-             */
-
-            normalized.materialKeywords =
-                cleanMaterialKeywords(
-                    normalized.materialKeywords
-                );
-
-
-            /*
-             * Setting lainnya
-             */
-
-            normalized.materialStartPhrases =
-                cleanPhraseArray(
-                    normalized.materialStartPhrases
-                );
-
-
-            normalized.materialEndPhrases =
-                cleanPhraseArray(
-                    normalized.materialEndPhrases
-                );
-
-
-            normalized.releasePhrases =
-                cleanPhraseArray(
-                    normalized.releasePhrases
-                );
-
-
-            normalized.notFoundPhrases =
-                cleanPhraseArray(
-                    normalized.notFoundPhrases
-                );
-
-
-            normalized.maxReleaseMinutes =
-                Number(
-                    normalized.maxReleaseMinutes
-                ) || 0;
-
-
-            localStorage.setItem(
-                STORAGE_KEY,
-                JSON.stringify(
-                    normalized
-                )
+        const confirmed =
+            window.confirm(
+                "Reset daftar material ke pengaturan default?"
             );
 
 
-            return true;
-
-        }
-        catch (error) {
-
-            console.error(
-                "Gagal menyimpan settings:",
-                error
-            );
-
-
-            return false;
-
+        if (!confirmed) {
+            return;
         }
 
-    }
+
+        const materials =
+            DEFAULT_MATERIALS.slice();
 
 
-    /* =====================================================
-       RESET SETTINGS
-    ===================================================== */
+        setMaterialList(materials);
 
-    function resetSettings() {
 
         try {
 
@@ -706,620 +388,342 @@
                 STORAGE_KEY
             );
 
-
-            return cloneDefaultSettings();
-
-        }
-        catch (error) {
+        } catch (error) {
 
             console.error(
-                "Gagal reset settings:",
+                "Gagal menghapus pengaturan material:",
                 error
             );
 
+        }
 
-            return cloneDefaultSettings();
+
+        /*
+         * Simpan kembali default sebagai setting aktif.
+         */
+
+        try {
+
+            localStorage.setItem(
+                STORAGE_KEY,
+                JSON.stringify({
+                    materials: materials,
+                    updatedAt:
+                        new Date().toISOString()
+                })
+            );
+
+        } catch (error) {
+
+            console.error(
+                "Gagal menyimpan default material:",
+                error
+            );
 
         }
+
+
+        showSavedMessage(
+            "✓ Daftar material berhasil di-reset."
+        );
+
+
+        window.dispatchEvent(
+            new CustomEvent(
+                "materialSettingsChanged",
+                {
+                    detail: {
+                        materials: materials
+                    }
+                }
+            )
+        );
 
     }
 
 
     /* =====================================================
-       TEXTAREA HELPERS
+       SAVED MESSAGE
     ===================================================== */
 
-    function arrayToTextarea(array) {
+    function showSavedMessage(
+        message
+    ) {
 
-        if (!Array.isArray(array)) {
+        const element =
+            document.getElementById(
+                "settingsSavedMessage"
+            );
 
-            return "";
 
+        if (!element) {
+            return;
         }
 
 
-        return array.join("\n");
+        element.textContent =
+            message ||
+            "✓ Pengaturan berhasil disimpan.";
 
-    }
 
+        element.classList.remove(
+            "hidden"
+        );
 
-    function textareaToArray(value) {
 
-        if (!value) {
+        clearTimeout(
+            showSavedMessage.timer
+        );
 
-            return [];
 
-        }
-
-
-        return value
-
-            .split(/\r?\n/)
-
-            .map(function (item) {
-
-                return item.trim();
-
-            })
-
-            .filter(function (item) {
-
-                return item.length > 0;
-
-            });
-
-    }
-
-
-    /* =====================================================
-       LOAD SETTINGS INTO UI
-    ===================================================== */
-
-    function loadSettingsToUI() {
-
-        const settings =
-            loadSettings();
-
-
-        /*
-         * Master material
-         */
-
-        const materialKeywords =
-            document.getElementById(
-                "materialKeywords"
-            );
-
-
-        /*
-         * Kompatibilitas UI lama
-         */
-
-        const materialStart =
-            document.getElementById(
-                "materialStartPhrases"
-            );
-
-
-        const materialEnd =
-            document.getElementById(
-                "materialEndPhrases"
-            );
-
-
-        const releasePhrases =
-            document.getElementById(
-                "releasePhrases"
-            );
-
-
-        const notFound =
-            document.getElementById(
-                "notFoundPhrases"
-            );
-
-
-        const validationType =
-            document.getElementById(
-                "validationType"
-            );
-
-
-        const maxReleaseMinutes =
-            document.getElementById(
-                "maxReleaseMinutes"
-            );
-
-
-        /*
-         * Material master
-         */
-
-        if (materialKeywords) {
-
-            materialKeywords.value =
-                arrayToTextarea(
-                    settings.materialKeywords
-                );
-
-        }
-
-
-        /*
-         * Setting lama.
-         */
-
-        if (materialStart) {
-
-            materialStart.value =
-                arrayToTextarea(
-                    settings.materialStartPhrases
-                );
-
-        }
-
-
-        if (materialEnd) {
-
-            materialEnd.value =
-                arrayToTextarea(
-                    settings.materialEndPhrases
-                );
-
-        }
-
-
-        if (releasePhrases) {
-
-            releasePhrases.value =
-                arrayToTextarea(
-                    settings.releasePhrases
-                );
-
-        }
-
-
-        if (notFound) {
-
-            notFound.value =
-                arrayToTextarea(
-                    settings.notFoundPhrases
-                );
-
-        }
-
-
-        if (validationType) {
-
-            validationType.value =
-                settings.validationType;
-
-        }
-
-
-        if (maxReleaseMinutes) {
-
-            maxReleaseMinutes.value =
-                settings.maxReleaseMinutes;
-
-        }
-
-    }
-
-
-    /* =====================================================
-       READ SETTINGS FROM UI
-    ===================================================== */
-
-    function getSettingsFromUI() {
-
-        const current =
-            loadSettings();
-
-
-        const materialKeywords =
-            document.getElementById(
-                "materialKeywords"
-            );
-
-
-        const materialStart =
-            document.getElementById(
-                "materialStartPhrases"
-            );
-
-
-        const materialEnd =
-            document.getElementById(
-                "materialEndPhrases"
-            );
-
-
-        const releasePhrases =
-            document.getElementById(
-                "releasePhrases"
-            );
-
-
-        const notFound =
-            document.getElementById(
-                "notFoundPhrases"
-            );
-
-
-        const validationType =
-            document.getElementById(
-                "validationType"
-            );
-
-
-        const maxReleaseMinutes =
-            document.getElementById(
-                "maxReleaseMinutes"
-            );
-
-
-        return {
-
-            ...current,
-
-
-            /*
-             * Jika UI baru memiliki
-             * #materialKeywords,
-             * gunakan itu sebagai master.
-             */
-
-            materialKeywords:
-                materialKeywords
-                    ? textareaToArray(
-                        materialKeywords.value
-                    )
-                    : current.materialKeywords,
-
-
-            /*
-             * Tetap kompatibel dengan
-             * UI lama.
-             */
-
-            materialStartPhrases:
-                materialStart
-                    ? textareaToArray(
-                        materialStart.value
-                    )
-                    : current.materialStartPhrases,
-
-
-            materialEndPhrases:
-                materialEnd
-                    ? textareaToArray(
-                        materialEnd.value
-                    )
-                    : current.materialEndPhrases,
-
-
-            releasePhrases:
-                releasePhrases
-                    ? textareaToArray(
-                        releasePhrases.value
-                    )
-                    : current.releasePhrases,
-
-
-            notFoundPhrases:
-                notFound
-                    ? textareaToArray(
-                        notFound.value
-                    )
-                    : current.notFoundPhrases,
-
-
-            validationType:
-                validationType
-                    ? validationType.value
-                    : current.validationType,
-
-
-            maxReleaseMinutes:
-                maxReleaseMinutes
-                    ? Number(
-                        maxReleaseMinutes.value
-                    ) || 0
-                    : current.maxReleaseMinutes
-
-        };
-
-    }
-
-
-    /* =====================================================
-       UI EVENT HANDLERS
-    ===================================================== */
-
-    function initializeSettingsUI() {
-
-        loadSettingsToUI();
-
-
-        const toggleButton =
-            document.getElementById(
-                "toggleSettingsBtn"
-            );
-
-
-        const settingsPanel =
-            document.getElementById(
-                "settingsPanel"
-            );
-
-
-        if (
-            toggleButton &&
-            settingsPanel
-        ) {
-
-            toggleButton.addEventListener(
-                "click",
+        showSavedMessage.timer =
+            setTimeout(
                 function () {
 
-                    const isHidden =
-                        settingsPanel.classList.contains(
-                            "hidden"
-                        );
-
-
-                    settingsPanel.classList.toggle(
+                    element.classList.add(
                         "hidden"
                     );
 
-
-                    toggleButton.textContent =
-                        isHidden
-                            ? "Tutup Pengaturan"
-                            : "Buka Pengaturan";
-
-                }
+                },
+                2500
             );
-
-        }
-
-
-        /* ---------------------------------------------
-           SAVE
-        --------------------------------------------- */
-
-        const saveButton =
-            document.getElementById(
-                "saveSettingsBtn"
-            );
-
-
-        if (saveButton) {
-
-            saveButton.addEventListener(
-                "click",
-                function () {
-
-                    const settings =
-                        getSettingsFromUI();
-
-
-                    const saved =
-                        saveSettings(
-                            settings
-                        );
-
-
-                    const message =
-                        document.getElementById(
-                            "settingsSavedMessage"
-                        );
-
-
-                    if (
-                        saved &&
-                        message
-                    ) {
-
-                        message.textContent =
-                            "✓ Pengaturan berhasil disimpan.";
-
-                        message.classList.remove(
-                            "hidden"
-                        );
-
-
-                        setTimeout(
-                            function () {
-
-                                message.classList.add(
-                                    "hidden"
-                                );
-
-                            },
-                            2500
-                        );
-
-                    }
-
-                }
-            );
-
-        }
-
-
-        /* ---------------------------------------------
-           RESET
-        --------------------------------------------- */
-
-        const resetButton =
-            document.getElementById(
-                "resetSettingsBtn"
-            );
-
-
-        if (resetButton) {
-
-            resetButton.addEventListener(
-                "click",
-                function () {
-
-                    const confirmed =
-                        window.confirm(
-                            "Reset semua pengaturan parser ke default?"
-                        );
-
-
-                    if (!confirmed) {
-
-                        return;
-
-                    }
-
-
-                    resetSettings();
-
-
-                    loadSettingsToUI();
-
-
-                    const message =
-                        document.getElementById(
-                            "settingsSavedMessage"
-                        );
-
-
-                    if (message) {
-
-                        message.textContent =
-                            "✓ Pengaturan dikembalikan ke default.";
-
-                        message.classList.remove(
-                            "hidden"
-                        );
-
-
-                        setTimeout(
-                            function () {
-
-                                message.classList.add(
-                                    "hidden"
-                                );
-
-                            },
-                            2500
-                        );
-
-                    }
-
-                }
-            );
-
-        }
 
     }
 
 
     /* =====================================================
        PUBLIC API
-       ===================================================== */
+       Dipakai material-parser.js / app.js
+    ===================================================== */
 
     window.ReportCheckerSettings = {
 
         /*
-         * Ambil seluruh settings.
+         * Ambil daftar material terbaru
+         * langsung dari textarea.
+         *
+         * Jadi meskipun user belum klik Save,
+         * parser bisa mengambil perubahan terbaru.
          */
 
-        get:
-            loadSettings,
+        getMaterials: function () {
+
+            return getMaterialList();
+
+        },
 
 
         /*
-         * Simpan settings.
+         * Ambil daftar material yang tersimpan.
          */
 
-        save:
-            saveSettings,
+        getSavedMaterials: function () {
+
+            try {
+
+                const saved =
+                    localStorage.getItem(
+                        STORAGE_KEY
+                    );
+
+
+                if (!saved) {
+                    return [];
+                }
+
+
+                const data =
+                    JSON.parse(saved);
+
+
+                if (
+                    data &&
+                    Array.isArray(data.materials)
+                ) {
+
+                    return data.materials.slice();
+
+                }
+
+            } catch (error) {
+
+                console.error(
+                    "Gagal mengambil material tersimpan:",
+                    error
+                );
+
+            }
+
+
+            return [];
+
+        },
 
 
         /*
-         * Reset settings.
-
+         * Ganti daftar material dari JavaScript.
          */
 
-        reset:
-            resetSettings,
+        setMaterials: function (
+            materials
+        ) {
+
+            setMaterialList(materials);
+
+        },
 
 
         /*
-         * Load settings ke UI.
+         * Simpan.
          */
 
-        loadToUI:
-            loadSettingsToUI,
+        save: function () {
+
+            return saveMaterialSettings(
+                true
+            );
+
+        },
 
 
         /*
-         * Ambil settings dari UI.
-
+         * Reset.
          */
 
-        getFromUI:
-            getSettingsFromUI,
+        reset: function () {
+
+            resetMaterialSettings();
+
+        },
 
 
         /*
-         * Default settings.
-
+         * Default material.
          */
 
-        defaults:
-            cloneDefaultSettings,
+        getDefaults: function () {
 
+            return DEFAULT_MATERIALS.slice();
 
-        /*
-         * Utility untuk parser material.
-
-         * Contoh:
-
-           const settings =
-               window.ReportCheckerSettings.get();
-
-           const materials =
-               settings.materialKeywords;
-
-         */
-
-        normalizeMaterialName:
-            normalizeMaterialName,
-
-
-        cleanMaterialKeywords:
-            cleanMaterialKeywords
+        }
 
     };
 
 
     /* =====================================================
-       INITIALIZE AFTER DOM READY
+       DOM READY
     ===================================================== */
 
-    if (
-        document.readyState ===
-        "loading"
-    ) {
+    document.addEventListener(
+        "DOMContentLoaded",
+        function () {
 
-        document.addEventListener(
-            "DOMContentLoaded",
-            initializeSettingsUI
-        );
+            const textarea =
+                getMaterialElement();
 
-    }
-    else {
 
-        initializeSettingsUI();
+            if (!textarea) {
 
-    }
+                console.warn(
+                    "Textarea #materialList belum ditemukan."
+                );
+
+                return;
+
+            }
+
+
+            /*
+             * Load setting saat aplikasi dibuka.
+             */
+
+            loadMaterialSettings();
+
+
+            /* =============================================
+               SAVE BUTTON
+            ============================================= */
+
+            const saveButton =
+                document.getElementById(
+                    "saveSettingsBtn"
+                );
+
+
+            if (saveButton) {
+
+                saveButton.addEventListener(
+                    "click",
+                    function () {
+
+                        saveMaterialSettings(
+                            true
+                        );
+
+                    }
+                );
+
+            }
+
+
+            /* =============================================
+               RESET BUTTON
+            ============================================= */
+
+            const resetButton =
+                document.getElementById(
+                    "resetSettingsBtn"
+                );
+
+
+            if (resetButton) {
+
+                resetButton.addEventListener(
+                    "click",
+                    function () {
+
+                        resetMaterialSettings();
+
+                    }
+                );
+
+            }
+
+
+            /* =============================================
+               AUTO SYNC
+            ============================================= */
+
+            /*
+             * Ketika user mengubah textarea,
+             * parser bisa langsung mengambil
+             * nilai terbaru melalui getMaterials().
+             *
+             * Event ini hanya memberi tanda bahwa
+             * data berubah.
+             */
+
+            textarea.addEventListener(
+                "input",
+                function () {
+
+                    window.dispatchEvent(
+                        new CustomEvent(
+                            "materialSettingsChanged",
+                            {
+                                detail: {
+                                    materials:
+                                        getMaterialList()
+                                }
+                            }
+                        )
+                    );
+
+                }
+            );
+
+        }
+    );
+
 
 })();
