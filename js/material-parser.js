@@ -1,34 +1,13 @@
 /* =========================================================
-   REPORT CHECKER
-   material-parser.js
-
-   UPDATED - SYNC WITH settings.js
-
+   MATERIAL PARSER
+   ---------------------------------------------------------
    Fungsi:
-   - Material hanya diambil berdasarkan MASTER LIST
-     dari ReportCheckerSettings
-   - Tidak bergantung pada nama material hard-code
-   - Typo ringan masih diterima
-   - Material yang tidak cukup mirip ditolak
-   - Material excluded tidak pernah masuk hasil
-   - Support CIR object maupun array
-   - Support parse()
-   - Support parseMultiple()
-   - Support parseWithTicket()
-   - Support buildRows()
-   - Support flatten()
-   - Support parseDetailed()
-
-   CATATAN:
-   MASTER MATERIAL sekarang membaca:
-
-       window.ReportCheckerSettings.get()
-
-   dari:
-
-       settings.js
-
-   sehingga daftar material cukup diatur melalui Settings.
+   - Mengambil daftar nama material dari settings.js
+   - Otomatis sinkron dengan pengaturan Material
+   - Mencari material di bagian CIR
+   - Mendukung nama material multi-baris
+   - Mengambil Qty, Satuan, dan Kode jika tersedia
+   - Material yang tidak cocok dimasukkan ke error
 ========================================================= */
 
 (function () {
@@ -37,177 +16,590 @@
 
 
     /* =====================================================
-       FALLBACK MASTER MATERIAL
+       HELPER
+    ====================================================== */
 
-       Hanya digunakan jika settings.js belum tersedia
-       atau materialStartPhrases tidak ditemukan.
+    function normalizeText(value) {
 
-       Parser TETAP menggunakan setting.js apabila tersedia.
-    ===================================================== */
+        if (value === null || value === undefined) {
+            return "";
+        }
 
-    const FALLBACK_MATERIAL_MASTER = [
+        return String(value)
+            .replace(/\r/g, "")
+            .replace(/\u00A0/g, " ")
+            .trim();
 
-        "Pigtail",
-        "Patchcord",
-
-        "Splitter 1:2",
-        "Splitter 1:4",
-        "Splitter 1:8",
-        "Splitter 1:16",
-
-        "2C (METER)",
-        "12C (Meter)",
-        "24C (Meter)",
-        "48C (Meter)",
-        "96C (Meter)",
-
-        "DPFO",
-
-        "12C DOME (UNIT)",
-        "24C DOME (UNIT)",
-        "48C DOME (UNIT)",
-        "96C DOME (UNIT)",
-        "144C DOME (UNIT)",
-
-        "12C INLANE (Unit)",
-        "24C INLANE (Unit)",
-
-        "48C INLINE (Unit)",
-        "96C INLINE (Unit)",
-        "144C INLINE (Unit)",
-
-        "Fixing Slack",
-        "Kaset JB",
-
-        "Terminal Roset (Unit)",
-
-        "Tiang 7 (Batang)",
-        "Tiang 9 (Batang)",
-
-        "Subduct",
-
-        "Handhole 40 x 40",
-        "Handhole 60 x 60",
-        "Handhole 80 x 80",
-
-        "Dead End"
-
-    ];
+    }
 
 
-    /* =====================================================
-       EXCLUDED MATERIAL
-    ===================================================== */
+    function normalizeMaterialName(value) {
 
-    const EXCLUDED_MATERIAL_PATTERNS = [
+        return normalizeText(value)
+            .replace(/\s+/g, " ")
+            .toLowerCase();
 
-        "alcohol",
-        "alkohol",
-
-        "tisu",
-        "tissue",
-
-        "wet tissue",
-        "dry tissue",
-
-        "sleeve protector",
-        "sleeve protect",
-        "sleeve protection",
-
-        "protector sleeve",
-        "protective sleeve",
-
-        "fiber sleeve",
-        "splice sleeve",
-        "heat sleeve",
-        "heat shrink sleeve",
-
-        "protection",
-        "protector",
-        "protective"
-
-    ];
+    }
 
 
-    /* =====================================================
-       TT NUMBER COLUMN
+    function escapeRegex(value) {
 
-       Excel:
-       A = 0
-       B = 1
-       C = 2
-       D = 3
+        return String(value)
+            .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-       TT Number = kolom D
-    ===================================================== */
+    }
 
-    const TT_NUMBER_COLUMN_INDEX = 3;
-
-
-    /* =====================================================
-       MATCHING CONFIG
-    ===================================================== */
-
-    const MATCH_CONFIG = {
-
-        minimumScore: 0.82,
-
-        longTokenMinimum: 0.78,
-
-        mediumTokenMinimum: 0.84,
-
-        shortTokenMinimum: 0.92
-
-    };
-
-
-    /* =====================================================
-       GET MATERIAL MASTER FROM SETTINGS.JS
-       
-       settings.js memiliki:
-
-       materialStartPhrases
-
-       Tetapi daftar contoh user adalah nama material.
-       
-       Karena itu parser juga mendukung field:
-       
-       materialMaster
-       materialList
-       materials
-       materialNames
-
-       Jika field tersebut tersedia di settings.js,
-       akan dipakai.
-
-       Jika belum ada, fallback digunakan.
-    ===================================================== */
 
     function getSettings() {
 
+        /*
+         * settings.js diharapkan menyediakan:
+         *
+         * getParserSettings()
+         *
+         * atau:
+         *
+         * PARSER_SETTINGS
+         *
+         * atau:
+         *
+         * parserSettings
+         */
+
         try {
 
-            if (
-                window.ReportCheckerSettings &&
-                typeof
-                    window.ReportCheckerSettings.get ===
-                    "function"
-            ) {
+            if (typeof getParserSettings === "function") {
 
-                return (
-                    window.ReportCheckerSettings.get()
-                );
+                const settings = getParserSettings();
+
+                if (settings) {
+                    return settings;
+                }
 
             }
 
         } catch (error) {
 
-            console.error(
-                "Gagal membaca ReportCheckerSettings:",
+            console.warn(
+                "Gagal membaca getParserSettings():",
                 error
             );
 
         }
+
+
+        try {
+
+            if (
+                typeof window !== "undefined" &&
+                window.PARSER_SETTINGS
+            ) {
+
+                return window.PARSER_SETTINGS;
+
+            }
+
+        } catch (error) {
+
+            console.warn(
+                "Gagal membaca PARSER_SETTINGS:",
+                error
+            );
+
+        }
+
+
+        try {
+
+            if (
+                typeof window !== "undefined" &&
+                window.parserSettings
+            ) {
+
+                return window.parserSettings;
+
+            }
+
+        } catch (error) {
+
+            console.warn(
+                "Gagal membaca parserSettings:",
+                error
+            );
+
+        }
+
+
+        return {};
+
+    }
+
+
+    /* =====================================================
+       AMBIL DAFTAR MATERIAL DARI SETTINGS
+    ====================================================== */
+
+    function getMaterialListFromSettings() {
+
+        const settings = getSettings();
+
+        let materialList = [];
+
+
+        /*
+         * Format yang didukung:
+         *
+         * materialNames
+         * materials
+         * materialList
+         * materialNamesList
+         */
+
+        if (Array.isArray(settings.materialNames)) {
+
+            materialList = settings.materialNames;
+
+        } else if (Array.isArray(settings.materials)) {
+
+            materialList = settings.materials;
+
+        } else if (Array.isArray(settings.materialList)) {
+
+            materialList = settings.materialList;
+
+        } else if (Array.isArray(settings.materialNamesList)) {
+
+            materialList = settings.materialNamesList;
+
+        }
+
+
+        /*
+         * Kalau settings menyimpan textarea sebagai string
+         */
+
+        if (
+            materialList.length === 0 &&
+            typeof settings.materialNames === "string"
+        ) {
+
+            materialList =
+                settings.materialNames.split(/\r?\n/);
+
+        }
+
+
+        /*
+         * Fallback langsung dari textarea HTML.
+         * Ini membuat parser tetap otomatis mengikuti
+         * isi "Daftar Nama Material".
+         */
+
+        if (materialList.length === 0) {
+
+            const textarea =
+                document.getElementById(
+                    "materialNames"
+                );
+
+            if (textarea) {
+
+                materialList =
+                    textarea.value.split(/\r?\n/);
+
+            }
+
+        }
+
+
+        /*
+         * Bersihkan daftar.
+         */
+
+        materialList = materialList
+            .map(item => normalizeText(item))
+            .filter(item => item !== "");
+
+
+        /*
+         * Hilangkan duplikat berdasarkan lowercase.
+         */
+
+        const unique = [];
+        const seen = new Set();
+
+        materialList.forEach(material => {
+
+            const key =
+                normalizeMaterialName(material);
+
+            if (!key) {
+                return;
+            }
+
+            if (!seen.has(key)) {
+
+                seen.add(key);
+
+                unique.push(material);
+
+            }
+
+        });
+
+
+        /*
+         * Material lebih panjang diletakkan di depan.
+         *
+         * Contoh:
+         *
+         * Tiang 7
+         * Tiang 7 (Batang)
+         *
+         * Yang lebih spesifik dicoba terlebih dahulu.
+         */
+
+        unique.sort(function (a, b) {
+
+            return b.length - a.length;
+
+        });
+
+
+        return unique;
+
+    }
+
+
+    /* =====================================================
+       BERSIHKAN NAMA MATERIAL MULTI BARIS
+    ====================================================== */
+
+    function cleanMaterialName(value) {
+
+        return normalizeText(value)
+            .replace(/\s+/g, " ")
+            .trim();
+
+    }
+
+
+    /* =====================================================
+       PARSE ANGKA
+    ====================================================== */
+
+    function parseNumber(value) {
+
+        if (
+            value === null ||
+            value === undefined ||
+            value === ""
+        ) {
+
+            return "";
+
+        }
+
+
+        let text =
+            String(value)
+                .trim()
+                .replace(/\s/g, "");
+
+
+        /*
+         * Format:
+         *
+         * 1.000
+         * 1,000
+         * 1.5
+         * 1,5
+         */
+
+        if (
+            text.includes(".") &&
+            text.includes(",")
+        ) {
+
+            /*
+             * Anggap titik ribuan dan koma desimal.
+             */
+
+            text =
+                text
+                    .replace(/\./g, "")
+                    .replace(",", ".");
+
+        } else if (
+            text.includes(",") &&
+            !text.includes(".")
+        ) {
+
+            /*
+             * Koma desimal.
+             */
+
+            text =
+                text.replace(",", ".");
+
+        }
+
+
+        const number =
+            Number(text);
+
+
+        if (Number.isNaN(number)) {
+
+            return value;
+
+        }
+
+
+        return number;
+
+    }
+
+
+    /* =====================================================
+       CARI QTY
+    ====================================================== */
+
+    function findQty(text) {
+
+        const value =
+            normalizeText(text);
+
+
+        /*
+         * Contoh:
+         *
+         * Pigtail 2
+         * Pigtail : 2
+         * Pigtail = 2
+         */
+
+        const match =
+            value.match(
+                /(?:qty|jumlah)?\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)/i
+            );
+
+
+        if (match) {
+
+            return parseNumber(match[1]);
+
+        }
+
+
+        return "";
+
+    }
+
+
+    /* =====================================================
+       CARI SATUAN
+    ====================================================== */
+
+    function findUnit(text) {
+
+        const value =
+            normalizeText(text);
+
+
+        const units = [
+
+            "meter",
+            "m",
+            "unit",
+            "batang",
+            "pcs",
+            "pc",
+            "set",
+            "buah"
+
+        ];
+
+
+        for (const unit of units) {
+
+            const regex =
+                new RegExp(
+                    "\\b" +
+                    escapeRegex(unit) +
+                    "\\b",
+                    "i"
+                );
+
+
+            if (regex.test(value)) {
+
+                return unit;
+
+            }
+
+        }
+
+
+        /*
+         * Beberapa nama material sudah memiliki
+         * satuan di dalam namanya.
+         */
+
+        const lower =
+            value.toLowerCase();
+
+
+        if (lower.includes("meter")) {
+            return "Meter";
+        }
+
+        if (lower.includes("(unit)")) {
+            return "Unit";
+        }
+
+        if (lower.includes("(batang)")) {
+            return "Batang";
+        }
+
+
+        return "";
+
+    }
+
+
+    /* =====================================================
+       CARI KODE
+    ====================================================== */
+
+    function findCode(text) {
+
+        const value =
+            normalizeText(text);
+
+
+        /*
+         * Mendukung:
+         *
+         * Kode: ABC123
+         * Code: ABC123
+         * Kode = ABC123
+         */
+
+        const match =
+            value.match(
+                /(?:kode|code)\s*[:=]\s*([A-Za-z0-9._/-]+)/i
+            );
+
+
+        if (match) {
+
+            return match[1];
+
+        }
+
+
+        return "";
+
+    }
+
+
+    /* =====================================================
+       BUAT REGEX MATERIAL
+    ====================================================== */
+
+    function createMaterialRegex(materialName) {
+
+        /*
+         * Material bisa mempunyai line break.
+         *
+         * Contoh:
+         *
+         * Splitter
+         * 1:2
+         *
+         * akan tetap cocok dengan:
+         *
+         * Splitter 1:2
+         */
+
+        const parts =
+            String(materialName)
+                .split(/\s+/)
+                .filter(Boolean);
+
+
+        if (parts.length === 0) {
+            return null;
+        }
+
+
+        const pattern =
+            parts
+                .map(part => escapeRegex(part))
+                .join("\\s*");
+
+
+        return new RegExp(
+            "(^|[^A-Za-z0-9])" +
+            pattern +
+            "(?=$|[^A-Za-z0-9])",
+            "i"
+        );
+
+    }
+
+
+    /* =====================================================
+       DETEKSI MATERIAL
+    ====================================================== */
+
+    function detectMaterialInLine(
+        line,
+        materialList
+    ) {
+
+        const original =
+            normalizeText(line);
+
+
+        if (!original) {
+            return null;
+        }
+
+
+        /*
+         * Coba material yang paling panjang
+         * terlebih dahulu.
+         */
+
+        for (const material of materialList) {
+
+            const regex =
+                createMaterialRegex(material);
+
+
+            if (!regex) {
+                continue;
+            }
+
+
+            if (regex.test(original)) {
+
+                return {
+
+                    material:
+                        cleanMaterialName(material),
+
+                    raw:
+                        original
+
+                };
+
+            }
+
+        }
+
 
         return null;
 
@@ -215,830 +607,81 @@
 
 
     /* =====================================================
-       GET MATERIAL MASTER
-    ===================================================== */
+       PARSE SATU BARIS MATERIAL
+    ====================================================== */
 
-    function getMaterialMaster() {
-
-        const settings =
-            getSettings();
-
-
-        if (settings) {
-
-            /*
-             * Prioritas 1:
-             * materialMaster
-             */
-
-            if (
-                Array.isArray(
-                    settings.materialMaster
-                ) &&
-                settings.materialMaster.length
-            ) {
-
-                return cleanMaterialMaster(
-                    settings.materialMaster
-                );
-
-            }
-
-
-            /*
-             * Prioritas 2:
-             * materialList
-             */
-
-            if (
-                Array.isArray(
-                    settings.materialList
-                ) &&
-                settings.materialList.length
-            ) {
-
-                return cleanMaterialMaster(
-                    settings.materialList
-                );
-
-            }
-
-
-            /*
-             * Prioritas 3:
-             * materials
-             */
-
-            if (
-                Array.isArray(
-                    settings.materials
-                ) &&
-                settings.materials.length
-            ) {
-
-                return cleanMaterialMaster(
-                    settings.materials
-                );
-
-            }
-
-
-            /*
-             * Prioritas 4:
-             * materialNames
-             */
-
-            if (
-                Array.isArray(
-                    settings.materialNames
-                ) &&
-                settings.materialNames.length
-            ) {
-
-                return cleanMaterialMaster(
-                    settings.materialNames
-                );
-
-            }
-
-        }
-
-
-        /*
-         * Jika settings.js belum memiliki
-         * field master material,
-         * gunakan fallback.
-         */
-
-        return FALLBACK_MATERIAL_MASTER.slice();
-
-    }
-
-
-    /* =====================================================
-       CLEAN MATERIAL MASTER
-    ===================================================== */
-
-    function cleanMaterialMaster(
-        list
+    function parseMaterialLine(
+        line,
+        materialList,
+        ticket
     ) {
 
-        if (
-            !Array.isArray(list)
-        ) {
+        const text =
+            normalizeText(line);
 
-            return [];
 
-        }
-
-
-        const output = [];
-
-        const seen = new Set();
-
-
-        for (
-            const item
-            of list
-        ) {
-
-            const value =
-                normalizeLine(
-                    item
-                );
-
-
-            if (!value) {
-
-                continue;
-
-            }
-
-
-            const key =
-                normalizeMaterialName(
-                    value
-                );
-
-
-            if (!key) {
-
-                continue;
-
-            }
-
-
-            if (
-                seen.has(key)
-            ) {
-
-                continue;
-
-            }
-
-
-            seen.add(key);
-
-            output.push(
-                value
-            );
-
-        }
-
-
-        return output;
-
-    }
-
-
-    /* =====================================================
-       NORMALIZE TEXT
-    ===================================================== */
-
-    function normalizeText(value) {
-
-        if (
-            value === null ||
-            value === undefined
-        ) {
-
-            return "";
-
-        }
-
-        return String(value)
-
-            .replace(/\r\n/g, "\n")
-
-            .replace(/\r/g, "\n")
-
-            .replace(/\u00A0/g, " ")
-
-            .trim();
-
-    }
-
-
-    /* =====================================================
-       NORMALIZE LINE
-    ===================================================== */
-
-    function normalizeLine(value) {
-
-        return normalizeText(value)
-
-            .replace(/\s+/g, " ")
-
-            .trim();
-
-    }
-
-
-    /* =====================================================
-       NORMALIZE MATERIAL NAME
-    ===================================================== */
-
-    function normalizeMaterialName(value) {
-
-        if (!value) {
-
-            return "";
-
-        }
-
-        return normalizeLine(value)
-
-            .toLowerCase()
-
-            .replace(/\s*x\s*/gi, "x")
-
-            .replace(/\s*:\s*/g, ":")
-
-            .replace(
-                /(\d+)\s*\/\s*(\d+)/g,
-                "$1:$2"
-            )
-
-            .replace(/[()]/g, " ")
-
-            .replace(/["']/g, "")
-
-            .replace(/[_\-]+/g, " ")
-
-            .replace(/\s+/g, " ")
-
-            .trim();
-
-    }
-
-
-    /* =====================================================
-       CHECK EXCLUDED
-    ===================================================== */
-
-    function isExcludedMaterial(value) {
-
-        const normalized =
-            normalizeMaterialName(value);
-
-
-        if (!normalized) {
-
-            return true;
-
-        }
-
-
-        for (
-            const excluded
-            of EXCLUDED_MATERIAL_PATTERNS
-        ) {
-
-            const normalizedExcluded =
-                normalizeMaterialName(
-                    excluded
-                );
-
-
-            if (
-                normalized.includes(
-                    normalizedExcluded
-                )
-            ) {
-
-                return true;
-
-            }
-
-        }
-
-
-        return false;
-
-    }
-
-
-    /* =====================================================
-       TOKENIZE
-    ===================================================== */
-
-    function tokenize(value) {
-
-        const normalized =
-            normalizeMaterialName(value);
-
-
-        if (!normalized) {
-
-            return [];
-
-        }
-
-
-        return normalized
-
-            .split(/\s+/)
-
-            .filter(Boolean);
-
-    }
-
-
-    /* =====================================================
-       LEVENSHTEIN
-    ===================================================== */
-
-    function levenshtein(a, b) {
-
-        a = String(a || "");
-        b = String(b || "");
-
-
-        if (a === b) {
-
-            return 0;
-
-        }
-
-
-        if (!a.length) {
-
-            return b.length;
-
-        }
-
-
-        if (!b.length) {
-
-            return a.length;
-
-        }
-
-
-        const matrix = [];
-
-
-        for (
-            let i = 0;
-            i <= b.length;
-            i++
-        ) {
-
-            matrix[i] = [i];
-
-        }
-
-
-        for (
-            let j = 0;
-            j <= a.length;
-            j++
-        ) {
-
-            matrix[0][j] = j;
-
-        }
-
-
-        for (
-            let i = 1;
-            i <= b.length;
-            i++
-        ) {
-
-            for (
-                let j = 1;
-                j <= a.length;
-                j++
-            ) {
-
-                if (
-                    b.charAt(i - 1) ===
-                    a.charAt(j - 1)
-                ) {
-
-                    matrix[i][j] =
-                        matrix[i - 1][j - 1];
-
-                } else {
-
-                    matrix[i][j] =
-                        Math.min(
-
-                            matrix[i - 1][j] + 1,
-
-                            matrix[i][j - 1] + 1,
-
-                            matrix[i - 1][j - 1] + 1
-
-                        );
-
-                }
-
-            }
-
-        }
-
-
-        return matrix[b.length][a.length];
-
-    }
-
-
-    /* =====================================================
-       SIMILARITY
-    ===================================================== */
-
-    function similarity(a, b) {
-
-        const left =
-            normalizeMaterialName(a);
-
-        const right =
-            normalizeMaterialName(b);
-
-
-        if (
-            !left ||
-            !right
-        ) {
-
-            return 0;
-
-        }
-
-
-        if (
-            left === right
-        ) {
-
-            return 1;
-
-        }
-
-
-        const distance =
-            levenshtein(
-                left,
-                right
-            );
-
-
-        const maxLength =
-            Math.max(
-                left.length,
-                right.length
-            );
-
-
-        if (!maxLength) {
-
-            return 0;
-
-        }
-
-
-        return 1 -
-            (
-                distance /
-                maxLength
-            );
-
-    }
-
-
-    /* =====================================================
-       TOKEN SCORE
-    ===================================================== */
-
-    function tokenSimilarity(
-        sourceToken,
-        targetToken
-    ) {
-
-        const source =
-            String(
-                sourceToken || ""
-            ).toLowerCase();
-
-
-        const target =
-            String(
-                targetToken || ""
-            ).toLowerCase();
-
-
-        if (
-            !source ||
-            !target
-        ) {
-
-            return 0;
-
-        }
-
-
-        /*
-         * Angka wajib exact.
-         */
-
-        if (
-            /^\d+$/.test(target)
-        ) {
-
-            return source === target
-                ? 1
-                : 0;
-
-        }
-
-
-        if (
-            source === target
-        ) {
-
-            return 1;
-
-        }
-
-
-        return similarity(
-            source,
-            target
-        );
-
-    }
-
-
-    /* =====================================================
-       MATERIAL MATCH SCORE
-    ===================================================== */
-
-    function materialMatchScore(
-        input,
-        master
-    ) {
-
-        const source =
-            normalizeMaterialName(
-                input
-            );
-
-
-        const target =
-            normalizeMaterialName(
-                master
-            );
-
-
-        if (
-            !source ||
-            !target
-        ) {
-
-            return 0;
-
-        }
-
-
-        if (
-            source === target
-        ) {
-
-            return 1;
-
-        }
-
-
-        const sourceTokens =
-            tokenize(source);
-
-
-        const targetTokens =
-            tokenize(target);
-
-
-        if (
-            !sourceTokens.length ||
-            !targetTokens.length
-        ) {
-
-            return 0;
-
-        }
-
-
-        let matchedCount = 0;
-
-        let scoreTotal = 0;
-
-
-        for (
-            const targetToken
-            of targetTokens
-        ) {
-
-            let bestScore = 0;
-
-
-            for (
-                const sourceToken
-                of sourceTokens
-            ) {
-
-                const score =
-                    tokenSimilarity(
-                        sourceToken,
-                        targetToken
-                    );
-
-
-                if (
-                    score >
-                    bestScore
-                ) {
-
-                    bestScore =
-                        score;
-
-                }
-
-            }
-
-
-            let minimumScore;
-
-
-            if (
-                targetToken.length <= 3
-            ) {
-
-                minimumScore =
-                    MATCH_CONFIG
-                        .shortTokenMinimum;
-
-            } else if (
-                targetToken.length <= 5
-            ) {
-
-                minimumScore =
-                    MATCH_CONFIG
-                        .mediumTokenMinimum;
-
-            } else {
-
-                minimumScore =
-                    MATCH_CONFIG
-                        .longTokenMinimum;
-
-            }
-
-
-            if (
-                bestScore >=
-                minimumScore
-            ) {
-
-                matchedCount++;
-
-                scoreTotal +=
-                    bestScore;
-
-            } else {
-
-                return 0;
-
-            }
-
-        }
-
-
-        if (
-            matchedCount !==
-            targetTokens.length
-        ) {
-
-            return 0;
-
-        }
-
-
-        const tokenScore =
-            scoreTotal /
-            targetTokens.length;
-
-
-        if (
-            sourceTokens.length >
-            targetTokens.length + 2
-        ) {
-
-            return 0;
-
-        }
-
-
-        return tokenScore;
-
-    }
-
-
-    /* =====================================================
-       FIND BEST MATERIAL
-    ===================================================== */
-
-    function findBestMaterial(input) {
-
-        if (!input) {
-
+        if (!text) {
             return null;
-
         }
 
 
-        if (
-            isExcludedMaterial(
-                input
-            )
-        ) {
-
-            return null;
-
-        }
-
-
-        const source =
-            normalizeMaterialName(
-                input
+        const detected =
+            detectMaterialInLine(
+                text,
+                materialList
             );
 
 
-        if (!source) {
+        if (!detected) {
 
-            return null;
+            return {
 
-        }
+                success: false,
 
+                ticket:
+                    ticket || "",
 
-        /*
-         * MASTER MATERIAL DARI SETTINGS.JS
-         */
+                material:
+                    text,
 
-        const materialMaster =
-            getMaterialMaster();
+                qty:
+                    findQty(text),
 
+                satuan:
+                    findUnit(text),
 
-        let best = null;
+                kode:
+                    findCode(text),
 
-        let bestScore = 0;
+                error:
+                    "Nama material tidak ditemukan dalam daftar pengaturan."
 
-
-        for (
-            const master
-            of materialMaster
-        ) {
-
-            const score =
-                materialMatchScore(
-                    source,
-                    master
-                );
-
-
-            if (
-                score >
-                bestScore
-            ) {
-
-                bestScore =
-                    score;
-
-                best =
-                    master;
-
-            }
-
-        }
-
-
-        if (
-            !best ||
-            bestScore <
-            MATCH_CONFIG.minimumScore
-        ) {
-
-            return null;
+            };
 
         }
 
 
         return {
 
-            material:
-                best,
+            success: true,
 
-            score:
-                bestScore
+            ticket:
+                ticket || "",
+
+            material:
+                detected.material,
+
+            qty:
+                findQty(text),
+
+            satuan:
+                findUnit(text),
+
+            kode:
+                findCode(text),
+
+            raw:
+                text
 
         };
 
@@ -1046,1088 +689,56 @@
 
 
     /* =====================================================
-       GET TT NUMBER
-    ===================================================== */
-
-    function getTTNumber(row) {
-
-        if (!row) {
-
-            return "";
-
-        }
-
-
-        /* ================================================
-           1. ARRAY
-        ================================================ */
-
-        if (
-            Array.isArray(row)
-        ) {
-
-            const value =
-                normalizeLine(
-                    row[
-                        TT_NUMBER_COLUMN_INDEX
-                    ]
-                );
-
-
-            if (value) {
-
-                return value;
-
-            }
-
-        }
-
-
-        /* ================================================
-           2. OBJECT
-        ================================================ */
-
-        if (
-            typeof row === "object"
-        ) {
-
-            const possibleFields = [
-
-                "TT Number",
-                "TT number",
-                "TT NUMBER",
-
-                "TT_Number",
-                "TT_NUMBER",
-
-                "tt_number",
-
-                "TTNumber",
-                "ttNumber",
-
-                "TT No",
-                "TT NO",
-
-                "TT No.",
-                "TT NO.",
-
-                "Ticket Number",
-                "Ticket number",
-
-                "ticketNumber",
-                "ticket_number",
-
-                "Ticket",
-                "ticket"
-
-            ];
-
-
-            for (
-                const field
-                of possibleFields
-            ) {
-
-                if (
-                    Object.prototype
-                        .hasOwnProperty
-                        .call(
-                            row,
-                            field
-                        )
-                ) {
-
-                    const value =
-                        normalizeLine(
-                            row[field]
-                        );
-
-
-                    if (value) {
-
-                        return value;
-
-                    }
-
-                }
-
-            }
-
-        }
-
-
-        /* ================================================
-           3. originalRow
-        ================================================ */
-
-        if (
-            row.originalRow
-        ) {
-
-            const original =
-                getTTNumber(
-                    row.originalRow
-                );
-
-
-            if (original) {
-
-                return original;
-
-            }
-
-        }
-
-
-        /* ================================================
-           4. source
-        ================================================ */
-
-        if (
-            row.source
-        ) {
-
-            const source =
-                getTTNumber(
-                    row.source
-                );
-
-
-            if (source) {
-
-                return source;
-
-            }
-
-        }
-
-
-        /* ================================================
-           5. nested row
-        ================================================ */
-
-        if (
-            row.row
-        ) {
-
-            const nested =
-                getTTNumber(
-                    row.row
-                );
-
-
-            if (nested) {
-
-                return nested;
-
-            }
-
-        }
-
-
-        return "";
-
-    }
-
-
-    /* =====================================================
-       GET CIR VALUE
-    ===================================================== */
-
-    function getCIRValue(
-        row,
-        cirField
+       PARSE BLOK MATERIAL
+    ====================================================== */
+
+    function parseMaterialBlock(
+        materialText,
+        ticket
     ) {
 
-        if (!row) {
-
-            return "";
-
-        }
+        const materialList =
+            getMaterialListFromSettings();
 
 
-        /* ================================================
-           ARRAY + numeric index
-        ================================================ */
+        if (!materialList.length) {
 
-        if (
-            Array.isArray(row) &&
-            typeof cirField === "number"
-        ) {
-
-            return normalizeText(
-                row[cirField]
+            console.warn(
+                "Daftar Nama Material kosong."
             );
 
-        }
+            return {
 
+                materials: [],
 
-        /* ================================================
-           OBJECT + CUSTOM FIELD
-        ================================================ */
+                errors: [{
 
-        if (
-            !Array.isArray(row) &&
-            cirField
-        ) {
+                    ticket:
+                        ticket || "",
 
-            const value =
-                row[cirField];
+                    material: "",
 
+                    qty: "",
 
-            if (
-                value !== undefined &&
-                value !== null
-            ) {
+                    satuan: "",
 
-                return normalizeText(
-                    value
-                );
+                    kode: "",
 
-            }
+                    error:
+                        "Daftar Nama Material belum diatur."
+
+                }]
+
+            };
 
         }
 
 
-        /* ================================================
-           OBJECT FIELD CIR
-        ================================================ */
+        const text =
+            normalizeText(materialText);
 
-        if (
-            !Array.isArray(row)
-        ) {
-
-            const fields = [
-
-                "CIR",
-                "cir",
-                "Cir",
-
-                "CIR Text",
-                "CIR_TEXT",
-
-                "cirText",
-                "cir_text"
-
-            ];
-
-
-            for (
-                const field
-                of fields
-            ) {
-
-                if (
-                    row[field] !==
-                    undefined &&
-                    row[field] !==
-                    null
-                ) {
-
-                    return normalizeText(
-                        row[field]
-                    );
-
-                }
-
-            }
-
-        }
-
-
-        return "";
-
-    }
-
-
-    /* =====================================================
-       NORMALIZE NUMBER
-    ===================================================== */
-
-    function normalizeNumber(value) {
-
-        if (
-            value === null ||
-            value === undefined
-        ) {
-
-            return 0;
-
-        }
-
-
-        const normalized =
-            String(value)
-
-                .replace(",", ".")
-
-                .trim();
-
-
-        const result =
-            Number(
-                normalized
-            );
-
-
-        return Number.isFinite(
-            result
-        )
-            ? result
-            : 0;
-
-    }
-
-
-    /* =====================================================
-       PARSE QTY
-    ===================================================== */
-
-    function parseQty(text) {
 
         if (!text) {
-
-            return 1;
-
-        }
-
-
-        const value =
-            normalizeLine(text);
-
-
-        let match =
-            value.match(
-                /(?:qty|quantity|jumlah)\s*[:=]?\s*(\d+(?:[.,]\d+)?)/i
-            );
-
-
-        if (match) {
-
-            return normalizeNumber(
-                match[1]
-            );
-
-        }
-
-
-        match =
-            value.match(
-                /(?:^|\s)(\d+(?:[.,]\d+)?)\s*(?:pcs?|piece|unit|batang|m|meter|metre)\b/i
-            );
-
-
-        if (match) {
-
-            return normalizeNumber(
-                match[1]
-            );
-
-        }
-
-
-        match =
-            value.match(
-                /[:=]\s*(\d+(?:[.,]\d+)?)\s*$/i
-            );
-
-
-        if (match) {
-
-            return normalizeNumber(
-                match[1]
-            );
-
-        }
-
-
-        return 1;
-
-    }
-
-
-    /* =====================================================
-       PARSE SATUAN
-    ===================================================== */
-
-    function parseSatuan(
-        text,
-        material
-    ) {
-
-        const value =
-            normalizeLine(text);
-
-
-        const match =
-            value.match(
-                /\b(pcs?|piece|unit|batang|m|meter|metre)\b/i
-            );
-
-
-        if (match) {
-
-            const unit =
-                match[1]
-                    .toLowerCase();
-
-
-            if (
-                unit === "pc" ||
-                unit === "pcs" ||
-                unit === "piece"
-            ) {
-
-                return "pcs";
-
-            }
-
-
-            if (
-                unit === "unit"
-            ) {
-
-                return "unit";
-
-            }
-
-
-            if (
-                unit === "batang"
-            ) {
-
-                return "batang";
-
-            }
-
-
-            if (
-                unit === "m" ||
-                unit === "meter" ||
-                unit === "metre"
-            ) {
-
-                return "m";
-
-            }
-
-        }
-
-
-        const normalized =
-            normalizeMaterialName(
-                material
-            );
-
-
-        if (
-            normalized.includes(
-                "meter"
-            )
-        ) {
-
-            return "m";
-
-        }
-
-
-        if (
-            normalized.includes(
-                "batang"
-            )
-        ) {
-
-            return "batang";
-
-        }
-
-
-        if (
-            normalized.includes(
-                "unit"
-            )
-        ) {
-
-            return "unit";
-
-        }
-
-
-        return "pcs";
-
-    }
-
-
-    /* =====================================================
-       CLEAN MATERIAL TEXT
-    ===================================================== */
-
-    function cleanMaterialText(line) {
-
-        return normalizeLine(line)
-
-            .replace(
-                /\bqty\b\s*[:=]?\s*\d+(?:[.,]\d+)?/gi,
-                " "
-            )
-
-            .replace(
-                /\bquantity\b\s*[:=]?\s*\d+(?:[.,]\d+)?/gi,
-                " "
-            )
-
-            .replace(
-                /\bjumlah\b\s*[:=]?\s*\d+(?:[.,]\d+)?/gi,
-                " "
-            )
-
-            .replace(
-                /\b\d+(?:[.,]\d+)?\s*(?:pcs?|piece|unit|batang|m|meter|metre)\b/gi,
-                " "
-            )
-
-            .replace(
-                /[:=]\s*\d+(?:[.,]\d+)?\s*$/i,
-                " "
-            )
-
-            .replace(
-                /\s+/g,
-                " "
-            )
-
-            .trim();
-
-    }
-
-
-    /* =====================================================
-       EXTRACT MATERIAL CANDIDATES
-       
-       INI BAGIAN PENTING.
-
-       CIR bisa menulis:
-
-       matrial
-       protek:1
-       pigtail:1
-
-       atau:
-
-       material
-       Pigtail:1
-       Patchcord:2
-
-       Parser tidak lagi menganggap seluruh baris
-       sebagai nama material.
-
-       Parser mencoba mencocokkan setiap bagian
-       terhadap MASTER LIST dari settings.js.
-    ===================================================== */
-
-    function extractMaterialCandidates(
-        line
-    ) {
-
-        const candidates = [];
-
-        const originalLine =
-            normalizeLine(line);
-
-
-        if (!originalLine) {
-
-            return candidates;
-
-        }
-
-
-        /*
-         * Coba seluruh baris dahulu.
-         */
-
-        candidates.push(
-            originalLine
-        );
-
-
-        /*
-         * Pecah berdasarkan separator umum.
-         *
-         * Contoh:
-         *
-         * Pigtail:1
-         * Pigtail - 1
-         * Pigtail = 1
-         */
-
-        const separated =
-            originalLine.split(
-                /\s*(?:,|;|\||\/)\s*/
-            );
-
-
-        for (
-            const part
-            of separated
-        ) {
-
-            if (
-                part &&
-                !candidates.includes(part)
-            ) {
-
-                candidates.push(
-                    part
-                );
-
-            }
-
-        }
-
-
-        /*
-         * Coba hapus quantity.
-         */
-
-        const cleaned =
-            cleanMaterialText(
-                originalLine
-            );
-
-
-        if (
-            cleaned &&
-            !candidates.includes(
-                cleaned
-            )
-        ) {
-
-            candidates.push(
-                cleaned
-            );
-
-        }
-
-
-        return candidates;
-
-    }
-
-
-    /* =====================================================
-       FIND MATERIALS INSIDE LINE
-       
-       Ini memungkinkan:
-       
-       "protek:1 pigtail:1"
-
-       tetap menemukan Pigtail.
-
-       Tetapi hasil akhirnya HARUS salah satu dari
-       MASTER LIST settings.js.
-    ===================================================== */
-
-    function findMaterialsInLine(
-        line
-    ) {
-
-        const master =
-            getMaterialMaster();
-
-
-        if (
-            !master.length
-        ) {
-
-            return [];
-
-        }
-
-
-        const originalLine =
-            normalizeLine(line);
-
-
-        if (!originalLine) {
-
-            return [];
-
-        }
-
-
-        /*
-         * Excluded langsung ditolak.
-         */
-
-        if (
-            isExcludedMaterial(
-                originalLine
-            )
-        ) {
-
-            return [];
-
-        }
-
-
-        const found = [];
-
-
-        /*
-         * Cari setiap material MASTER di dalam
-         * tulisan CIR.
-         */
-
-        for (
-            const material
-            of master
-        ) {
-
-            if (
-                isExcludedMaterial(
-                    material
-                )
-            ) {
-
-                continue;
-
-            }
-
-
-            const normalizedMaster =
-                normalizeMaterialName(
-                    material
-                );
-
-
-            if (!normalizedMaster) {
-
-                continue;
-
-            }
-
-
-            /*
-             * Exact / normalized match
-             */
-
-            const normalizedLine =
-                normalizeMaterialName(
-                    originalLine
-                );
-
-
-            if (
-                normalizedLine.includes(
-                    normalizedMaster
-                )
-            ) {
-
-                found.push({
-
-                    material:
-                        material,
-
-                    score:
-                        1
-
-                });
-
-                continue;
-
-            }
-
-
-            /*
-             * Coba setiap candidate.
-             */
-
-            const candidates =
-                extractMaterialCandidates(
-                    originalLine
-                );
-
-
-            let bestScore = 0;
-
-
-            for (
-                const candidate
-                of candidates
-            ) {
-
-                const result =
-                    materialMatchScore(
-                        candidate,
-                        material
-                    );
-
-
-                if (
-                    result >
-                    bestScore
-                ) {
-
-                    bestScore =
-                        result;
-
-                }
-
-            }
-
-
-            if (
-                bestScore >=
-                MATCH_CONFIG.minimumScore
-            ) {
-
-                found.push({
-
-                    material:
-                        material,
-
-                    score:
-                        bestScore
-
-                });
-
-            }
-
-        }
-
-
-        /*
-         * Hilangkan duplicate.
-         */
-
-        const map =
-            new Map();
-
-
-        for (
-            const item
-            of found
-        ) {
-
-            const key =
-                normalizeMaterialName(
-                    item.material
-                );
-
-
-            if (
-                !map.has(key)
-            ) {
-
-                map.set(
-                    key,
-                    item
-                );
-
-            } else {
-
-                const existing =
-                    map.get(key);
-
-
-                if (
-                    item.score >
-                    existing.score
-                ) {
-
-                    existing.score =
-                        item.score;
-
-                }
-
-            }
-
-        }
-
-
-        return Array.from(
-            map.values()
-        );
-
-    }
-
-
-    /* =====================================================
-       PARSE MATERIAL LINE
-    ===================================================== */
-
-    function parseMaterialLine(line) {
-
-        const originalLine =
-            normalizeLine(line);
-
-
-        if (!originalLine) {
-
-            return [];
-
-        }
-
-
-        /*
-         * Heading material tidak dihitung.
-         */
-
-        if (
-            /^material\s*:?\s*$/i.test(
-                originalLine
-            ) ||
-            /^matrial\s*:?\s*$/i.test(
-                originalLine
-            )
-        ) {
-
-            return [];
-
-        }
-
-
-        /*
-         * Cari material berdasarkan MASTER LIST.
-         */
-
-        const found =
-            findMaterialsInLine(
-                originalLine
-            );
-
-
-        if (
-            !found.length
-        ) {
-
-            return [];
-
-        }
-
-
-        const results = [];
-
-
-        for (
-            const item
-            of found
-        ) {
-
-            const qty =
-                parseQty(
-                    originalLine
-                );
-
-
-            const satuan =
-                parseSatuan(
-                    originalLine,
-                    item.material
-                );
-
-
-            results.push({
-
-                material:
-                    item.material,
-
-                qty:
-                    qty,
-
-                satuan:
-                    satuan,
-
-                score:
-                    item.score,
-
-                sourceLine:
-                    originalLine,
-
-                status:
-                    "OK",
-
-                error:
-                    ""
-
-            });
-
-        }
-
-
-        return results;
-
-    }
-
-
-    /* =====================================================
-       PARSE MATERIAL TEXT
-    ===================================================== */
-
-    function parseMaterialText(text) {
-
-        const normalized =
-            normalizeText(text);
-
-
-        if (!normalized) {
-
-            return [];
-
-        }
-
-
-        const lines =
-            normalized.split("\n");
-
-
-        const results = [];
-
-
-        for (
-            const line
-            of lines
-        ) {
-
-            const parsed =
-                parseMaterialLine(
-                    line
-                );
-
-
-            if (!parsed) {
-
-                continue;
-
-            }
-
-
-            results.push(
-                ...parsed
-            );
-
-        }
-
-
-        return mergeMaterials(
-            results
-        );
-
-    }
-
-
-    /* =====================================================
-       PARSE DETAILED
-    ===================================================== */
-
-    function parseDetailed(text) {
-
-        const normalized =
-            normalizeText(text);
-
-
-        if (!normalized) {
 
             return {
 
@@ -2140,740 +751,145 @@
         }
 
 
+        /*
+         * Pecah berdasarkan baris.
+         */
+
         const lines =
-            normalized.split("\n");
+            String(materialText)
+                .replace(/\r/g, "")
+                .split("\n");
 
 
         const materials = [];
-
         const errors = [];
 
 
-        for (
-            const line
-            of lines
-        ) {
+        /*
+         * Tangani material multi-line.
+         *
+         * Contoh:
+         *
+         * Splitter
+         * 1:2
+         *
+         * akan digabung sementara.
+         */
 
-            const parsed =
+        let i = 0;
+
+
+        while (i < lines.length) {
+
+            let current =
+                normalizeText(lines[i]);
+
+
+            if (!current) {
+
+                i++;
+
+                continue;
+
+            }
+
+
+            /*
+             * Coba langsung.
+             */
+
+            let parsed =
                 parseMaterialLine(
-                    line
+                    current,
+                    materialList,
+                    ticket
                 );
 
 
-            if (!parsed) {
-
-                continue;
-
-            }
-
-
-            materials.push(
-                ...parsed
-            );
-
-        }
-
-
-        return {
-
-            materials:
-                mergeMaterials(
-                    materials
-                ),
-
-            errors:
-                errors
-
-        };
-
-    }
-
-
-    /* =====================================================
-       MERGE MATERIAL
-    ===================================================== */
-
-    function mergeMaterials(materials) {
-
-        const map =
-            new Map();
-
-
-        for (
-            const item
-            of materials || []
-        ) {
-
-            if (!item) {
-
-                continue;
-
-            }
-
+            /*
+             * Kalau belum ketemu,
+             * gabungkan dengan baris berikutnya.
+             */
 
             if (
-                !item.material
+                parsed &&
+                !parsed.success &&
+                i + 1 < lines.length
             ) {
 
-                continue;
+                const combined =
+                    normalizeText(
+                        current +
+                        " " +
+                        lines[i + 1]
+                    );
+
+
+                const combinedParsed =
+                    parseMaterialLine(
+                        combined,
+                        materialList,
+                        ticket
+                    );
+
+
+                if (
+                    combinedParsed &&
+                    combinedParsed.success
+                ) {
+
+                    parsed =
+                        combinedParsed;
+
+                    i += 1;
+
+                }
 
             }
 
 
-            if (
-                isExcludedMaterial(
-                    item.material
-                )
-            ) {
+            if (parsed) {
 
-                continue;
+                if (parsed.success) {
 
-            }
+                    materials.push(parsed);
+
+                } else {
+
+                    /*
+                     * Jangan langsung memasukkan semua
+                     * baris biasa sebagai error.
+                     *
+                     * Hanya masukkan jika baris terlihat
+                     * seperti data material.
+                     */
+
+                    const looksLikeMaterial =
+                        /\d/.test(current) ||
+                        /qty|jumlah|kode|code|unit|pcs|meter|batang/i.test(current);
 
 
-            const key =
-                normalizeMaterialName(
-                    item.material
-                );
+                    if (looksLikeMaterial) {
 
-
-            if (
-                !map.has(key)
-            ) {
-
-                map.set(
-                    key,
-                    {
-
-                        material:
-                            item.material,
-
-                        qty:
-                            Number(
-                                item.qty
-                            ) || 0,
-
-                        satuan:
-                            item.satuan ||
-                            "pcs",
-
-                        score:
-                            Number(
-                                item.score
-                            ) || 0,
-
-                        sourceLine:
-                            item.sourceLine ||
-                            "",
-
-                        status:
-                            "OK",
-
-                        error:
-                            ""
+                        errors.push(parsed);
 
                     }
-                );
-
-            } else {
-
-                const existing =
-                    map.get(key);
-
-
-                existing.qty +=
-                    Number(
-                        item.qty
-                    ) || 0;
-
-
-                existing.score =
-                    Math.max(
-
-                        existing.score || 0,
-
-                        item.score || 0
-
-                    );
-
-
-                if (
-                    !existing.sourceLine &&
-                    item.sourceLine
-                ) {
-
-                    existing.sourceLine =
-                        item.sourceLine;
 
                 }
 
             }
 
-        }
 
-
-        return Array.from(
-            map.values()
-        );
-
-    }
-
-
-    /* =====================================================
-       BUILD MATERIAL ROW
-    ===================================================== */
-
-    function buildMaterialRows(
-        row,
-        cirField
-    ) {
-
-        const ttNumber =
-            getTTNumber(
-                row
-            );
-
-
-        const cirText =
-            getCIRValue(
-                row,
-                cirField
-            );
-
-
-        const materials =
-            parseMaterialText(
-                cirText
-            );
-
-
-        return materials.map(
-            function (item) {
-
-                return {
-
-                    ticket:
-                        ttNumber,
-
-                    ttNumber:
-                        ttNumber,
-
-                    Ticket:
-                        ttNumber,
-
-                    "TT Number":
-                        ttNumber,
-
-
-                    material:
-                        item.material,
-
-                    Material:
-                        item.material,
-
-
-                    quantity:
-                        item.qty,
-
-                    qty:
-                        item.qty,
-
-                    Qty:
-                        item.qty,
-
-
-                    unit:
-                        item.satuan,
-
-                    satuan:
-                        item.satuan,
-
-                    Satuan:
-                        item.satuan,
-
-
-                    code:
-                        "",
-
-                    kode:
-                        "",
-
-                    Kode:
-                        "",
-
-
-                    score:
-                        item.score,
-
-                    Score:
-                        item.score,
-
-
-                    source:
-                        item.sourceLine,
-
-                    Source:
-                        item.sourceLine,
-
-
-                    status:
-                        "OK",
-
-                    error:
-                        ""
-
-                };
-
-            }
-        );
-
-    }
-
-
-    /* =====================================================
-       PARSE MULTIPLE
-    ===================================================== */
-
-    function parseMultiple(
-        rows,
-        cirField
-    ) {
-
-        if (
-            !Array.isArray(rows)
-        ) {
-
-            return [];
+            i++;
 
         }
-
-
-        const output = [];
-
-
-        for (
-            const row
-            of rows
-        ) {
-
-            const materialRows =
-                buildMaterialRows(
-                    row,
-                    cirField
-                );
-
-
-            output.push(
-                ...materialRows
-            );
-
-        }
-
-
-        return output;
-
-    }
-
-
-    /* =====================================================
-       PARSE WITH TICKET
-    ===================================================== */
-
-    function parseWithTicket(
-        ticket,
-        cirText
-    ) {
-
-        const ttNumber =
-            normalizeLine(
-                ticket
-            );
-
-
-        const materials =
-            parseMaterialText(
-                cirText
-            );
-
-
-        return materials.map(
-            function (item) {
-
-                return {
-
-                    ticket:
-                        ttNumber,
-
-                    ttNumber:
-                        ttNumber,
-
-                    Ticket:
-                        ttNumber,
-
-                    "TT Number":
-                        ttNumber,
-
-
-                    material:
-                        item.material,
-
-                    Material:
-                        item.material,
-
-
-                    quantity:
-                        item.qty,
-
-                    qty:
-                        item.qty,
-
-                    Qty:
-                        item.qty,
-
-
-                    unit:
-                        item.satuan,
-
-                    satuan:
-                        item.satuan,
-
-                    Satuan:
-                        item.satuan,
-
-
-                    code:
-                        "",
-
-                    kode:
-                        "",
-
-                    Kode:
-                        "",
-
-
-                    score:
-                        item.score,
-
-                    Score:
-                        item.score,
-
-
-                    source:
-                        item.sourceLine,
-
-                    Source:
-                        item.sourceLine,
-
-
-                    status:
-                        "OK",
-
-                    error:
-                        ""
-
-                };
-
-            }
-        );
-
-    }
-
-
-    /* =====================================================
-       FLATTEN
-    ===================================================== */
-
-    function flatten(input) {
-
-        if (
-            input === null ||
-            input === undefined
-        ) {
-
-            return [];
-
-        }
-
-
-        if (
-            !Array.isArray(input) &&
-            typeof input === "object"
-        ) {
-
-            if (
-                Array.isArray(
-                    input.materials
-                )
-            ) {
-
-                return flatten(
-                    input.materials
-                );
-
-            }
-
-
-            if (
-                Array.isArray(
-                    input.material
-                )
-            ) {
-
-                return flatten(
-                    input.material
-                );
-
-            }
-
-
-            if (
-                input.Material ||
-                input.material
-            ) {
-
-                return [
-
-                    normalizeMaterialRow(
-                        input
-                    )
-
-                ];
-
-            }
-
-
-            return [];
-
-        }
-
-
-        if (
-            Array.isArray(input)
-        ) {
-
-            const output = [];
-
-
-            for (
-                const item
-                of input
-            ) {
-
-                if (
-                    item === null ||
-                    item === undefined
-                ) {
-
-                    continue;
-
-                }
-
-
-                if (
-                    Array.isArray(item)
-                ) {
-
-                    output.push(
-                        ...flatten(
-                            item
-                        )
-                    );
-
-                    continue;
-
-                }
-
-
-                if (
-                    typeof item === "object" &&
-                    (
-                        Array.isArray(
-                            item.materials
-                        ) ||
-                        Array.isArray(
-                            item.material
-                        )
-                    )
-                ) {
-
-                    output.push(
-                        ...flatten(
-                            item
-                        )
-                    );
-
-                    continue;
-
-                }
-
-
-                if (
-                    typeof item === "object"
-                ) {
-
-                    output.push(
-                        normalizeMaterialRow(
-                            item
-                        )
-                    );
-
-                }
-
-            }
-
-
-            return output;
-
-        }
-
-
-        return [];
-
-    }
-
-
-    /* =====================================================
-       NORMALIZE MATERIAL ROW
-    ===================================================== */
-
-    function normalizeMaterialRow(row) {
-
-        if (!row) {
-
-            return {};
-
-        }
-
-
-        const ticket =
-            getTTNumber(
-                row
-            );
-
-
-        const material =
-            normalizeLine(
-                row.material ||
-                row.Material ||
-                ""
-            );
-
-
-        const qty =
-            row.quantity ??
-            row.qty ??
-            row.Qty ??
-            1;
-
-
-        const unit =
-            normalizeLine(
-                row.unit ||
-                row.satuan ||
-                row.Satuan ||
-                ""
-            );
-
-
-        const code =
-            normalizeLine(
-                row.code ||
-                row.kode ||
-                row.Kode ||
-                ""
-            );
-
-
-        const score =
-            Number(
-                row.score ??
-                row.Score ??
-                0
-            ) || 0;
-
-
-        const source =
-            normalizeLine(
-                row.source ||
-                row.Source ||
-                row.sourceLine ||
-                ""
-            );
 
 
         return {
 
-            ticket:
-                ticket,
+            materials,
 
-            ttNumber:
-                ticket,
-
-            Ticket:
-                ticket,
-
-            "TT Number":
-                ticket,
-
-
-            material:
-                material,
-
-            Material:
-                material,
-
-
-            quantity:
-                Number(qty) || 0,
-
-            qty:
-                Number(qty) || 0,
-
-            Qty:
-                Number(qty) || 0,
-
-
-            unit:
-                unit,
-
-            satuan:
-                unit,
-
-            Satuan:
-                unit,
-
-
-            code:
-                code,
-
-            kode:
-                code,
-
-            Kode:
-                code,
-
-
-            score:
-                score,
-
-            Score:
-                score,
-
-
-            source:
-                source,
-
-            Source:
-                source,
-
-
-            status:
-                row.status ||
-                "OK",
-
-            error:
-                row.error ||
-                ""
+            errors
 
         };
 
@@ -2881,111 +897,139 @@
 
 
     /* =====================================================
-       PUBLIC API
-    ===================================================== */
+       PARSE DARI ARRAY BARIS
+    ====================================================== */
 
-    window.ReportCheckerMaterial = {
+    function parseMaterialsFromLines(
+        lines,
+        ticket
+    ) {
+
+        if (!Array.isArray(lines)) {
+
+            return {
+
+                materials: [],
+
+                errors: []
+
+            };
+
+        }
+
+
+        return parseMaterialBlock(
+            lines.join("\n"),
+            ticket
+        );
+
+    }
+
+
+    /* =====================================================
+       PARSE DARI CIR
+    ====================================================== */
+
+    function parseMaterialsFromCIR(
+        cirText,
+        ticket
+    ) {
+
+        if (
+            cirText === null ||
+            cirText === undefined
+        ) {
+
+            return {
+
+                materials: [],
+
+                errors: []
+
+            };
+
+        }
+
+
+        return parseMaterialBlock(
+            String(cirText),
+            ticket
+        );
+
+    }
+
+
+    /* =====================================================
+       ALIAS FUNCTION
+    ====================================================== */
+
+    function parseMaterial(
+        materialText,
+        ticket
+    ) {
+
+        return parseMaterialBlock(
+            materialText,
+            ticket
+        );
+
+    }
+
+
+    /* =====================================================
+       EXPORT GLOBAL
+    ====================================================== */
+
+    window.MaterialParser = {
 
         parse:
-            parseMaterialText,
+            parseMaterialBlock,
 
-        parseDetailed:
-            parseDetailed,
+        parseMaterial:
+            parseMaterial,
 
-        parseMultiple:
-            parseMultiple,
+        parseMaterials:
+            parseMaterialBlock,
 
-        parseWithTicket:
-            parseWithTicket,
+        parseFromCIR:
+            parseMaterialsFromCIR,
 
-        buildRows:
-            buildMaterialRows,
+        parseFromLines:
+            parseMaterialsFromLines,
 
-        flatten:
-            flatten,
+        detect:
+            detectMaterialInLine,
 
-        getTTNumber:
-            getTTNumber,
+        getMaterialList:
+            getMaterialListFromSettings,
 
-        getCIRValue:
-            getCIRValue,
-
-        getMaterialMaster:
-            getMaterialMaster,
-
-        findBestMaterial:
-            findBestMaterial,
-
-        isExcludedMaterial:
-            isExcludedMaterial,
-
-        normalizeMaterialName:
-            normalizeMaterialName,
-
-        parseQty:
-            parseQty,
-
-        parseSatuan:
-            parseSatuan,
-
-        mergeMaterials:
-            mergeMaterials,
-
-        cleanMaterialText:
-            cleanMaterialText,
-
-        findMaterialsInLine:
-            findMaterialsInLine
+        normalize:
+            normalizeMaterialName
 
     };
 
 
+    /*
+     * Alias supaya kode lama tetap bisa bekerja.
+     */
+
+    window.parseMaterial =
+        parseMaterial;
+
+    window.parseMaterials =
+        parseMaterialBlock;
+
+    window.getMaterialList =
+        getMaterialListFromSettings;
+
+
     /* =====================================================
        DEBUG
-    ===================================================== */
+    ====================================================== */
 
     console.log(
-        "ReportCheckerMaterial loaded.",
-        {
-
-            masterCount:
-                getMaterialMaster().length,
-
-            masterSource:
-                (
-                    window.ReportCheckerSettings
-                        ? "settings.js"
-                        : "fallback"
-                ),
-
-            minimumScore:
-                MATCH_CONFIG.minimumScore,
-
-            ttNumberColumn:
-                "D",
-
-            ttNumberIndex:
-                TT_NUMBER_COLUMN_INDEX,
-
-            hasFlatten:
-                typeof window
-                    .ReportCheckerMaterial
-                    .flatten ===
-                "function",
-
-            hasParseDetailed:
-                typeof window
-                    .ReportCheckerMaterial
-                    .parseDetailed ===
-                "function",
-
-            hasGetTTNumber:
-                typeof window
-                    .ReportCheckerMaterial
-                    .getTTNumber ===
-                "function"
-
-        }
+        "Material Parser aktif. Daftar material:",
+        getMaterialListFromSettings()
     );
 
 
