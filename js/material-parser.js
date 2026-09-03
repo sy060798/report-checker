@@ -27,6 +27,19 @@
    - Tidak mudah salah mengambil teks biasa
    - Kompatibel:
        parser.parse(cirText)
+
+   UPDATE:
+   - Header MATERIAL sekarang mendukung typo ringan
+   - Contoh:
+       MATERIAL:
+       MATERIL:
+       MATERILA:
+       MATERAL:
+       MATERRIAL:
+       MATERIAL LIST:
+       MATERIL LIST:
+   - Perubahan hanya pada deteksi header MATERIAL.
+   - Logic parser material lainnya tetap dipertahankan.
 ========================================================= */
 
 (function () {
@@ -41,11 +54,7 @@
     const CONFIG = {
 
         /*
-         * Threshold typo.
-         *
-         * Semakin tinggi = semakin ketat.
-         *
-         * 0.80 cocok untuk typo ringan.
+         * Threshold typo material.
          */
 
         FUZZY_THRESHOLD: 0.80,
@@ -71,6 +80,10 @@
 
         /*
          * Header bagian Material.
+         *
+         * Tetap dipertahankan untuk kompatibilitas.
+         *
+         * Deteksi aktual menggunakan isMaterialHeader().
          */
 
         HEADER_WORDS: [
@@ -642,14 +655,235 @@
 
 
     /* =====================================================
+       LEVENSHTEIN
+    ====================================================== */
+
+    function levenshtein(
+        a,
+        b
+    ) {
+
+        const s =
+            normalizeForFuzzy(
+                a
+            );
+
+
+        const t =
+            normalizeForFuzzy(
+                b
+            );
+
+
+        if (
+            s === t
+        ) {
+
+            return 0;
+
+        }
+
+
+        if (!s.length) {
+            return t.length;
+        }
+
+
+        if (!t.length) {
+            return s.length;
+        }
+
+
+        let previous =
+            new Array(
+                t.length + 1
+            );
+
+
+        let current =
+            new Array(
+                t.length + 1
+            );
+
+
+        for (
+            let j = 0;
+            j <= t.length;
+            j++
+        ) {
+
+            previous[j] =
+                j;
+
+        }
+
+
+        for (
+            let i = 1;
+            i <= s.length;
+            i++
+        ) {
+
+            current[0] =
+                i;
+
+
+            for (
+                let j = 1;
+                j <= t.length;
+                j++
+            ) {
+
+                const cost =
+                    s[i - 1] ===
+                    t[j - 1]
+                        ? 0
+                        : 1;
+
+
+                current[j] =
+                    Math.min(
+
+                        current[j - 1] + 1,
+
+                        previous[j] + 1,
+
+                        previous[j - 1] +
+                        cost
+
+                    );
+
+            }
+
+
+            const temp =
+                previous;
+
+            previous =
+                current;
+
+            current =
+                temp;
+
+        }
+
+
+        return previous[
+            t.length
+        ];
+
+    }
+
+
+    /* =====================================================
+       SIMILARITY
+    ====================================================== */
+
+    function similarity(
+        a,
+        b
+    ) {
+
+        const x =
+            normalizeForFuzzy(
+                a
+            );
+
+
+        const y =
+            normalizeForFuzzy(
+                b
+            );
+
+
+        if (
+            !x ||
+            !y
+        ) {
+
+            return 0;
+
+        }
+
+
+        if (
+            x === y
+        ) {
+
+            return 1;
+
+        }
+
+
+        if (
+            x.includes(y) ||
+            y.includes(x)
+        ) {
+
+            const ratio =
+                Math.min(
+                    x.length,
+                    y.length
+                ) /
+                Math.max(
+                    x.length,
+                    y.length
+                );
+
+
+            return Math.max(
+                0.88,
+                ratio
+            );
+
+        }
+
+
+        const distance =
+            levenshtein(
+                x,
+                y
+            );
+
+
+        return (
+            1 -
+            (
+                distance /
+                Math.max(
+                    x.length,
+                    y.length
+                )
+            )
+        );
+
+    }
+
+
+    /* =====================================================
        HEADER DETECTION
+       
+       UPDATE:
+       Hanya bagian ini yang dibuat lebih fleksibel.
+       
+       Bisa membaca:
+       MATERIAL
+       MATERIAL:
+       MATERIL:
+       MATERILA:
+       MATERAL:
+       MATERRIAL:
+       MATERIAL LIST:
+       MATERIL LIST:
+       
+       Tidak mengubah logic material lainnya.
     ====================================================== */
 
     function isMaterialHeader(
         line
     ) {
 
-        const value =
+        let value =
             normalizeMaterialName(
                 line
             );
@@ -660,17 +894,119 @@
         }
 
 
-        return CONFIG.HEADER_WORDS
-            .some(function (header) {
+        /*
+         * Buang tanda ":" "=" "-"
+         * di akhir kalimat.
+         */
 
-                return (
-                    value ===
-                    normalizeMaterialName(
-                        header
-                    )
-                );
+        value =
+            value
+                .replace(
+                    /[:=-]\s*$/,
+                    ""
+                )
+                .trim();
 
-            });
+
+        /*
+         * Exact:
+         *
+         * material
+         * materials
+         */
+
+        if (
+            value === "material" ||
+            value === "materials"
+        ) {
+
+            return true;
+
+        }
+
+
+        /*
+         * Support:
+         *
+         * material list
+         * materil list
+         * material data
+         * materil data
+         *
+         * Yang penting kata pertama
+         * adalah typo ringan dari material.
+         */
+
+        const words =
+            value
+                .split(/\s+/)
+                .filter(Boolean);
+
+
+        if (
+            !words.length
+        ) {
+
+            return false;
+
+        }
+
+
+        const firstWord =
+            words[0];
+
+
+        /*
+         * Batasi supaya tidak sembarang
+         * kalimat dianggap Material.
+         *
+         * Contoh yang diterima:
+         *
+         * material
+         * material list
+         * material data
+         * material detail
+         *
+         * dan typo ringannya.
+         */
+
+        if (
+            words.length > 4
+        ) {
+
+            return false;
+
+        }
+
+
+        const score =
+            similarity(
+                firstWord,
+                "material"
+            );
+
+
+        /*
+         * Minimal 0.80.
+         *
+         * Contoh:
+         *
+         * materil  -> tinggi
+         * materila -> tinggi
+         * materal  -> tinggi
+         * materrial -> tinggi
+         */
+
+        if (
+            score >= 0.80
+        ) {
+
+            return true;
+
+        }
+
+
+        return false;
 
     }
 
@@ -711,9 +1047,21 @@
                 );
 
 
+            /*
+             * UPDATE:
+             *
+             * Sebelumnya regex exact:
+             *
+             * /^material\s*[:=-]?\s*$/i
+             *
+             * Sekarang menggunakan
+             * isMaterialHeader().
+             */
+
             if (
-                /^material\s*[:=-]?\s*$/i
-                    .test(line)
+                isMaterialHeader(
+                    line
+                )
             ) {
 
                 materialIndex =
@@ -1132,212 +1480,6 @@
 
 
         return best;
-
-    }
-
-
-    /* =====================================================
-       LEVENSHTEIN
-    ====================================================== */
-
-    function levenshtein(
-        a,
-        b
-    ) {
-
-        const s =
-            normalizeForFuzzy(
-                a
-            );
-
-
-        const t =
-            normalizeForFuzzy(
-                b
-            );
-
-
-        if (
-            s === t
-        ) {
-
-            return 0;
-
-        }
-
-
-        if (!s.length) {
-            return t.length;
-        }
-
-
-        if (!t.length) {
-            return s.length;
-        }
-
-
-        let previous =
-            new Array(
-                t.length + 1
-            );
-
-
-        let current =
-            new Array(
-                t.length + 1
-            );
-
-
-        for (
-            let j = 0;
-            j <= t.length;
-            j++
-        ) {
-
-            previous[j] =
-                j;
-
-        }
-
-
-        for (
-            let i = 1;
-            i <= s.length;
-            i++
-        ) {
-
-            current[0] =
-                i;
-
-
-            for (
-                let j = 1;
-                j <= t.length;
-                j++
-            ) {
-
-                const cost =
-                    s[i - 1] ===
-                    t[j - 1]
-                        ? 0
-                        : 1;
-
-
-                current[j] =
-                    Math.min(
-
-                        current[j - 1] + 1,
-
-                        previous[j] + 1,
-
-                        previous[j - 1] +
-                        cost
-
-                    );
-
-            }
-
-
-            const temp =
-                previous;
-
-            previous =
-                current;
-
-            current =
-                temp;
-
-        }
-
-
-        return previous[
-            t.length
-        ];
-
-    }
-
-
-    /* =====================================================
-       SIMILARITY
-    ====================================================== */
-
-    function similarity(
-        a,
-        b
-    ) {
-
-        const x =
-            normalizeForFuzzy(
-                a
-            );
-
-
-        const y =
-            normalizeForFuzzy(
-                b
-            );
-
-
-        if (
-            !x ||
-            !y
-        ) {
-
-            return 0;
-
-        }
-
-
-        if (
-            x === y
-        ) {
-
-            return 1;
-
-        }
-
-
-        if (
-            x.includes(y) ||
-            y.includes(x)
-        ) {
-
-            const ratio =
-                Math.min(
-                    x.length,
-                    y.length
-                ) /
-                Math.max(
-                    x.length,
-                    y.length
-                );
-
-
-            return Math.max(
-                0.88,
-                ratio
-            );
-
-        }
-
-
-        const distance =
-            levenshtein(
-                x,
-                y
-            );
-
-
-        return (
-            1 -
-            (
-                distance /
-                Math.max(
-                    x.length,
-                    y.length
-                )
-            )
-        );
 
     }
 
