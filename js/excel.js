@@ -2,27 +2,25 @@
    REPORT CHECKER
    excel.js
 
-   VERSION UPDATED
+   VERSION FINAL / STABLE
 
    Fungsi:
    - Upload Excel
-   - Baca header A sampai AF
+   - Validasi header A sampai AF
    - TT Number = kolom D
+   - CIR = kolom AF
    - Validasi Ticket Release
-   - Baca CIR
-   - Parse Material
+   - Parsing Material dari CIR
    - Pisahkan SESUAI / TIDAK SESUAI
    - Material menggunakan TT Number
    - Material Error jika CIR ada tetapi material gagal ditemukan
-   - Export hasil ke Excel
-
-   COMPATIBLE:
-   - index.html terbaru
-   - app.js terbaru
-   - material-parser.js terbaru
-   - validator.js
+   - Export hasil Excel
+   - Kompatibel dengan app.js
+   - Kompatibel dengan material-parser.js
+   - Kompatibel dengan validator.js
    - SheetJS XLSX
-========================================================= */
+
+   ========================================================= */
 
 (function () {
 
@@ -30,7 +28,7 @@
 
 
     /* =====================================================
-       COLUMN CONFIG
+       CONFIG
     ===================================================== */
 
     const EXPECTED_HEADERS = [
@@ -72,17 +70,19 @@
 
 
     /*
-     * Excel:
+     * Kolom Excel:
      *
      * A = 0
      * B = 1
      * C = 2
      * D = 3
      *
-     * Jadi TT Number = index 3.
+     * AF = 31
      */
 
     const TT_NUMBER_COLUMN_INDEX = 3;
+
+    const CIR_COLUMN_INDEX = 31;
 
 
     /* =====================================================
@@ -121,29 +121,36 @@
 
 
     /* =====================================================
-       XLSX
+       UTILITY
     ===================================================== */
 
-    function getXLSX() {
+    function cleanValue(value) {
 
         if (
-            typeof XLSX !== "undefined"
+            value === null ||
+            value === undefined
         ) {
 
-            return XLSX;
+            return "";
 
         }
 
-        throw new Error(
-            "Library XLSX belum dimuat."
-        );
+
+        if (
+            value instanceof Date
+        ) {
+
+            return value;
+
+        }
+
+
+        return String(value)
+            .replace(/\u00A0/g, " ")
+            .trim();
 
     }
 
-
-    /* =====================================================
-       NORMALIZE HEADER
-    ===================================================== */
 
     function normalizeHeader(value) {
 
@@ -158,8 +165,41 @@
     }
 
 
+    function isEmptyValue(value) {
+
+        return (
+            value === null ||
+            value === undefined ||
+            String(value).trim() === ""
+        );
+
+    }
+
+
     /* =====================================================
-       FIND HEADER
+       XLSX
+    ===================================================== */
+
+    function getXLSX() {
+
+        if (
+            typeof XLSX !== "undefined"
+        ) {
+
+            return XLSX;
+
+        }
+
+
+        throw new Error(
+            "Library XLSX belum dimuat."
+        );
+
+    }
+
+
+    /* =====================================================
+       HEADER
     ===================================================== */
 
     function findHeader(
@@ -197,10 +237,6 @@
     }
 
 
-    /* =====================================================
-       VALIDATE HEADER
-    ===================================================== */
-
     function validateHeaders(
         headers
     ) {
@@ -216,6 +252,21 @@
             indexes: {}
 
         };
+
+
+        if (
+            !Array.isArray(headers)
+        ) {
+
+            result.valid =
+                false;
+
+            result.missing =
+                EXPECTED_HEADERS.slice();
+
+            return result;
+
+        }
 
 
         for (
@@ -242,7 +293,6 @@
                 );
 
             }
-
             else {
 
                 result.found.push(
@@ -264,7 +314,7 @@
 
 
     /* =====================================================
-       READ FILE
+       FILE READER
     ===================================================== */
 
     function readFile(file) {
@@ -297,7 +347,7 @@
 
                         try {
 
-                            const XLSX =
+                            const xlsx =
                                 getXLSX();
 
 
@@ -308,14 +358,16 @@
 
 
                             const workbook =
-                                XLSX.read(
+                                xlsx.read(
                                     data,
                                     {
+
                                         type: "array",
 
                                         cellDates: true,
 
                                         raw: true
+
                                     }
                                 );
 
@@ -325,7 +377,6 @@
                             );
 
                         }
-
                         catch (error) {
 
                             reject(
@@ -372,7 +423,7 @@
             !Array.isArray(
                 workbook.SheetNames
             ) ||
-            !workbook.SheetNames.length
+            workbook.SheetNames.length === 0
         ) {
 
             throw new Error(
@@ -415,18 +466,18 @@
 
 
     /* =====================================================
-       SHEET TO ARRAY
+       SHEET -> ARRAY
     ===================================================== */
 
     function sheetToArray(
         sheet
     ) {
 
-        const XLSX =
+        const xlsx =
             getXLSX();
 
 
-        return XLSX.utils.sheet_to_json(
+        return xlsx.utils.sheet_to_json(
             sheet,
             {
 
@@ -445,18 +496,18 @@
 
 
     /* =====================================================
-       SHEET TO OBJECT ROWS
+       SHEET -> OBJECT
     ===================================================== */
 
     function sheetToRows(
         sheet
     ) {
 
-        const XLSX =
+        const xlsx =
             getXLSX();
 
 
-        return XLSX.utils.sheet_to_json(
+        return xlsx.utils.sheet_to_json(
             sheet,
             {
 
@@ -496,7 +547,7 @@
 
 
         /*
-         * Simpan field tambahan.
+         * Pertahankan kolom tambahan
          */
 
         if (row) {
@@ -532,14 +583,6 @@
 
     /* =====================================================
        GET TT NUMBER
-       
-       PRIORITAS MUTLAK:
-       1. TT Number
-       2. fallback index D jika row array
-       
-       TIDAK menggunakan:
-       - Customer Ticket
-       - Ref Ticket
     ===================================================== */
 
     function getTTNumber(
@@ -554,8 +597,8 @@
 
 
         /*
-         * Jika array:
-         * kolom D = index 3
+         * Array:
+         * D = index 3
          */
 
         if (
@@ -572,21 +615,17 @@
 
 
         /*
-         * Object hasil SheetJS.
+         * Object:
+         * Prioritas hanya TT Number.
          */
 
         const fields = [
 
             "TT Number",
-
             "TT number",
-
             "TT_NUMBER",
-
             "tt_number",
-
             "TTNumber",
-
             "ttNumber"
 
         ];
@@ -598,10 +637,8 @@
         ) {
 
             if (
-                row[field] !==
-                undefined &&
-                row[field] !==
-                null
+                row[field] !== undefined &&
+                row[field] !== null
             ) {
 
                 const value =
@@ -629,9 +666,9 @@
     /* =====================================================
        GET TICKET
        
-       Alias supaya kompatibel dengan kode lama.
+       Alias lama.
        
-       Sekarang Ticket = TT Number.
+       Ticket sistem = TT Number.
     ===================================================== */
 
     function getTicket(
@@ -641,31 +678,6 @@
         return getTTNumber(
             row
         );
-
-    }
-
-
-    /* =====================================================
-       CLEAN VALUE
-    ===================================================== */
-
-    function cleanValue(
-        value
-    ) {
-
-        if (
-            value === null ||
-            value === undefined
-        ) {
-
-            return "";
-
-        }
-
-
-        return String(value)
-            .replace(/\u00A0/g, " ")
-            .trim();
 
     }
 
@@ -685,31 +697,46 @@
         }
 
 
+        /*
+         * Array:
+         * AF = index 31
+         */
+
         if (
             Array.isArray(row)
         ) {
 
-            /*
-             * CIR = kolom AF
-             * index 31
-             */
-
             return cleanValue(
-                row[31]
+                row[
+                    CIR_COLUMN_INDEX
+                ]
             );
 
         }
 
 
-        return cleanValue(
-            row["CIR"]
-        );
+        /*
+         * Object
+         */
+
+        if (
+            row["CIR"] !== undefined
+        ) {
+
+            return cleanValue(
+                row["CIR"]
+            );
+
+        }
+
+
+        return "";
 
     }
 
 
     /* =====================================================
-       MATERIAL PARSER CHECK
+       MATERIAL PARSER
     ===================================================== */
 
     function getMaterialParser() {
@@ -725,6 +752,20 @@
         }
 
 
+        if (
+            typeof window
+                .ReportCheckerMaterial
+                .parse !==
+            "function"
+        ) {
+
+            throw new Error(
+                "Fungsi parse() pada material-parser.js tidak ditemukan."
+            );
+
+        }
+
+
         return window.ReportCheckerMaterial;
 
     }
@@ -732,14 +773,6 @@
 
     /* =====================================================
        PARSE MATERIAL
-       
-       Parser baru:
-       
-       parse(cirText)
-       
-       BUKAN:
-       
-       parse(cirText, ticket)
     ===================================================== */
 
     function parseMaterials(
@@ -747,97 +780,205 @@
         cirText
     ) {
 
-        const parser =
-            getMaterialParser();
+        const ticket =
+            cleanValue(
+                ttNumber
+            );
 
 
-        if (!cirText) {
+        const cir =
+            cleanValue(
+                cirText
+            );
+
+
+        /*
+         * Tidak ada TT Number
+         */
+
+        if (!ticket) {
 
             return {
 
                 found: false,
 
                 status:
-                    ttNumber
-                        ? "NO MATERIAL"
-                        : "NO TICKET",
+                    "NO TICKET",
 
-                ticket:
-                    ttNumber,
+                ticket: "",
 
                 materials: [],
 
                 note:
-                    ttNumber
-                        ? "CIR tidak berisi material."
-                        : "TT Number tidak ditemukan."
+                    "TT Number tidak ditemukan."
 
             };
 
         }
 
 
-        const parsed =
-            parser.parse(
-                cirText
-            );
+        /*
+         * CIR kosong
+         */
+
+        if (!cir) {
+
+            return {
+
+                found: false,
+
+                status:
+                    "NO MATERIAL",
+
+                ticket:
+                    ticket,
+
+                materials: [],
+
+                note:
+                    "CIR tidak berisi material."
+
+            };
+
+        }
 
 
-        const materials =
+        const parser =
+            getMaterialParser();
+
+
+        let parsed;
+
+
+        try {
+
+            parsed =
+                parser.parse(
+                    cir
+                );
+
+        }
+        catch (error) {
+
+            return {
+
+                found: false,
+
+                status:
+                    "PARSE ERROR",
+
+                ticket:
+                    ticket,
+
+                materials: [],
+
+                note:
+                    error?.message ||
+                    "Gagal parsing material dari CIR."
+
+            };
+
+        }
+
+
+        const materialList =
             Array.isArray(parsed)
                 ? parsed
                 : [];
 
 
-        /*
-         * Tambahkan TT Number ke setiap material.
-         *
-         * Material parser sendiri sudah support
-         * Ticket, tetapi excel.js tetap memaksa
-         * ticket berasal dari TT Number kolom D.
-         */
+        const rows = [];
 
-        const rows =
-            materials.map(
-                function (item) {
 
-                    return {
+        for (
+            const item
+            of materialList
+        ) {
 
-                        ticket:
-                            ttNumber,
+            if (!item) {
 
-                        material:
-                            item.material ||
-                            "",
+                continue;
 
-                        quantity:
-                            item.qty ??
-                            item.quantity ??
-                            1,
+            }
 
-                        unit:
-                            item.satuan ||
-                            item.unit ||
-                            "",
 
-                        code:
-                            item.kode ||
-                            item.code ||
-                            "",
+            const material =
+                cleanValue(
+                    item.material
+                );
 
-                        score:
-                            item.score ??
-                            0,
 
-                        raw:
-                            item.sourceLine ||
-                            item.raw ||
-                            ""
+            /*
+             * Material kosong jangan dianggap
+             * sebagai material valid.
+             */
 
-                    };
+            if (!material) {
 
-                }
-            );
+                continue;
+
+            }
+
+
+            rows.push({
+
+                ticket:
+                    ticket,
+
+                material:
+                    material,
+
+                originalMaterial:
+                    cleanValue(
+                        item.originalMaterial ||
+                        item.material
+                    ),
+
+                quantity:
+                    item.qty ??
+                    item.quantity ??
+                    1,
+
+                unit:
+                    cleanValue(
+                        item.satuan ||
+                        item.unit ||
+                        ""
+                    ),
+
+                code:
+                    cleanValue(
+                        item.kode ||
+                        item.code ||
+                        ""
+                    ),
+
+                type:
+                    cleanValue(
+                        item.type ||
+                        "OFFICIAL"
+                    ),
+
+                matchedAlias:
+                    cleanValue(
+                        item.matchedAlias ||
+                        ""
+                    ),
+
+                score:
+                    item.score ??
+                    0,
+
+                raw:
+                    cleanValue(
+                        item.raw ||
+                        item.sourceLine ||
+                        ""
+                    )
+
+            });
+
+        }
 
 
         return {
@@ -851,13 +992,13 @@
                     : "NO MATERIAL",
 
             ticket:
-                ttNumber,
+                ticket,
 
             materials:
                 rows,
 
             note:
-                rows.length
+                rows.length > 0
                     ? ""
                     : "Tidak ditemukan material resmi di dalam CIR."
 
@@ -867,18 +1008,21 @@
 
 
     /* =====================================================
-       BUILD NO MATERIAL
+       CREATE MATERIAL ERROR
     ===================================================== */
 
     function createNoMaterial(
         ticket,
-        note
+        note,
+        cir
     ) {
 
         return {
 
             ticket:
-                ticket || "",
+                cleanValue(
+                    ticket
+                ),
 
             material:
                 "",
@@ -901,8 +1045,13 @@
             matchedAlias:
                 "",
 
+            score:
+                0,
+
             raw:
-                "",
+                cleanValue(
+                    cir
+                ),
 
             reason:
                 note ||
@@ -929,7 +1078,8 @@
 
 
         /*
-         * TICKET = TT NUMBER KOLOM D
+         * Ticket utama:
+         * TT Number kolom D.
          */
 
         const ttNumber =
@@ -938,46 +1088,76 @@
             );
 
 
+        /*
+         * CIR:
+         * kolom AF.
+         */
+
         const cir =
             getCIR(
                 normalized
             );
 
 
-        /* ---------------------------------------------
-           VALIDATION
-        --------------------------------------------- */
+        /*
+         * Validator
+         */
 
         if (
             !window.ReportCheckerValidator ||
             typeof window
                 .ReportCheckerValidator
                 .validate !==
-                "function"
+            "function"
         ) {
 
             throw new Error(
-                "validator.js belum berhasil dimuat."
+                "validator.js belum berhasil dimuat atau fungsi validate() tidak tersedia."
             );
 
         }
 
 
-        const validation =
-            window
-                .ReportCheckerValidator
-                .validate(
-                    normalized
-                );
+        let validation;
 
 
-        validation.rowIndex =
-            index;
+        try {
+
+            validation =
+                window
+                    .ReportCheckerValidator
+                    .validate(
+                        normalized
+                    );
+
+        }
+        catch (error) {
+
+            throw new Error(
+                "Gagal validasi baris " +
+                (index + 2) +
+                ": " +
+                (
+                    error?.message ||
+                    error
+                )
+            );
+
+        }
+
+
+        if (
+            !validation ||
+            typeof validation !== "object"
+        ) {
+
+            validation = {};
+
+        }
 
 
         /*
-         * Jangan gunakan Customer Ticket
-         * sebagai ticket hasil.
+         * Paksa ticket hasil = TT Number.
          */
 
         validation.ticket =
@@ -988,13 +1168,17 @@
             ttNumber;
 
 
+        validation.rowIndex =
+            index;
+
+
         validation.originalRow =
             normalized;
 
 
-        /* ---------------------------------------------
-           MATERIAL
-        --------------------------------------------- */
+        /*
+         * Material
+         */
 
         const materialResult =
             parseMaterials(
@@ -1007,6 +1191,10 @@
             materialResult;
 
 
+        validation.cir =
+            cir;
+
+
         return validation;
 
     }
@@ -1014,12 +1202,6 @@
 
     /* =====================================================
        FLATTEN MATERIAL
-       
-       Pengganti API lama:
-       ReportCheckerMaterial.flatten()
-       
-       Tidak lagi bergantung kepada flatten()
-       dari material-parser.js.
     ===================================================== */
 
     function flattenMaterialResults(
@@ -1047,6 +1229,18 @@
                 );
 
 
+            /*
+             * Material tanpa ticket
+             * tidak boleh masuk output.
+             */
+
+            if (!ticket) {
+
+                continue;
+
+            }
+
+
             const materials =
                 Array.isArray(
                     result.materials
@@ -1067,23 +1261,32 @@
                 }
 
 
-                /*
-                 * Ticket selalu TT Number.
-                 */
+                const material =
+                    cleanValue(
+                        item.material
+                    );
 
-                const materialRow = {
+
+                if (!material) {
+
+                    continue;
+
+                }
+
+
+                output.push({
 
                     ticket:
                         ticket,
 
                     material:
-                        item.material ||
-                        "",
+                        material,
 
                     originalMaterial:
-                        item.originalMaterial ||
-                        item.material ||
-                        "",
+                        cleanValue(
+                            item.originalMaterial ||
+                            material
+                        ),
 
                     quantity:
                         item.quantity ??
@@ -1091,49 +1294,43 @@
                         1,
 
                     unit:
-                        item.unit ||
-                        item.satuan ||
-                        "",
+                        cleanValue(
+                            item.unit ||
+                            item.satuan ||
+                            ""
+                        ),
 
                     code:
-                        item.code ||
-                        item.kode ||
-                        "",
+                        cleanValue(
+                            item.code ||
+                            item.kode ||
+                            ""
+                        ),
 
                     type:
-                        item.type ||
-                        "OFFICIAL",
+                        cleanValue(
+                            item.type ||
+                            "OFFICIAL"
+                        ),
 
                     matchedAlias:
-                        item.matchedAlias ||
-                        "",
+                        cleanValue(
+                            item.matchedAlias ||
+                            ""
+                        ),
 
                     score:
                         item.score ??
                         0,
 
                     raw:
-                        item.raw ||
-                        item.sourceLine ||
-                        ""
+                        cleanValue(
+                            item.raw ||
+                            item.sourceLine ||
+                            ""
+                        )
 
-                };
-
-
-                /*
-                 * Jangan masukkan material tanpa ticket.
-                 */
-
-                if (!ticket) {
-
-                    continue;
-
-                }
-
-
-                output.push(
-                    materialRow
-                );
+                });
 
             }
 
@@ -1141,6 +1338,91 @@
 
 
         return output;
+
+    }
+
+
+    /* =====================================================
+       MATERIAL ERROR
+    ===================================================== */
+
+    function buildMaterialErrors(
+        validationResults
+    ) {
+
+        const errors = [];
+
+
+        for (
+            const item
+            of validationResults || []
+        ) {
+
+            if (!item) {
+
+                continue;
+
+            }
+
+
+            const ticket =
+                cleanValue(
+                    item.ttNumber ||
+                    item.ticket
+                );
+
+
+            /*
+             * Baris tanpa TT Number
+             * tidak masuk Material Error,
+             * karena tidak bisa dikaitkan ke Ticket.
+             */
+
+            if (!ticket) {
+
+                continue;
+
+            }
+
+
+            const materialResult =
+                item.materialResult;
+
+
+            if (!materialResult) {
+
+                errors.push(
+                    createNoMaterial(
+                        ticket,
+                        "Hasil parsing material tidak tersedia.",
+                        item.cir
+                    )
+                );
+
+                continue;
+
+            }
+
+
+            if (
+                !materialResult.found
+            ) {
+
+                errors.push(
+                    createNoMaterial(
+                        ticket,
+                        materialResult.note ||
+                        "Material tidak ditemukan.",
+                        item.cir
+                    )
+                );
+
+            }
+
+        }
+
+
+        return errors;
 
     }
 
@@ -1169,6 +1451,10 @@
             );
 
 
+        /*
+         * Baca array mentah
+         */
+
         const arrayRows =
             sheetToArray(
                 firstSheet.sheet
@@ -1190,6 +1476,10 @@
             arrayRows[0] || [];
 
 
+        /*
+         * Validasi header
+         */
+
         const headerValidation =
             validateHeaders(
                 headers
@@ -1202,14 +1492,24 @@
 
             throw new Error(
                 "Header Excel tidak lengkap.\n\n" +
-                "Kolom yang belum ditemukan:\n" +
-                headerValidation.missing.join(
-                    ", "
-                )
+                "Kolom yang belum ditemukan:\n\n" +
+                headerValidation.missing
+                    .map(
+                        function (item) {
+
+                            return "• " + item;
+
+                        }
+                    )
+                    .join("\n")
             );
 
         }
 
+
+        /*
+         * Baca object rows
+         */
 
         const rows =
             sheetToRows(
@@ -1228,14 +1528,24 @@
         }
 
 
+        /*
+         * Normalisasi
+         */
+
         const normalizedRows =
             rows.map(
-                normalizeRow
+                function (row) {
+
+                    return normalizeRow(
+                        row
+                    );
+
+                }
             );
 
 
         /*
-         * PROCESS VALIDATION + MATERIAL
+         * PROCESS
          */
 
         const validationResults =
@@ -1254,16 +1564,16 @@
             );
 
 
-        /* ---------------------------------------------
-           SPLIT VALIDATION
-        --------------------------------------------- */
+        /*
+         * VALIDATOR SPLIT
+         */
 
         if (
             !window.ReportCheckerValidator ||
             typeof window
                 .ReportCheckerValidator
                 .split !==
-                "function"
+            "function"
         ) {
 
             throw new Error(
@@ -1273,27 +1583,53 @@
         }
 
 
-        const split =
-            window
-                .ReportCheckerValidator
-                .split(
-                    validationResults
-                );
+        let split;
 
 
-        /* ---------------------------------------------
-           MATERIAL
-        --------------------------------------------- */
+        try {
+
+            split =
+                window
+                    .ReportCheckerValidator
+                    .split(
+                        validationResults
+                    );
+
+        }
+        catch (error) {
+
+            throw new Error(
+                "Gagal memisahkan hasil validasi: " +
+                (
+                    error?.message ||
+                    error
+                )
+            );
+
+        }
+
+
+        split =
+            split || {};
+
+
+        /*
+         * MATERIAL RESULTS
+         */
 
         const materialResults =
             validationResults.map(
                 function (item) {
 
-                    return item.materialResult;
+                    return item?.materialResult;
 
                 }
             );
 
+
+        /*
+         * FLATTEN
+         */
 
         const materialRows =
             flattenMaterialResults(
@@ -1301,62 +1637,19 @@
             );
 
 
-        /* ---------------------------------------------
-           MATERIAL ERROR / NOT FOUND
-        --------------------------------------------- */
+        /*
+         * MATERIAL ERROR
+         */
 
         const materialError =
-            [];
+            buildMaterialErrors(
+                validationResults
+            );
 
 
-        for (
-            const item
-            of validationResults
-        ) {
-
-            const ttNumber =
-                cleanValue(
-                    item?.ttNumber ||
-                    item?.ticket
-                );
-
-
-            if (!ttNumber) {
-
-                continue;
-
-            }
-
-
-            const materialResult =
-                item?.materialResult;
-
-
-            if (
-                !materialResult ||
-                !materialResult.found
-            ) {
-
-                materialError.push(
-                    createNoMaterial(
-                        ttNumber,
-                        materialResult?.note
-                    )
-                );
-
-            }
-
-        }
-
-
-        /* ---------------------------------------------
-           CUSTOM MATERIAL
-           
-           Parser versi sekarang hanya memakai
-           MATERIAL_MASTER resmi.
-
-           Tetap disediakan agar kompatibel.
-        --------------------------------------------- */
+        /*
+         * CUSTOM MATERIAL
+         */
 
         const customMaterials =
             materialRows.filter(
@@ -1364,9 +1657,11 @@
 
                     return (
                         String(
-                            item.type ||
+                            item?.type ||
                             ""
-                        ).toUpperCase() ===
+                        )
+                            .trim()
+                            .toUpperCase() ===
                         "CUSTOM"
                     );
 
@@ -1374,9 +1669,37 @@
             );
 
 
-        /* ---------------------------------------------
-           SAVE STATE
-        --------------------------------------------- */
+        /*
+         * VALIDASI SPLIT
+         */
+
+        const sesuai =
+            Array.isArray(
+                split.sesuai
+            )
+                ? split.sesuai
+                : [];
+
+
+        const tidakSesuai =
+            Array.isArray(
+                split.tidakSesuai
+            )
+                ? split.tidakSesuai
+                : [];
+
+
+        const invalid =
+            Array.isArray(
+                split.invalid
+            )
+                ? split.invalid
+                : [];
+
+
+        /*
+         * SAVE STATE
+         */
 
         state.workbook =
             workbook;
@@ -1399,27 +1722,15 @@
 
 
         state.sesuai =
-            Array.isArray(
-                split.sesuai
-            )
-                ? split.sesuai
-                : [];
+            sesuai;
 
 
         state.tidakSesuai =
-            Array.isArray(
-                split.tidakSesuai
-            )
-                ? split.tidakSesuai
-                : [];
+            tidakSesuai;
 
 
         state.invalid =
-            Array.isArray(
-                split.invalid
-            )
-                ? split.invalid
-                : [];
+            invalid;
 
 
         state.materials =
@@ -1443,26 +1754,26 @@
             "report.xlsx";
 
 
-        /* ---------------------------------------------
-           RESULT
-        --------------------------------------------- */
+        /*
+         * RETURN RESULT
+         */
 
         return {
 
             workbook:
-                workbook,
+                state.workbook,
 
             sheetName:
-                firstSheet.name,
+                state.sheetName,
 
             rows:
-                normalizedRows,
+                state.rows,
 
             validation:
-                validationResults,
+                state.validationResults,
 
             validationResults:
-                validationResults,
+                state.validationResults,
 
             sesuai:
                 state.sesuai,
@@ -1488,7 +1799,7 @@
             summary: {
 
                 total:
-                    validationResults.length,
+                    state.validationResults.length,
 
                 sesuai:
                     state.sesuai.length,
@@ -1519,7 +1830,7 @@
 
 
     /* =====================================================
-       LOAD EXCEL
+       LOAD
     ===================================================== */
 
     async function loadExcel(
@@ -1542,7 +1853,7 @@
 
 
     /* =====================================================
-       CREATE WORKSHEET
+       WORKSHEET
     ===================================================== */
 
     function createWorksheet(
@@ -1550,24 +1861,47 @@
         headers
     ) {
 
-        const XLSX =
+        const xlsx =
             getXLSX();
+
+
+        const safeRows =
+            Array.isArray(rows)
+                ? rows
+                : [];
+
+
+        const safeHeaders =
+            Array.isArray(headers)
+                ? headers
+                : [];
 
 
         const data = [
 
-            headers,
+            safeHeaders,
 
-            ...(rows || []).map(
+            ...safeRows.map(
                 function (row) {
 
-                    return headers.map(
+                    return safeHeaders.map(
                         function (header) {
 
-                            return (
-                                row?.[header] ??
-                                ""
-                            );
+                            const value =
+                                row?.[header];
+
+
+                            if (
+                                value === null ||
+                                value === undefined
+                            ) {
+
+                                return "";
+
+                            }
+
+
+                            return value;
 
                         }
                     );
@@ -1578,7 +1912,7 @@
         ];
 
 
-        return XLSX.utils.aoa_to_sheet(
+        return xlsx.utils.aoa_to_sheet(
             data
         );
 
@@ -1676,12 +2010,12 @@
         sheetName
     ) {
 
-        const XLSX =
+        const xlsx =
             getXLSX();
 
 
         const workbook =
-            XLSX.utils.book_new();
+            xlsx.utils.book_new();
 
 
         const sheet =
@@ -1698,29 +2032,47 @@
         );
 
 
-        XLSX.utils.book_append_sheet(
-            workbook,
-            sheet,
-            (
+        let safeSheetName =
+            String(
                 sheetName ||
                 "Data"
-            ).substring(
-                0,
-                31
             )
+                .replace(
+                    /[:\\/?*\[\]]/g,
+                    "_"
+                )
+                .substring(
+                    0,
+                    31
+                );
+
+
+        if (!safeSheetName) {
+
+            safeSheetName =
+                "Data";
+
+        }
+
+
+        xlsx.utils.book_append_sheet(
+            workbook,
+            sheet,
+            safeSheetName
         );
 
 
-        XLSX.writeFile(
+        xlsx.writeFile(
             workbook,
-            fileName
+            fileName ||
+            "hasil.xlsx"
         );
 
     }
 
 
     /* =====================================================
-       VALIDATION EXPORT ROW
+       VALIDATION EXPORT
     ===================================================== */
 
     function makeValidationExportRows(
@@ -1732,23 +2084,25 @@
         ).map(
             function (item) {
 
+                const original =
+                    item?.originalRow ||
+                    {};
+
+
                 return {
 
-                    ...(
-                        item?.originalRow ||
-                        {}
-                    ),
+                    ...original,
 
                     "TT Release":
-                        item?.releaseDateTime ||
+                        item?.releaseDateTime ??
                         "",
 
                     "Validation Status":
-                        item?.status ||
+                        item?.status ??
                         "",
 
                     "Validation Note":
-                        item?.reason ||
+                        item?.reason ??
                         ""
 
                 };
@@ -1852,7 +2206,7 @@
 
 
     /* =====================================================
-       MATERIAL EXPORT ROW
+       MATERIAL EXPORT
     ===================================================== */
 
     function makeMaterialExportRows() {
@@ -1943,10 +2297,6 @@
     }
 
 
-    /* =====================================================
-       EXPORT MATERIAL
-    ===================================================== */
-
     function exportMaterial(
         fileName
     ) {
@@ -1967,44 +2317,112 @@
 
 
     /* =====================================================
-       EXPORT MATERIAL ERROR
+       MATERIAL ERROR EXPORT
     ===================================================== */
+
+    function makeMaterialErrorExportRows() {
+
+        return state.materialError
+            .filter(
+                function (item) {
+
+                    return (
+                        item &&
+                        cleanValue(
+                            item.ticket
+                        )
+                    );
+
+                }
+            )
+            .map(
+                function (item) {
+
+                    return {
+
+                        "Ticket":
+                            item.ticket,
+
+                        "Material":
+                            item.material,
+
+                        "Original Material":
+                            item.originalMaterial,
+
+                        "Quantity":
+                            item.quantity,
+
+                        "Unit":
+                            item.unit,
+
+                        "Code":
+                            item.code,
+
+                        "Type":
+                            item.type,
+
+                        "Matched Alias":
+                            item.matchedAlias,
+
+                        "Score":
+                            item.score,
+
+                        "Raw":
+                            item.raw,
+
+                        "Error":
+                            item.reason
+
+                    };
+
+                }
+            );
+
+    }
+
+
+    function materialErrorHeaders() {
+
+        return [
+
+            "Ticket",
+
+            "Material",
+
+            "Original Material",
+
+            "Quantity",
+
+            "Unit",
+
+            "Code",
+
+            "Type",
+
+            "Matched Alias",
+
+            "Score",
+
+            "Raw",
+
+            "Error"
+
+        ];
+
+    }
+
 
     function exportMaterialError(
         fileName
     ) {
 
         const rows =
-            state.materialError
-                .filter(
-                    function (item) {
-
-                        return (
-                            item &&
-                            cleanValue(
-                                item.ticket
-                            )
-                        );
-
-                    }
-                );
+            makeMaterialErrorExportRows();
 
 
         downloadWorkbook(
             rows,
-            [
-                "ticket",
-                "material",
-                "originalMaterial",
-                "quantity",
-                "unit",
-                "code",
-                "type",
-                "matchedAlias",
-                "raw",
-                "reason"
-
-            ],
+            materialErrorHeaders(),
             fileName ||
             "material_error.xlsx",
             "MATERIAL ERROR"
@@ -2014,9 +2432,9 @@
 
 
     /* =====================================================
-       EXPORT MATERIAL NOT FOUND
+       MATERIAL NOT FOUND
        
-       Alias lama.
+       Alias kompatibilitas lama.
     ===================================================== */
 
     function exportMaterialNotFound(
@@ -2032,7 +2450,7 @@
 
 
     /* =====================================================
-       EXPORT CUSTOM MATERIAL
+       CUSTOM MATERIAL
     ===================================================== */
 
     function exportCustomMaterial(
@@ -2113,17 +2531,13 @@
         fileName
     ) {
 
-        const XLSX =
+        const xlsx =
             getXLSX();
 
 
         const workbook =
-            XLSX.utils.book_new();
+            xlsx.utils.book_new();
 
-
-        /*
-         * HELPER APPEND
-         */
 
         function appendSheet(
             rows,
@@ -2145,13 +2559,25 @@
             );
 
 
-            XLSX.utils.book_append_sheet(
+            const safeName =
+                String(
+                    name ||
+                    "Data"
+                )
+                    .replace(
+                        /[:\\/?*\[\]]/g,
+                        "_"
+                    )
+                    .substring(
+                        0,
+                        31
+                    );
+
+
+            xlsx.utils.book_append_sheet(
                 workbook,
                 sheet,
-                name.substring(
-                    0,
-                    31
-                )
+                safeName
             );
 
         }
@@ -2161,16 +2587,16 @@
          * SESUAI
          */
 
-        const sesuaiRows =
+        appendSheet(
+
             makeValidationExportRows(
                 state.sesuai
-            );
+            ),
 
-
-        appendSheet(
-            sesuaiRows,
             validationHeaders(),
+
             "SESUAI"
+
         );
 
 
@@ -2178,16 +2604,16 @@
          * TIDAK SESUAI
          */
 
-        const tidakRows =
+        appendSheet(
+
             makeValidationExportRows(
                 state.tidakSesuai
-            );
+            ),
 
-
-        appendSheet(
-            tidakRows,
             validationHeaders(),
+
             "TIDAK SESUAI"
+
         );
 
 
@@ -2195,16 +2621,16 @@
          * INVALID
          */
 
-        const invalidRows =
+        appendSheet(
+
             makeValidationExportRows(
                 state.invalid
-            );
+            ),
 
-
-        appendSheet(
-            invalidRows,
             validationHeaders(),
+
             "INVALID"
+
         );
 
 
@@ -2213,9 +2639,13 @@
          */
 
         appendSheet(
+
             makeMaterialExportRows(),
+
             materialHeaders(),
+
             "MATERIAL"
+
         );
 
 
@@ -2223,38 +2653,14 @@
          * MATERIAL ERROR
          */
 
-        const materialErrorRows =
-            state.materialError
-                .filter(
-                    function (item) {
-
-                        return (
-                            item &&
-                            cleanValue(
-                                item.ticket
-                            )
-                        );
-
-                    }
-                );
-
-
         appendSheet(
-            materialErrorRows,
-            [
-                "ticket",
-                "material",
-                "originalMaterial",
-                "quantity",
-                "unit",
-                "code",
-                "type",
-                "matchedAlias",
-                "raw",
-                "reason"
 
-            ],
+            makeMaterialErrorExportRows(),
+
+            materialErrorHeaders(),
+
             "MATERIAL ERROR"
+
         );
 
 
@@ -2262,48 +2668,57 @@
          * CUSTOM
          */
 
+        const customRows =
+            state.customMaterials
+                .map(
+                    function (item) {
+
+                        return {
+
+                            "Ticket":
+                                item.ticket,
+
+                            "Material":
+                                item.material,
+
+                            "Original Material":
+                                item.originalMaterial,
+
+                            "Quantity":
+                                item.quantity,
+
+                            "Unit":
+                                item.unit,
+
+                            "Code":
+                                item.code,
+
+                            "Type":
+                                item.type,
+
+                            "Matched Alias":
+                                item.matchedAlias,
+
+                            "Score":
+                                item.score,
+
+                            "Raw":
+                                item.raw
+
+                        };
+
+                    }
+                );
+
+
         appendSheet(
-            state.customMaterials.map(
-                function (item) {
 
-                    return {
+            customRows,
 
-                        "Ticket":
-                            item.ticket,
-
-                        "Material":
-                            item.material,
-
-                        "Original Material":
-                            item.originalMaterial,
-
-                        "Quantity":
-                            item.quantity,
-
-                        "Unit":
-                            item.unit,
-
-                        "Code":
-                            item.code,
-
-                        "Type":
-                            item.type,
-
-                        "Matched Alias":
-                            item.matchedAlias,
-
-                        "Score":
-                            item.score,
-
-                        "Raw":
-                            item.raw
-
-                    };
-
-                }
-            ),
             materialHeaders(),
+
             "CUSTOM"
+
         );
 
 
@@ -2311,7 +2726,7 @@
          * DOWNLOAD
          */
 
-        XLSX.writeFile(
+        xlsx.writeFile(
             workbook,
             fileName ||
             "report_checker_result.xlsx"
@@ -2323,19 +2738,22 @@
     /* =====================================================
        EXPORT RESULT
        
-       Dipakai app.js:
-       excel.exportResult(type)
+       API utama untuk app.js
     ===================================================== */
 
     function exportResult(
         type
     ) {
 
-        switch (
+        const target =
             String(
                 type || ""
-            ).toLowerCase()
-        ) {
+            )
+                .trim()
+                .toLowerCase();
+
+
+        switch (target) {
 
             case "valid":
 
@@ -2459,7 +2877,13 @@
                     state.materials.length,
 
                 materialError:
-                    state.materialError.length
+                    state.materialError.length,
+
+                materialNotFound:
+                    state.materialNotFound.length,
+
+                customMaterial:
+                    state.customMaterials.length
 
             }
 
@@ -2522,14 +2946,33 @@
 
     window.ReportCheckerExcel = {
 
+        /*
+         * Load Excel
+         */
+
         load:
             loadExcel,
+
+
+        /*
+         * Process workbook
+         */
 
         process:
             processWorkbook,
 
+
+        /*
+         * Header
+         */
+
         validateHeaders:
             validateHeaders,
+
+
+        /*
+         * Ticket
+         */
 
         getTicket:
             getTicket,
@@ -2537,11 +2980,34 @@
         getTTNumber:
             getTTNumber,
 
+
+        /*
+         * CIR
+         */
+
+        getCIR:
+            getCIR,
+
+
+        /*
+         * State
+         */
+
         getState:
             getState,
 
+
+        /*
+         * Reset
+         */
+
         reset:
             reset,
+
+
+        /*
+         * Export
+         */
 
         exportSesuai:
             exportSesuai,
@@ -2567,15 +3033,32 @@
         exportAll:
             exportAll,
 
+
         /*
-         * Dipakai oleh app.js
+         * API utama app.js
          */
 
         exportResult:
             exportResult,
 
+
+        /*
+         * Headers
+         */
+
         headers:
-            EXPECTED_HEADERS
+            EXPECTED_HEADERS,
+
+
+        /*
+         * Constants
+         */
+
+        TT_NUMBER_COLUMN_INDEX:
+            TT_NUMBER_COLUMN_INDEX,
+
+        CIR_COLUMN_INDEX:
+            CIR_COLUMN_INDEX
 
     };
 
