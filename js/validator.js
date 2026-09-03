@@ -2,41 +2,26 @@
    REPORT CHECKER
    validator.js
 
-   UPDATE:
-   1. Ticket utama WAJIB diambil dari kolom "TT Number"
-   2. Tidak lagi menggunakan Customer Ticket / Ref Ticket
-   3. Membaca Datetime Receive dari Excel
-   4. Membaca TT Release dari CIR
-   5. Membandingkan tanggal release dengan tanggal receive
-   6. Menentukan SESUAI / TIDAK SESUAI
-   7. Mengambil waktu release
-   8. Memastikan setiap hasil mempunyai TT Number
-   9. Menyediakan data siap export
+   SESUAI DENGAN settings.js
 
    ATURAN:
 
-   TT Number:
-      - Ambil hanya dari kolom "TT Number"
-      - Jika kosong => INVALID
+   1. Ticket utama WAJIB diambil dari kolom "TT Number"
+   2. Tidak menggunakan Customer Ticket / Ref Ticket
+   3. Datetime Receive dibaca dari Excel
+   4. TT Release dicari dari CIR
+   5. Keyword TT Release mengikuti settings.js
+      -> releasePhrases
+   6. Tidak membuat daftar release keyword sendiri
+   7. TT Release boleh satu baris dengan tanggal
+   8. TT Release boleh sebelum / sesudah tanggal
+   9. Jarak tanggal maksimal 3 baris
+   10. Tanggal Receive dan Release harus sama
+   11. Jika TT Release tidak ditemukan => TIDAK SESUAI
+   12. Jika TT Number kosong => INVALID
+   13. Menyediakan data siap export
 
-   TT Release:
-      - Dicari di dalam CIR
-      - Case insensitive
-      - Format CIR fleksibel
-      - TT Release boleh berada satu baris dengan tanggal
-      - TT Release boleh berada sebelum / sesudah tanggal
-      - Jarak tanggal maksimal 3 baris
-
-   Jika TT Release ditemukan:
-      - tanggal sama dengan Datetime Receive
-        => SESUAI
-
-      - tanggal berbeda
-        => TIDAK SESUAI
-
-   Jika TT Release tidak ditemukan:
-      => TIDAK SESUAI
-========================================================= */
+   ========================================================= */
 
 (function () {
 
@@ -45,23 +30,40 @@
 
     /* =====================================================
        DEFAULT SETTINGS
+       
+       HANYA fallback jika settings.js belum tersedia.
+       
+       Pengaturan utama tetap dari:
+       
+       window.ReportCheckerSettings.get()
     ===================================================== */
 
     const DEFAULT_SETTINGS = {
 
-        releaseKeywords: [
+        releasePhrases: [
+
             "TT Release",
-            "Ticket Release"
+            "TT release",
+            "TT RELEASE",
+            "Ticket Release",
+            "Ticket release",
+            "TICKET RELEASE"
+
         ],
 
-        timezone:
-            "Asia/Jakarta"
+        validationType:
+            "release-after-receive",
+
+        maxReleaseMinutes:
+            0
 
     };
 
 
     /* =====================================================
        GET SETTINGS
+       
+       Semua pengaturan utama diambil dari settings.js
     ===================================================== */
 
     function getSettings() {
@@ -72,11 +74,15 @@
                 "function"
         ) {
 
+            const settings =
+                window.ReportCheckerSettings.get();
+
+
             return {
 
                 ...DEFAULT_SETTINGS,
 
-                ...window.ReportCheckerSettings.get()
+                ...settings
 
             };
 
@@ -109,9 +115,13 @@
 
 
         return String(value)
+
             .replace(/\r\n/g, "\n")
+
             .replace(/\r/g, "\n")
+
             .replace(/\u00A0/g, " ")
+
             .trim();
 
     }
@@ -124,7 +134,9 @@
     function normalizeLine(value) {
 
         return String(value || "")
+
             .replace(/\s+/g, " ")
+
             .trim();
 
     }
@@ -188,8 +200,7 @@
          */
 
         if (
-            typeof value ===
-            "number"
+            typeof value === "number"
         ) {
 
             const excelEpoch =
@@ -258,12 +269,14 @@
         if (match) {
 
             return createValidDate(
+
                 Number(match[1]),
                 Number(match[2]),
                 Number(match[3]),
                 Number(match[4] || 0),
                 Number(match[5] || 0),
                 Number(match[6] || 0)
+
             );
 
         }
@@ -282,12 +295,14 @@
         if (match) {
 
             return createValidDate(
+
                 Number(match[3]),
                 Number(match[2]),
                 Number(match[1]),
                 Number(match[4] || 0),
                 Number(match[5] || 0),
                 Number(match[6] || 0)
+
             );
 
         }
@@ -306,12 +321,14 @@
         if (match) {
 
             return createValidDate(
+
                 Number(match[3]),
                 Number(match[2]),
                 Number(match[1]),
                 Number(match[4] || 0),
                 Number(match[5] || 0),
                 Number(match[6] || 0)
+
             );
 
         }
@@ -377,7 +394,8 @@
 
 
         /*
-         * Cegah tanggal invalid seperti:
+         * Cegah tanggal invalid:
+         *
          * 31/02/2026
          */
 
@@ -507,7 +525,117 @@
 
 
     /* =====================================================
-       CHECK RELEASE KEYWORD
+       GET RELEASE PHRASES
+       
+       PENTING:
+       
+       Validator TIDAK lagi menggunakan:
+       
+       releaseKeywords
+       
+       Validator menggunakan:
+       
+       settings.js
+       -> releasePhrases
+       
+       Contoh setting:
+
+       releasePhrases: [
+           "TT Release",
+           "Ticket Release"
+       ]
+
+       Kalau user menambahkan:
+
+       "TT RELEASE :"
+       "TT Release Number"
+
+       validator otomatis mengikuti.
+    ===================================================== */
+
+    function getReleasePhrases() {
+
+        const settings =
+            getSettings();
+
+
+        /*
+         * Ambil dari settings.js
+         */
+
+        let phrases =
+            settings.releasePhrases;
+
+
+        /*
+         * Pastikan array.
+         */
+
+        if (
+            !Array.isArray(
+                phrases
+            )
+        ) {
+
+            phrases =
+                DEFAULT_SETTINGS
+                    .releasePhrases;
+
+        }
+
+
+        /*
+         * Bersihkan phrase kosong.
+         */
+
+        phrases =
+            phrases
+
+                .map(
+                    function (item) {
+
+                        return String(
+                            item || ""
+                        )
+                            .trim();
+
+                    }
+                )
+
+                .filter(
+                    function (item) {
+
+                        return item.length > 0;
+
+                    }
+                );
+
+
+        /*
+         * Jika setting kosong,
+         * gunakan default.
+         */
+
+        if (
+            phrases.length === 0
+        ) {
+
+            return DEFAULT_SETTINGS
+                .releasePhrases
+                .slice();
+
+        }
+
+
+        return phrases;
+
+    }
+
+
+    /* =====================================================
+       CHECK RELEASE PHRASE
+       
+       Case insensitive.
     ===================================================== */
 
     function hasReleaseKeyword(
@@ -527,33 +655,33 @@
         }
 
 
-        const settings =
-            getSettings();
-
-
         const lowerText =
             value.toLowerCase();
 
 
+        const releasePhrases =
+            getReleasePhrases();
+
+
         for (
-            const keyword of
-            settings.releaseKeywords || []
+            const phrase
+            of releasePhrases
         ) {
 
-            if (!keyword) {
+            if (!phrase) {
 
                 continue;
 
             }
 
 
-            const lowerKeyword =
-                String(keyword)
+            const lowerPhrase =
+                String(phrase)
                     .toLowerCase()
                     .trim();
 
 
-            if (!lowerKeyword) {
+            if (!lowerPhrase) {
 
                 continue;
 
@@ -562,7 +690,7 @@
 
             if (
                 lowerText.includes(
-                    lowerKeyword
+                    lowerPhrase
                 )
             ) {
 
@@ -640,12 +768,14 @@
 
                 date:
                     createValidDate(
+
                         Number(match[3]),
                         Number(match[2]),
                         Number(match[1]),
                         Number(match[4]),
                         Number(match[5]),
                         Number(match[6] || 0)
+
                     ),
 
                 raw:
@@ -672,12 +802,14 @@
 
                 date:
                     createValidDate(
+
                         Number(match[3]),
                         Number(match[2]),
                         Number(match[1]),
                         Number(match[4]),
                         Number(match[5]),
                         Number(match[6] || 0)
+
                     ),
 
                 raw:
@@ -704,12 +836,14 @@
 
                 date:
                     createValidDate(
+
                         Number(match[1]),
                         Number(match[2]),
                         Number(match[3]),
                         Number(match[4]),
                         Number(match[5]),
                         Number(match[6] || 0)
+
                     ),
 
                 raw:
@@ -722,7 +856,8 @@
 
         /*
          * TT Release ditemukan,
-         * tetapi tanggal tidak ada di baris ini.
+         * tetapi tanggal tidak ada
+         * pada baris ini.
          */
 
         return {
@@ -741,27 +876,15 @@
     /* =====================================================
        FIND RELEASE IN CIR
        
-       Mendukung format CIR fleksibel.
-
-       Contoh:
-
-       ====CIR====
-       21//08/2026 19:07 TT RELEASE
-
-       =====CIR=====
-       18/08/2026 19:35 TT release
-
-       =====CIR=====
-
-       12/08/2026 11:42 TT onsite
-
        Prinsip:
+
        - CIR harus ada
        - Setelah CIR, cari TT Release
+       - Keyword mengikuti settings.js
        - Case insensitive
        - Tanggal boleh sebelum / sesudah TT Release
        - Jarak maksimal 3 baris
-       - Ambil release terakhir jika ada beberapa
+       - Ambil release terakhir
     ===================================================== */
 
     function findReleaseInCir(
@@ -806,8 +929,8 @@
 
 
         /*
-         * Cari semua baris yang mengandung
-         * TT Release.
+         * Cari semua baris yang
+         * mengandung release phrase.
          */
 
         for (
@@ -832,8 +955,8 @@
 
 
             /*
-             * Coba ambil tanggal dari
-             * baris TT Release itu sendiri.
+             * Coba tanggal pada
+             * baris yang sama.
              */
 
             let parsed =
@@ -865,13 +988,10 @@
 
 
             /*
-             * Jika tanggal tidak berada di
-             * baris yang sama, cari sekitar
-             * TT Release.
-             *
-             * Maksimal 3 baris.
+             * Jika tanggal tidak ada
+             * pada baris release,
+             * cari maksimal 3 baris.
              */
-
 
             const maxDistance =
                 3;
@@ -882,8 +1002,7 @@
 
 
             /*
-             * Prioritas:
-             * 1. Setelah TT Release
+             * 1. Cari setelah TT Release
              */
 
             for (
@@ -897,7 +1016,8 @@
 
 
                 if (
-                    index >= lines.length
+                    index >=
+                    lines.length
                 ) {
 
                     break;
@@ -934,7 +1054,7 @@
 
 
             /*
-             * 2. Kalau belum ketemu,
+             * 2. Kalau tidak ditemukan,
              *    cari sebelum TT Release.
              */
 
@@ -1023,7 +1143,7 @@
 
 
         /*
-         * Tidak ada TT Release.
+         * Tidak ada release.
          */
 
         if (
@@ -1115,14 +1235,20 @@
 
 
         return (
+
             receiveDate.getFullYear() ===
-            releaseDate.getFullYear() &&
+            releaseDate.getFullYear()
+
+            &&
 
             receiveDate.getMonth() ===
-            releaseDate.getMonth() &&
+            releaseDate.getMonth()
+
+            &&
 
             receiveDate.getDate() ===
             releaseDate.getDate()
+
         );
 
     }
@@ -1148,8 +1274,10 @@
 
 
         return (
+
             receiveDate.getTime() ===
             releaseDate.getTime()
+
         );
 
     }
@@ -1158,11 +1286,10 @@
     /* =====================================================
        GET TT NUMBER
        
-       PENTING:
-       Ticket sekarang HANYA dari:
+       HANYA:
        
-       "TT Number"
-
+       row["TT Number"]
+       
        Tidak fallback ke:
        - Customer Ticket
        - Ref Ticket
@@ -1173,9 +1300,7 @@
         row
     ) {
 
-        if (
-            !row
-        ) {
+        if (!row) {
 
             return "";
 
@@ -1239,17 +1364,8 @@
 
         const result = {
 
-            /*
-             * Ticket sekarang adalah TT Number
-             */
-
             ticket:
                 ticket,
-
-            /*
-             * Simpan juga secara eksplisit
-             * supaya mudah digunakan oleh app/export.
-             */
 
             ttNumber:
                 ticket,
@@ -1519,7 +1635,9 @@
 
 
         if (
-            !Array.isArray(results)
+            !Array.isArray(
+                results
+            )
         ) {
 
             return output;
@@ -1528,7 +1646,8 @@
 
 
         for (
-            const result of results
+            const result
+            of results
         ) {
 
             if (!result) {
@@ -1554,7 +1673,6 @@
 
             }
 
-
             else if (
                 result.status ===
                 "TIDAK SESUAI"
@@ -1567,7 +1685,6 @@
                 output.summary.tidakSesuai++;
 
             }
-
 
             else {
 
@@ -1605,7 +1722,7 @@
 
 
         /*
-         * Jangan export data tanpa TT Number.
+         * Jangan export tanpa TT Number.
          */
 
         if (
@@ -1654,7 +1771,9 @@
     ) {
 
         if (
-            !Array.isArray(results)
+            !Array.isArray(
+                results
+            )
         ) {
 
             return [];
@@ -1663,21 +1782,30 @@
 
 
         return results
+
             .filter(
                 function (item) {
 
                     return (
+
                         item &&
+
                         item.status ===
-                        "SESUAI" &&
+                        "SESUAI"
+
+                        &&
+
                         item.ticket
+
                     );
 
                 }
             )
+
             .map(
                 toExportRow
             )
+
             .filter(Boolean);
 
     }
@@ -1692,7 +1820,9 @@
     ) {
 
         if (
-            !Array.isArray(results)
+            !Array.isArray(
+                results
+            )
         ) {
 
             return [];
@@ -1701,21 +1831,30 @@
 
 
         return results
+
             .filter(
                 function (item) {
 
                     return (
+
                         item &&
+
                         item.status ===
-                        "TIDAK SESUAI" &&
+                        "TIDAK SESUAI"
+
+                        &&
+
                         item.ticket
+
                     );
 
                 }
             )
+
             .map(
                 toExportRow
             )
+
             .filter(Boolean);
 
     }
@@ -1753,12 +1892,14 @@
         validate:
             validateRow,
 
+
         /*
          * Multiple rows
          */
 
         validateRows:
             validateRows,
+
 
         /*
          * Cari TT Release
@@ -1767,12 +1908,14 @@
         findRelease:
             findReleaseInCir,
 
+
         /*
          * Parse Excel date
          */
 
         parseDate:
             parseExcelDate,
+
 
         /*
          * Format date
@@ -1781,12 +1924,14 @@
         formatDate:
             formatDate,
 
+
         /*
          * Format datetime
          */
 
         formatDateTime:
             formatDateTime,
+
 
         /*
          * Compare date
@@ -1795,12 +1940,14 @@
         compareDate:
             compareDateOnly,
 
+
         /*
          * Compare datetime
          */
 
         compareDateTime:
             compareDateTime,
+
 
         /*
          * Ambil TT Number
@@ -1809,6 +1956,23 @@
         getTTNumber:
             getTTNumber,
 
+
+        /*
+         * Ambil release phrases
+         */
+
+        getReleasePhrases:
+            getReleasePhrases,
+
+
+        /*
+         * Check release keyword
+         */
+
+        hasReleaseKeyword:
+            hasReleaseKeyword,
+
+
         /*
          * Pisahkan hasil
          */
@@ -1816,12 +1980,14 @@
         split:
             splitResults,
 
+
         /*
          * Summary
          */
 
         summary:
             getSummary,
+
 
         /*
          * Export rows
@@ -1833,6 +1999,7 @@
         exportTidakSesuai:
             exportTidakSesuaiRows,
 
+
         /*
          * Default settings
          */
@@ -1841,6 +2008,32 @@
             DEFAULT_SETTINGS
 
     };
+
+
+    /* =====================================================
+       DEBUG
+    ===================================================== */
+
+    console.log(
+        "ReportCheckerValidator loaded.",
+        {
+
+            releasePhrases:
+                getReleasePhrases(),
+
+            validationType:
+                getSettings()
+                    .validationType,
+
+            maxReleaseMinutes:
+                getSettings()
+                    .maxReleaseMinutes,
+
+            ticketSource:
+                'row["TT Number"]'
+
+        }
+    );
 
 
 })();
