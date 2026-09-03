@@ -3,35 +3,30 @@
    material-parser.js
 
    VERSION:
-   UPDATE FUZZY MATERIAL PARSER
+   MATERIAL + PHRASE / KEYWORD MATCHING
 
-   FUNGSI:
-   - Membaca daftar material dari #materialList
-   - Membaca material dari bagian "Material" pada CIR
-   - Exact match
-   - Fuzzy match untuk typo / nama yang mirip
-   - Material hasil selalu menggunakan nama resmi dari list
+   FORMAT HTML #materialList:
+
+   Pigtail | pigtail | pigtal | pigtail 2 pcs
+   Protect | protect | protek
+   Gembok | gembok | gembog | gembuk
+   Splitter 1:2 | splitter 1:2 | spliter 1:2
+
+   KETERANGAN:
+   - Bagian pertama = NAMA MATERIAL RESMI
+   - Setelah "|" = FRASA / KATA KUNCI
+   - Semua frasa dianggap alias material tersebut
+   - Hasil selalu menggunakan nama resmi
+   - Exact phrase match diprioritaskan
+   - Fuzzy typo digunakan sebagai cadangan
+   - Membaca bagian "Material" pada CIR
    - Mengambil Qty
    - Mengambil Satuan
    - Mengambil Kode
    - Mendukung material multi-line
-   - Tidak memasukkan teks biasa sebagai material
-   - Material gagal ditemukan masuk errors
-   - Kompatibel dengan excel.js:
+   - Tidak mudah salah mengambil teks biasa
+   - Kompatibel:
        parser.parse(cirText)
-
-   CONTOH CIR:
-
-   Material
-   Pigtail 2 pcs
-   Protect 2 pcs
-   Gembok (DPS-09-D0002-M01S2)
-
-   HASIL:
-
-   Pigtail | 2 | pcs
-   Protect | 2 | pcs
-   Gembok  | 1 | -
 ========================================================= */
 
 (function () {
@@ -46,43 +41,45 @@
     const CONFIG = {
 
         /*
-         * Nilai minimum kemiripan.
+         * Threshold typo.
          *
-         * 1.00 = harus sama persis
-         * 0.90 = sangat ketat
-         * 0.80 = cukup toleran
+         * Semakin tinggi = semakin ketat.
          *
-         * Untuk typo ringan gunakan 0.72 - 0.80.
+         * 0.80 cocok untuk typo ringan.
          */
 
-        FUZZY_THRESHOLD: 0.74,
+        FUZZY_THRESHOLD: 0.80,
 
         /*
-         * Minimal panjang material untuk fuzzy.
+         * Minimal panjang frasa untuk fuzzy.
          */
 
         MIN_FUZZY_LENGTH: 4,
 
         /*
-         * Berapa baris berikutnya boleh digabung
-         * untuk material multi-line.
+         * Maksimal baris tambahan untuk material multi-line.
          */
 
         MAX_COMBINE_LINES: 2,
 
         /*
-         * Kata yang dianggap header / pemisah.
+         * Jika score fuzzy terlalu dekat dengan material
+         * lain, jangan memaksakan hasil.
+         */
+
+        MIN_SCORE_GAP: 0.06,
+
+        /*
+         * Header bagian Material.
          */
 
         HEADER_WORDS: [
-
             "material",
             "materials",
             "material :",
             "material:",
             "material -",
             "material-"
-
         ]
 
     };
@@ -98,60 +95,42 @@
             value === null ||
             value === undefined
         ) {
-
             return "";
-
         }
 
-
         return String(value)
-
             .replace(/\r/g, "")
-
             .replace(/\u00A0/g, " ")
-
             .replace(/\t/g, " ")
-
             .replace(/\s+/g, " ")
-
             .trim();
 
     }
 
 
     /* =====================================================
-       NORMALIZE MATERIAL
+       NORMALIZE MATERIAL NAME
     ====================================================== */
 
     function normalizeMaterialName(value) {
 
         return normalizeText(value)
-
             .toLowerCase()
-
             .replace(/[“”"]/g, "")
-
             .replace(/[‘’']/g, "")
-
             .replace(/\s+/g, " ")
-
             .trim();
 
     }
 
 
     /* =====================================================
-       NORMALIZE FOR FUZZY
+       NORMALIZE FUZZY
     ====================================================== */
 
     function normalizeForFuzzy(value) {
 
         return normalizeMaterialName(value)
-
-            /*
-             * Hilangkan karakter non penting.
-             */
-
             .replace(/[^a-z0-9]+/g, "");
 
     }
@@ -164,7 +143,6 @@
     function escapeRegex(value) {
 
         return String(value)
-
             .replace(
                 /[.*+?^${}()|[\]\\]/g,
                 "\\$&"
@@ -179,11 +157,6 @@
 
     function getSettings() {
 
-        /*
-         * Support beberapa kemungkinan
-         * implementasi settings.js.
-         */
-
         try {
 
             if (
@@ -195,9 +168,7 @@
                     getParserSettings();
 
                 if (settings) {
-
                     return settings;
-
                 }
 
             }
@@ -215,8 +186,7 @@
         try {
 
             if (
-                typeof window !==
-                "undefined" &&
+                typeof window !== "undefined" &&
                 window.PARSER_SETTINGS
             ) {
 
@@ -237,8 +207,7 @@
         try {
 
             if (
-                typeof window !==
-                "undefined" &&
+                typeof window !== "undefined" &&
                 window.parserSettings
             ) {
 
@@ -262,20 +231,19 @@
 
 
     /* =====================================================
-       GET MATERIAL LIST
+       GET RAW MATERIAL DATA
     ====================================================== */
 
-    function getMaterialListFromSettings() {
+    function getRawMaterialList() {
 
         const settings =
             getSettings();
-
 
         let materialList = [];
 
 
         /*
-         * Format array.
+         * Prioritas settings.
          */
 
         if (
@@ -324,7 +292,7 @@
 
 
         /*
-         * Format string.
+         * Jika berupa string.
          */
 
         if (
@@ -369,7 +337,7 @@
         /*
          * PENTING:
          *
-         * HTML Anda menggunakan:
+         * HTML:
          *
          * <textarea id="materialList">
          */
@@ -385,7 +353,6 @@
                     "materialList"
                 );
 
-
             if (textarea) {
 
                 materialList =
@@ -398,7 +365,7 @@
 
 
         /*
-         * Fallback ID lama.
+         * Support ID lama.
          */
 
         if (
@@ -412,7 +379,6 @@
                     "materialNames"
                 );
 
-
             if (textarea) {
 
                 materialList =
@@ -424,42 +390,35 @@
         }
 
 
-        /*
-         * Bersihkan.
-         */
+        return materialList;
 
-        const cleaned = [];
+    }
 
 
-        const seen =
+    /* =====================================================
+       PARSE MATERIAL SETTINGS
+    ====================================================== */
+
+    function getMaterialDefinitions() {
+
+        const rawList =
+            getRawMaterialList();
+
+
+        const definitions = [];
+
+        const seenOfficial =
             new Set();
 
 
         for (
-            const item
-            of materialList
+            const rawItem
+            of rawList
         ) {
 
-            const value =
-                normalizeText(item);
-
-
-            if (!value) {
-
-                continue;
-
-            }
-
-
-            const key =
-                normalizeMaterialName(
-                    value
-                );
-
-
             if (
-                !key ||
-                seen.has(key)
+                rawItem === null ||
+                rawItem === undefined
             ) {
 
                 continue;
@@ -467,44 +426,223 @@
             }
 
 
-            seen.add(key);
+            const raw =
+                normalizeText(
+                    rawItem
+                );
 
-            cleaned.push(value);
+
+            if (!raw) {
+                continue;
+            }
+
+
+            /*
+             * Format:
+             *
+             * Pigtail | pigtal | pigtail
+             */
+
+            const parts =
+                raw
+                    .split("|")
+                    .map(function (item) {
+
+                        return normalizeText(
+                            item
+                        );
+
+                    })
+                    .filter(Boolean);
+
+
+            if (!parts.length) {
+                continue;
+            }
+
+
+            /*
+             * Bagian pertama selalu
+             * nama resmi.
+             */
+
+            const officialName =
+                parts[0];
+
+
+            const officialKey =
+                normalizeMaterialName(
+                    officialName
+                );
+
+
+            if (
+                !officialKey ||
+                seenOfficial.has(
+                    officialKey
+                )
+            ) {
+
+                continue;
+
+            }
+
+
+            seenOfficial.add(
+                officialKey
+            );
+
+
+            /*
+             * Alias:
+             *
+             * Nama resmi juga otomatis
+             * menjadi alias.
+             */
+
+            const aliases = [];
+
+            const seenAliases =
+                new Set();
+
+
+            const addAlias =
+                function (value) {
+
+                    const cleaned =
+                        normalizeText(
+                            value
+                        );
+
+                    if (!cleaned) {
+                        return;
+                    }
+
+
+                    const key =
+                        normalizeMaterialName(
+                            cleaned
+                        );
+
+
+                    if (
+                        !key ||
+                        seenAliases.has(key)
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    seenAliases.add(key);
+
+                    aliases.push(
+                        cleaned
+                    );
+
+                };
+
+
+            /*
+             * Nama resmi.
+             */
+
+            addAlias(
+                officialName
+            );
+
+
+            /*
+             * Semua frasa setelah "|".
+             */
+
+            for (
+                let i = 1;
+                i < parts.length;
+                i++
+            ) {
+
+                addAlias(
+                    parts[i]
+                );
+
+            }
+
+
+            definitions.push({
+
+                name:
+                    officialName,
+
+                aliases:
+                    aliases
+
+            });
 
         }
 
 
         /*
-         * Material terpanjang dahulu.
-         *
-         * Contoh:
-         *
-         * Tiang 7
-         * Tiang 7 (Batang)
-         *
-         * Maka Tiang 7 (Batang)
+         * Material yang alias-nya panjang
          * dicoba lebih dahulu.
          */
 
-        cleaned.sort(
+        definitions.sort(
             function (a, b) {
 
+                const aLength =
+                    Math.max.apply(
+                        null,
+                        a.aliases.map(
+                            function (x) {
+                                return x.length;
+                            }
+                        )
+                    );
+
+                const bLength =
+                    Math.max.apply(
+                        null,
+                        b.aliases.map(
+                            function (x) {
+                                return x.length;
+                            }
+                        )
+                    );
+
                 return (
-                    b.length -
-                    a.length
+                    bLength -
+                    aLength
                 );
 
             }
         );
 
 
-        return cleaned;
+        return definitions;
 
     }
 
 
     /* =====================================================
-       IS HEADER
+       COMPATIBLE MATERIAL LIST
+    ====================================================== */
+
+    function getMaterialListFromSettings() {
+
+        return getMaterialDefinitions()
+            .map(function (item) {
+
+                return item.name;
+
+            });
+
+    }
+
+
+    /* =====================================================
+       HEADER DETECTION
     ====================================================== */
 
     function isMaterialHeader(
@@ -518,25 +656,21 @@
 
 
         if (!value) {
-
             return false;
-
         }
 
 
         return CONFIG.HEADER_WORDS
-            .some(
-                function (header) {
+            .some(function (header) {
 
-                    return (
-                        value ===
-                        normalizeMaterialName(
-                            header
-                        )
-                    );
+                return (
+                    value ===
+                    normalizeMaterialName(
+                        header
+                    )
+                );
 
-                }
-            );
+            });
 
     }
 
@@ -551,8 +685,7 @@
 
         const text =
             String(
-                cirText ??
-                ""
+                cirText ?? ""
             );
 
 
@@ -562,11 +695,8 @@
                 .split("\n");
 
 
-        /*
-         * Cari tulisan Material.
-         */
-
-        let materialIndex = -1;
+        let materialIndex =
+            -1;
 
 
         for (
@@ -580,28 +710,6 @@
                     lines[i]
                 );
 
-
-            if (
-                isMaterialHeader(
-                    line
-                )
-            ) {
-
-                materialIndex =
-                    i;
-
-                break;
-
-            }
-
-
-            /*
-             * Support:
-             *
-             * Material:
-             * Material -
-             * Material
-             */
 
             if (
                 /^material\s*[:=-]?\s*$/i
@@ -619,11 +727,8 @@
 
 
         /*
-         * Jika tidak ada header Material,
-         * gunakan seluruh CIR.
-         *
-         * Ini menjaga kompatibilitas
-         * dengan CIR lama.
+         * Tidak ada header Material:
+         * fallback seluruh CIR.
          */
 
         if (
@@ -643,13 +748,71 @@
 
 
         /*
-         * Ambil semua baris setelah Material.
+         * Cari header bagian berikutnya.
+         *
+         * Contoh:
+         *
+         * Material
+         * Pigtail
+         * Protect
+         *
+         * Keterangan
+         * ...
+         *
+         * Parser berhenti saat menemukan
+         * header yang jelas.
          */
 
-        const result =
-            lines.slice(
-                materialIndex + 1
+        const result = [];
+
+
+        for (
+            let i =
+                materialIndex + 1;
+
+            i < lines.length;
+
+            i++
+        ) {
+
+            const line =
+                normalizeText(
+                    lines[i]
+                );
+
+
+            /*
+             * Kosong tetap dilewati nanti.
+             */
+
+            if (!line) {
+
+                result.push("");
+
+                continue;
+
+            }
+
+
+            /*
+             * Header umum.
+             */
+
+            if (
+                /^(?:keterangan|remark|remarks|catatan|status|foto|photo|evidence|note|notes)\s*[:=-]?\s*$/i
+                    .test(line)
+            ) {
+
+                break;
+
+            }
+
+
+            result.push(
+                line
             );
+
+        }
 
 
         return {
@@ -665,7 +828,7 @@
 
 
     /* =====================================================
-       REMOVE MATERIAL HEADER
+       CLEAN MATERIAL LINES
     ====================================================== */
 
     function cleanMaterialLines(
@@ -682,42 +845,34 @@
 
 
         return lines
+            .map(function (line) {
 
-            .map(
-                function (line) {
+                return normalizeText(
+                    line
+                );
 
-                    return normalizeText(
+            })
+            .filter(function (line) {
+
+                if (!line) {
+                    return false;
+                }
+
+
+                if (
+                    isMaterialHeader(
                         line
-                    );
+                    )
+                ) {
+
+                    return false;
 
                 }
-            )
-
-            .filter(
-                function (line) {
-
-                    if (!line) {
-
-                        return false;
-
-                    }
 
 
-                    if (
-                        isMaterialHeader(
-                            line
-                        )
-                    ) {
+                return true;
 
-                        return false;
-
-                    }
-
-
-                    return true;
-
-                }
-            );
+            });
 
     }
 
@@ -747,10 +902,6 @@
                 .replace(/\s/g, "");
 
 
-        /*
-         * 1.000,50
-         */
-
         if (
             text.includes(".") &&
             text.includes(",")
@@ -762,10 +913,6 @@
                     .replace(",", ".");
 
         }
-
-        /*
-         * 1,5
-         */
 
         else if (
             text.includes(",") &&
@@ -797,384 +944,7 @@
 
 
     /* =====================================================
-       EXTRACT QUANTITY
-    ====================================================== */
-
-    function findQty(
-        text,
-        materialName
-    ) {
-
-        const value =
-            normalizeText(
-                text
-            );
-
-
-        if (!value) {
-
-            return "";
-
-        }
-
-
-        /*
-         * Prioritas:
-         *
-         * Qty 2
-         * Qty: 2
-         * Qty = 2
-         */
-
-        let match =
-            value.match(
-                /\b(?:qty|quantity|jumlah)\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)/i
-            );
-
-
-        if (match) {
-
-            return parseNumber(
-                match[1]
-            );
-
-        }
-
-
-        /*
-         * Contoh:
-         *
-         * Pigtail 2 pcs
-         * Protect 2 pcs
-         * Tiang 7 5 batang
-         */
-
-        let remainder =
-            value;
-
-
-        if (materialName) {
-
-            const regex =
-                createMaterialRegex(
-                    materialName
-                );
-
-
-            if (regex) {
-
-                remainder =
-                    value.replace(
-                        regex,
-                        " "
-                    );
-
-            }
-
-        }
-
-
-        /*
-         * Cari angka yang berdiri sendiri.
-         *
-         * Hindari angka yang merupakan bagian
-         * dari kode seperti:
-         *
-         * DPS-09-D0002-M01S2
-         */
-
-        const numberMatches =
-            remainder.match(
-                /(?:^|\s)(-?\d+(?:[.,]\d+)?)(?=\s|$)/g
-            );
-
-
-        if (
-            numberMatches &&
-            numberMatches.length
-        ) {
-
-            const candidate =
-                numberMatches[0]
-                    .trim();
-
-
-            /*
-             * Pastikan bukan bagian dari
-             * nama material seperti:
-             *
-             * Splitter 1:2
-             */
-
-            if (
-                !(
-                    materialName &&
-                    new RegExp(
-                        escapeRegex(
-                            candidate
-                        )
-                    ).test(
-                        materialName
-                    )
-                )
-            ) {
-
-                return parseNumber(
-                    candidate
-                );
-
-            }
-
-        }
-
-
-        return "";
-
-    }
-
-
-    /* =====================================================
-       EXTRACT UNIT
-    ====================================================== */
-
-    function findUnit(
-        text,
-        materialName
-    ) {
-
-        const value =
-            normalizeText(
-                text
-            );
-
-
-        /*
-         * Urutan penting.
-         */
-
-        const units = [
-
-            "pcs",
-
-            "piece",
-
-            "pieces",
-
-            "unit",
-
-            "batang",
-
-            "meter",
-
-            "metre",
-
-            "buah",
-
-            "set",
-
-            "pc",
-
-            "m"
-
-        ];
-
-
-        for (
-            const unit
-            of units
-        ) {
-
-            const regex =
-                new RegExp(
-                    "\\b" +
-                    escapeRegex(unit) +
-                    "\\b",
-                    "i"
-                );
-
-
-            if (
-                regex.test(value)
-            ) {
-
-                /*
-                 * Gunakan format yang lebih
-                 * rapi untuk hasil.
-                 */
-
-                if (
-                    unit === "pcs" ||
-                    unit === "pc"
-                ) {
-
-                    return "pcs";
-
-                }
-
-
-                if (
-                    unit === "piece" ||
-                    unit === "pieces"
-                ) {
-
-                    return "pcs";
-
-                }
-
-
-                if (
-                    unit === "metre"
-                ) {
-
-                    return "meter";
-
-                }
-
-
-                if (
-                    unit === "m"
-                ) {
-
-                    return "m";
-
-                }
-
-
-                return (
-                    unit.charAt(0)
-                        .toUpperCase() +
-                    unit.slice(1)
-                );
-
-            }
-
-        }
-
-
-        /*
-         * Satuan dari nama material.
-         */
-
-        const lower =
-            normalizeMaterialName(
-                materialName
-            );
-
-
-        if (
-            lower.includes("(meter)")
-        ) {
-
-            return "Meter";
-
-        }
-
-
-        if (
-            lower.includes("(unit)")
-        ) {
-
-            return "Unit";
-
-        }
-
-
-        if (
-            lower.includes("(batang)")
-        ) {
-
-            return "Batang";
-
-        }
-
-
-        return "";
-
-    }
-
-
-    /* =====================================================
-       EXTRACT CODE
-    ====================================================== */
-
-    function findCode(
-        text
-    ) {
-
-        const value =
-            normalizeText(
-                text
-            );
-
-
-        /*
-         * Format:
-         *
-         * Kode: ABC123
-         * Code: ABC123
-         */
-
-        let match =
-            value.match(
-                /(?:kode|code)\s*[:=]\s*([A-Za-z0-9._/-]+)/i
-            );
-
-
-        if (match) {
-
-            return match[1];
-
-        }
-
-
-        /*
-         * Format:
-         *
-         * Gembok (DPS-09-D0002-M01S2)
-         *
-         * Ambil isi dalam kurung jika terlihat
-         * seperti kode.
-         */
-
-        const parentheses =
-            value.match(
-                /\(([^()]+)\)/
-            );
-
-
-        if (
-            parentheses &&
-            parentheses[1]
-        ) {
-
-            const inside =
-                parentheses[1].trim();
-
-
-            /*
-             * Kode biasanya memiliki
-             * angka + huruf + tanda -
-             */
-
-            if (
-                /[A-Za-z]/.test(inside) &&
-                /\d/.test(inside)
-            ) {
-
-                return inside;
-
-            }
-
-        }
-
-
-        return "";
-
-    }
-
-
-    /* =====================================================
-       MATERIAL REGEX
+       MATERIAL ALIAS REGEX
     ====================================================== */
 
     function createMaterialRegex(
@@ -1199,26 +969,20 @@
 
         const pattern =
             parts
-                .map(
-                    function (part) {
+                .map(function (part) {
 
-                        return escapeRegex(
-                            part
-                        );
+                    return escapeRegex(
+                        part
+                    );
 
-                    }
-                )
-                .join(
-                    "\\s*"
-                );
+                })
+                .join("\\s*");
 
 
         return new RegExp(
 
             "(^|[^A-Za-z0-9])" +
-
             pattern +
-
             "(?=$|[^A-Za-z0-9])",
 
             "i"
@@ -1229,7 +993,151 @@
 
 
     /* =====================================================
-       LEVENSHTEIN DISTANCE
+       CLEAN INPUT
+    ====================================================== */
+
+    function cleanLineForMatching(
+        line
+    ) {
+
+        let value =
+            normalizeText(
+                line
+            );
+
+
+        /*
+         * Hilangkan Qty.
+         */
+
+        value =
+            value.replace(
+                /\b(?:qty|quantity|jumlah)\s*[:=]?\s*-?\d+(?:[.,]\d+)?/gi,
+                " "
+            );
+
+
+        /*
+         * Hilangkan angka + satuan.
+         */
+
+        value =
+            value.replace(
+                /\b\d+(?:[.,]\d+)?\s*(?:pcs?|pieces?|unit|batang|meter|metre|buah|set)\b/gi,
+                " "
+            );
+
+
+        return normalizeText(
+            value
+        );
+
+    }
+
+
+    /* =====================================================
+       FIND EXACT PHRASE
+    ====================================================== */
+
+    function findExactMaterial(
+        line,
+        definitions
+    ) {
+
+        const original =
+            normalizeText(
+                line
+            );
+
+
+        const cleaned =
+            cleanLineForMatching(
+                original
+            );
+
+
+        let best =
+            null;
+
+
+        for (
+            const definition
+            of definitions
+        ) {
+
+            for (
+                const alias
+                of definition.aliases
+            ) {
+
+                const regex =
+                    createMaterialRegex(
+                        alias
+                    );
+
+
+                if (!regex) {
+                    continue;
+                }
+
+
+                if (
+                    regex.test(
+                        cleaned
+                    )
+                ) {
+
+                    const score =
+                        normalizeForFuzzy(
+                            alias
+                        ).length;
+
+
+                    /*
+                     * Alias terpanjang menang.
+                     */
+
+                    if (
+                        !best ||
+                        score >
+                        best.aliasLength
+                    ) {
+
+                        best = {
+
+                            material:
+                                definition.name,
+
+                            matchedAlias:
+                                alias,
+
+                            score:
+                                1,
+
+                            method:
+                                "EXACT",
+
+                            aliasLength:
+                                score
+
+                        };
+
+                    }
+
+                }
+
+            }
+
+        }
+
+
+        return best;
+
+    }
+
+
+    /* =====================================================
+       LEVENSHTEIN
     ====================================================== */
 
     function levenshtein(
@@ -1238,14 +1146,20 @@
     ) {
 
         const s =
-            normalizeForFuzzy(a);
+            normalizeForFuzzy(
+                a
+            );
 
 
         const t =
-            normalizeForFuzzy(b);
+            normalizeForFuzzy(
+                b
+            );
 
 
-        if (s === t) {
+        if (
+            s === t
+        ) {
 
             return 0;
 
@@ -1253,26 +1167,22 @@
 
 
         if (!s.length) {
-
             return t.length;
-
         }
 
 
         if (!t.length) {
-
             return s.length;
-
         }
 
 
-        const previous =
+        let previous =
             new Array(
                 t.length + 1
             );
 
 
-        const current =
+        let current =
             new Array(
                 t.length + 1
             );
@@ -1328,16 +1238,14 @@
             }
 
 
-            for (
-                let j = 0;
-                j <= t.length;
-                j++
-            ) {
+            const temp =
+                previous;
 
-                previous[j] =
-                    current[j];
+            previous =
+                current;
 
-            }
+            current =
+                temp;
 
         }
 
@@ -1359,11 +1267,15 @@
     ) {
 
         const x =
-            normalizeForFuzzy(a);
+            normalizeForFuzzy(
+                a
+            );
 
 
         const y =
-            normalizeForFuzzy(b);
+            normalizeForFuzzy(
+                b
+            );
 
 
         if (
@@ -1384,10 +1296,6 @@
 
         }
 
-
-        /*
-         * Exact substring.
-         */
 
         if (
             x.includes(y) ||
@@ -1477,7 +1385,8 @@
             of materialTokens
         ) {
 
-            let best = 0;
+            let best =
+                0;
 
 
             for (
@@ -1497,7 +1406,8 @@
             }
 
 
-            total += best;
+            total +=
+                best;
 
         }
 
@@ -1511,140 +1421,12 @@
 
 
     /* =====================================================
-       CLEAN INPUT FOR MATERIAL MATCH
-    ====================================================== */
-
-    function cleanLineForMatching(
-        line
-    ) {
-
-        let value =
-            normalizeText(
-                line
-            );
-
-
-        /*
-         * Hilangkan Qty:
-         *
-         * Qty: 2
-         * Qty 2
-         */
-
-        value =
-            value.replace(
-                /\b(?:qty|quantity|jumlah)\s*[:=]?\s*-?\d+(?:[.,]\d+)?/gi,
-                " "
-            );
-
-
-        /*
-         * Hilangkan angka yang diikuti satuan.
-         *
-         * 2 pcs
-         * 2 unit
-         * 2 batang
-         */
-
-        value =
-            value.replace(
-                /\b\d+(?:[.,]\d+)?\s*(?:pcs?|pieces?|unit|batang|meter|metre|buah|set|m)\b/gi,
-                " "
-            );
-
-
-        return normalizeText(
-            value
-        );
-
-    }
-
-
-    /* =====================================================
-       FIND EXACT MATERIAL
-    ====================================================== */
-
-    function findExactMaterial(
-        line,
-        materialList
-    ) {
-
-        const original =
-            normalizeText(
-                line
-            );
-
-
-        const cleaned =
-            cleanLineForMatching(
-                original
-            );
-
-
-        /*
-         * Coba material terpanjang
-         * terlebih dahulu.
-         */
-
-        for (
-            const material
-            of materialList
-        ) {
-
-            const regex =
-                createMaterialRegex(
-                    material
-                );
-
-
-            if (
-                !regex
-            ) {
-
-                continue;
-
-            }
-
-
-            if (
-                regex.test(
-                    cleaned
-                )
-            ) {
-
-                return {
-
-                    material:
-                        material,
-
-                    score:
-                        1,
-
-                    matchedAlias:
-                        material,
-
-                    method:
-                        "EXACT"
-
-                };
-
-            }
-
-        }
-
-
-        return null;
-
-    }
-
-
-    /* =====================================================
        FIND FUZZY MATERIAL
     ====================================================== */
 
     function findFuzzyMaterial(
         line,
-        materialList
+        definitions
     ) {
 
         const original =
@@ -1673,84 +1455,101 @@
             null;
 
 
+        let secondBest =
+            null;
+
+
         for (
-            const material
-            of materialList
+            const definition
+            of definitions
         ) {
 
-            const materialNormalized =
-                normalizeMaterialName(
-                    material
-                );
-
-
-            if (
-                materialNormalized.length <
-                CONFIG.MIN_FUZZY_LENGTH
+            for (
+                const alias
+                of definition.aliases
             ) {
 
-                continue;
+                const aliasNormalized =
+                    normalizeForFuzzy(
+                        alias
+                    );
 
-            }
-
-
-            /*
-             * 1. Kemiripan seluruh baris.
-             */
-
-            const fullScore =
-                similarity(
-                    cleaned,
-                    material
-                );
-
-
-            /*
-             * 2. Kemiripan token.
-             */
-
-            const tokenScore =
-                tokenSimilarity(
-                    cleaned,
-                    material
-                );
-
-
-            /*
-             * Gunakan score terbaik.
-             */
-
-            let score =
-                Math.max(
-                    fullScore,
-                    tokenScore
-                );
-
-
-            /*
-             * Jika material pendek,
-             * kita buat lebih ketat.
-             */
-
-            if (
-                materialNormalized.length <= 5
-            ) {
 
                 if (
-                    score < 0.84
+                    aliasNormalized.length <
+                    CONFIG.MIN_FUZZY_LENGTH
                 ) {
 
                     continue;
 
                 }
 
-            }
+
+                const fullScore =
+                    similarity(
+                        cleaned,
+                        alias
+                    );
 
 
-            if (
-                score >=
-                CONFIG.FUZZY_THRESHOLD
-            ) {
+                const tokenScore =
+                    tokenSimilarity(
+                        cleaned,
+                        alias
+                    );
+
+
+                let score =
+                    Math.max(
+                        fullScore,
+                        tokenScore
+                    );
+
+
+                /*
+                 * Untuk alias pendek
+                 * harus lebih ketat.
+                 */
+
+                if (
+                    aliasNormalized.length <= 5 &&
+                    score < 0.88
+                ) {
+
+                    continue;
+
+                }
+
+
+                if (
+                    score <
+                    CONFIG.FUZZY_THRESHOLD
+                ) {
+
+                    continue;
+
+                }
+
+
+                const candidate = {
+
+                    material:
+                        definition.name,
+
+                    matchedAlias:
+                        alias,
+
+                    score:
+                        score,
+
+                    method:
+                        "FUZZY",
+
+                    aliasLength:
+                        aliasNormalized.length
+
+                };
+
 
                 if (
                     !best ||
@@ -1758,23 +1557,53 @@
                     best.score
                 ) {
 
-                    best = {
+                    secondBest =
+                        best;
 
-                        material:
-                            material,
-
-                        score:
-                            score,
-
-                        matchedAlias:
-                            cleaned,
-
-                        method:
-                            "FUZZY"
-
-                    };
+                    best =
+                        candidate;
 
                 }
+
+                else if (
+                    !secondBest ||
+                    score >
+                    secondBest.score
+                ) {
+
+                    secondBest =
+                        candidate;
+
+                }
+
+            }
+
+        }
+
+
+        /*
+         * Jangan memilih fuzzy jika
+         * dua kandidat terlalu dekat.
+         */
+
+        if (
+            best &&
+            secondBest &&
+            best.material !==
+            secondBest.material
+        ) {
+
+            const gap =
+                best.score -
+                secondBest.score;
+
+
+            if (
+                gap <
+                CONFIG.MIN_SCORE_GAP
+            ) {
+
+                return null;
 
             }
 
@@ -1792,17 +1621,17 @@
 
     function findMaterial(
         line,
-        materialList
+        definitions
     ) {
 
         /*
-         * EXACT dahulu.
+         * EXACT / ALIAS dahulu.
          */
 
         const exact =
             findExactMaterial(
                 line,
-                materialList
+                definitions
             );
 
 
@@ -1816,24 +1645,24 @@
 
 
         /*
-         * Baru fuzzy.
+         * Fuzzy hanya cadangan.
          */
 
         return findFuzzyMaterial(
             line,
-            materialList
+            definitions
         );
 
     }
 
 
     /* =====================================================
-       DETECT MATERIAL IN LINE
+       DETECT MATERIAL
     ====================================================== */
 
     function detectMaterialInLine(
         line,
-        materialList
+        materialListOrDefinitions
     ) {
 
         const original =
@@ -1842,11 +1671,60 @@
             );
 
 
+        if (!original) {
+            return null;
+        }
+
+
+        /*
+         * API lama bisa mengirim array nama.
+         *
+         * Internal parser menggunakan definitions.
+         */
+
+        let definitions =
+            materialListOrDefinitions;
+
+
         if (
-            !original
+            !Array.isArray(
+                definitions
+            )
         ) {
 
-            return null;
+            definitions =
+                getMaterialDefinitions();
+
+        }
+
+
+        /*
+         * Kalau array hanya berisi string,
+         * ubah menjadi definitions.
+         */
+
+        if (
+            definitions.length &&
+            typeof definitions[0] ===
+            "string"
+        ) {
+
+            definitions =
+                definitions.map(
+                    function (name) {
+
+                        return {
+
+                            name:
+                                name,
+
+                            aliases:
+                                [name]
+
+                        };
+
+                    }
+                );
 
         }
 
@@ -1854,16 +1732,12 @@
         const match =
             findMaterial(
                 original,
-                materialList
+                definitions
             );
 
 
-        if (
-            !match
-        ) {
-
+        if (!match) {
             return null;
-
         }
 
 
@@ -1890,6 +1764,351 @@
 
 
     /* =====================================================
+       FIND QTY
+    ====================================================== */
+
+    function findQty(
+        text,
+        materialName
+    ) {
+
+        const value =
+            normalizeText(
+                text
+            );
+
+
+        if (!value) {
+            return "";
+        }
+
+
+        /*
+         * Qty 2
+         * Qty: 2
+         * Jumlah 2
+         */
+
+        let match =
+            value.match(
+                /\b(?:qty|quantity|jumlah)\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)/i
+            );
+
+
+        if (match) {
+
+            return parseNumber(
+                match[1]
+            );
+
+        }
+
+
+        /*
+         * Cari angka yang diikuti satuan.
+         *
+         * Contoh:
+         *
+         * Pigtail 2 pcs
+         */
+
+        match =
+            value.match(
+                /\b(-?\d+(?:[.,]\d+)?)\s*(?:pcs?|pieces?|unit|batang|meter|metre|buah|set)\b/i
+            );
+
+
+        if (match) {
+
+            return parseNumber(
+                match[1]
+            );
+
+        }
+
+
+        /*
+         * Hapus material dari teks.
+         */
+
+        let remainder =
+            value;
+
+
+        if (materialName) {
+
+            const regex =
+                createMaterialRegex(
+                    materialName
+                );
+
+
+            if (regex) {
+
+                remainder =
+                    remainder.replace(
+                        regex,
+                        " "
+                    );
+
+            }
+
+        }
+
+
+        /*
+         * Jangan ambil angka dari kode.
+         *
+         * Cari angka berdiri sendiri.
+         */
+
+        const numberMatches =
+            remainder.match(
+                /(?:^|\s)(-?\d+(?:[.,]\d+)?)(?=\s|$)/g
+            );
+
+
+        if (
+            numberMatches &&
+            numberMatches.length
+        ) {
+
+            return parseNumber(
+                numberMatches[0].trim()
+            );
+
+        }
+
+
+        return "";
+
+    }
+
+
+    /* =====================================================
+       FIND UNIT
+    ====================================================== */
+
+    function findUnit(
+        text,
+        materialName
+    ) {
+
+        const value =
+            normalizeText(
+                text
+            );
+
+
+        const units = [
+
+            {
+                regex:
+                    /\bpcs?\b/i,
+                value:
+                    "pcs"
+            },
+
+            {
+                regex:
+                    /\bpieces?\b/i,
+                value:
+                    "pcs"
+            },
+
+            {
+                regex:
+                    /\bunit\b/i,
+                value:
+                    "Unit"
+            },
+
+            {
+                regex:
+                    /\bbatang\b/i,
+                value:
+                    "Batang"
+            },
+
+            {
+                regex:
+                    /\bmeters?\b/i,
+                value:
+                    "Meter"
+            },
+
+            {
+                regex:
+                    /\bmetres?\b/i,
+                value:
+                    "Meter"
+            },
+
+            {
+                regex:
+                    /\bbuah\b/i,
+                value:
+                    "Buah"
+            },
+
+            {
+                regex:
+                    /\bset\b/i,
+                value:
+                    "Set"
+            },
+
+            {
+                regex:
+                    /(?:^|\s)m(?:\s|$)/i,
+                value:
+                    "m"
+            }
+
+        ];
+
+
+        for (
+            const item
+            of units
+        ) {
+
+            if (
+                item.regex.test(
+                    value
+                )
+            ) {
+
+                return item.value;
+
+            }
+
+        }
+
+
+        /*
+         * Ambil satuan dari nama resmi.
+         */
+
+        const lower =
+            normalizeMaterialName(
+                materialName
+            );
+
+
+        if (
+            /\(meter\)/i.test(
+                lower
+            )
+        ) {
+
+            return "Meter";
+
+        }
+
+
+        if (
+            /\(unit\)/i.test(
+                lower
+            )
+        ) {
+
+            return "Unit";
+
+        }
+
+
+        if (
+            /\(batang\)/i.test(
+                lower
+            )
+        ) {
+
+            return "Batang";
+
+        }
+
+
+        return "";
+
+    }
+
+
+    /* =====================================================
+       FIND CODE
+    ====================================================== */
+
+    function findCode(
+        text
+    ) {
+
+        const value =
+            normalizeText(
+                text
+            );
+
+
+        /*
+         * Kode: ABC123
+         * Code: ABC123
+         */
+
+        let match =
+            value.match(
+                /(?:kode|code)\s*[:=]\s*([A-Za-z0-9._/-]+)/i
+            );
+
+
+        if (match) {
+
+            return match[1];
+
+        }
+
+
+        /*
+         * Contoh:
+         *
+         * Gembok (DPS-09-D0002-M01S2)
+         */
+
+        const parentheses =
+            value.match(
+                /\(([^()]+)\)/
+            );
+
+
+        if (
+            parentheses &&
+            parentheses[1]
+        ) {
+
+            const inside =
+                parentheses[1].trim();
+
+
+            if (
+                /[A-Za-z]/.test(
+                    inside
+                ) &&
+                /\d/.test(
+                    inside
+                )
+            ) {
+
+                return inside;
+
+            }
+
+        }
+
+
+        return "";
+
+    }
+
+
+    /* =====================================================
        LOOKS LIKE MATERIAL
     ====================================================== */
 
@@ -1903,18 +2122,10 @@
             );
 
 
-        if (
-            !value
-        ) {
-
+        if (!value) {
             return false;
-
         }
 
-
-        /*
-         * Header jangan dianggap material.
-         */
 
         if (
             isMaterialHeader(
@@ -1928,7 +2139,7 @@
 
 
         /*
-         * Ada Qty / satuan / kode.
+         * Ada Qty / satuan.
          */
 
         if (
@@ -1942,7 +2153,7 @@
 
 
         if (
-            /\b(?:pcs?|unit|batang|meter|metre|buah|set)\b/i
+            /\b(?:pcs?|pieces?|unit|batang|meter|metre|buah|set)\b/i
                 .test(value)
         ) {
 
@@ -1965,6 +2176,21 @@
         }
 
 
+        /*
+         * Baris pendek yang terdiri dari
+         * kata + angka bisa menjadi material.
+         */
+
+        if (
+            value.length <= 80 &&
+            /\d/.test(value)
+        ) {
+
+            return true;
+
+        }
+
+
         return false;
 
     }
@@ -1976,7 +2202,7 @@
 
     function parseMaterialLine(
         line,
-        materialList,
+        definitions,
         ticket
     ) {
 
@@ -1986,25 +2212,23 @@
             );
 
 
-        if (
-            !text
-        ) {
-
+        if (!text) {
             return null;
-
         }
 
 
         const detected =
             detectMaterialInLine(
                 text,
-                materialList
+                definitions
             );
 
 
-        if (
-            !detected
-        ) {
+        /*
+         * Tidak ditemukan.
+         */
+
+        if (!detected) {
 
             if (
                 looksLikeMaterialLine(
@@ -2049,20 +2273,19 @@
                     matchedAlias:
                         "",
 
+                    method:
+                        "",
+
                     raw:
                         text,
 
                     error:
-                        "Nama material tidak ditemukan dalam daftar pengaturan."
+                        "Material tidak ditemukan dalam daftar / frasa pengaturan."
 
                 };
 
             }
 
-
-            /*
-             * Baris biasa.
-             */
 
             return null;
 
@@ -2076,6 +2299,10 @@
 
             ticket:
                 ticket || "",
+
+            /*
+             * SELALU nama resmi.
+             */
 
             material:
                 detected.material,
@@ -2118,13 +2345,13 @@
 
 
     /* =====================================================
-       COMBINE MULTI LINE
+       COMBINE MULTI-LINE
     ====================================================== */
 
     function tryCombineLines(
         lines,
         startIndex,
-        materialList,
+        definitions,
         ticket
     ) {
 
@@ -2167,7 +2394,7 @@
             const result =
                 parseMaterialLine(
                     combined,
-                    materialList,
+                    definitions,
                     ticket
                 );
 
@@ -2206,12 +2433,16 @@
         ticket
     ) {
 
-        const materialList =
-            getMaterialListFromSettings();
+        const definitions =
+            getMaterialDefinitions();
 
+
+        /*
+         * Tidak ada material di settings.
+         */
 
         if (
-            !materialList.length
+            !definitions.length
         ) {
 
             return {
@@ -2245,7 +2476,7 @@
                         "",
 
                     error:
-                        "Daftar Nama Material belum diatur."
+                        "Daftar Nama Material belum diatur di HTML."
 
                 }]
 
@@ -2271,7 +2502,7 @@
 
 
         /*
-         * Ambil bagian Material.
+         * Cari bagian Material.
          */
 
         const section =
@@ -2279,14 +2510,6 @@
                 materialText
             );
 
-
-        /*
-         * Jika header Material ditemukan,
-         * gunakan baris setelahnya.
-         *
-         * Jika tidak ditemukan,
-         * fallback seluruh CIR.
-         */
 
         const rawLines =
             section.lines || [];
@@ -2315,9 +2538,7 @@
                 );
 
 
-            if (
-                !current
-            ) {
+            if (!current) {
 
                 i++;
 
@@ -2327,25 +2548,20 @@
 
 
             /*
-             * Exact / fuzzy langsung.
+             * Coba langsung.
              */
 
             let parsed =
                 parseMaterialLine(
                     current,
-                    materialList,
+                    definitions,
                     ticket
                 );
 
 
             /*
-             * Kalau gagal,
-             * coba gabungkan dengan baris berikut.
-             *
-             * Contoh:
-             *
-             * Splitter
-             * 1:2
+             * Jika gagal,
+             * coba multi-line.
              */
 
             if (
@@ -2357,7 +2573,7 @@
                     tryCombineLines(
                         lines,
                         i,
-                        materialList,
+                        definitions,
                         ticket
                     );
 
@@ -2376,6 +2592,10 @@
 
             }
 
+
+            /*
+             * Simpan hasil.
+             */
 
             if (
                 parsed
@@ -2407,15 +2627,14 @@
         }
 
 
-        /*
-         * Hilangkan duplikat.
-         *
-         * Kadang CIR hasil copy paste
-         * memiliki baris yang sama dua kali.
-         */
+        /* =================================================
+           DEDUPLICATE
+        ================================================= */
 
         const uniqueMaterials = [];
-        const seen = new Set();
+
+        const seen =
+            new Set();
 
 
         for (
@@ -2555,25 +2774,42 @@
 
 
     /* =====================================================
-       DEBUG INFO
+       GET DEBUG INFO
     ====================================================== */
 
     function getDebugInfo() {
 
-        const list =
-            getMaterialListFromSettings();
+        const definitions =
+            getMaterialDefinitions();
 
 
         return {
 
             materialCount:
-                list.length,
+                definitions.length,
 
             materials:
-                list,
+                definitions.map(
+                    function (item) {
+
+                        return {
+
+                            name:
+                                item.name,
+
+                            aliases:
+                                item.aliases
+
+                        };
+
+                    }
+                ),
 
             threshold:
-                CONFIG.FUZZY_THRESHOLD
+                CONFIG.FUZZY_THRESHOLD,
+
+            phraseMode:
+                true
 
         };
 
@@ -2605,10 +2841,22 @@
             detectMaterialInLine,
 
         find:
-            findMaterial,
+            function (
+                line
+            ) {
+
+                return findMaterial(
+                    line,
+                    getMaterialDefinitions()
+                );
+
+            },
 
         getMaterialList:
             getMaterialListFromSettings,
+
+        getDefinitions:
+            getMaterialDefinitions,
 
         getDebugInfo:
             getDebugInfo,
@@ -2619,9 +2867,9 @@
     };
 
 
-    /*
-     * Alias kompatibilitas kode lama.
-     */
+    /* =====================================================
+       COMPATIBILITY ALIAS
+    ====================================================== */
 
     window.MaterialParser =
         window.ReportCheckerMaterial;
@@ -2640,7 +2888,7 @@
 
 
     /* =====================================================
-       STARTUP LOG
+       STARTUP
     ====================================================== */
 
     console.log(
@@ -2649,8 +2897,8 @@
 
 
     console.log(
-        "Material list:",
-        getMaterialListFromSettings()
+        "Material definitions:",
+        getMaterialDefinitions()
     );
 
 
