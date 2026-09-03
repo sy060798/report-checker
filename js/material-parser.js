@@ -2,14 +2,15 @@
    REPORT CHECKER
    material-parser.js
 
-   UPDATED VERSION
-   - Strict Material Matching
-   - Material hanya dari MASTER LIST
+   UPDATED - SYNC WITH settings.js
+
+   Fungsi:
+   - Material hanya diambil berdasarkan MASTER LIST
+     dari ReportCheckerSettings
+   - Tidak bergantung pada nama material hard-code
    - Typo ringan masih diterima
    - Material yang tidak cukup mirip ditolak
    - Material excluded tidak pernah masuk hasil
-   - Ticket Material = TT Number / kolom D
-   - Customer Ticket tidak digunakan sebagai Ticket
    - Support CIR object maupun array
    - Support parse()
    - Support parseMultiple()
@@ -18,14 +19,16 @@
    - Support flatten()
    - Support parseDetailed()
 
-   UPDATE:
-   - getTTNumber() lebih kuat
-   - Prioritas nomor ticket dari kolom D
-   - Support berbagai nama field TT Number
-   - Support originalRow
-   - Support source
-   - Support nested row
-   - Output Ticket tetap tersedia di semua format
+   CATATAN:
+   MASTER MATERIAL sekarang membaca:
+
+       window.ReportCheckerSettings.get()
+
+   dari:
+
+       settings.js
+
+   sehingga daftar material cukup diatur melalui Settings.
 ========================================================= */
 
 (function () {
@@ -34,10 +37,15 @@
 
 
     /* =====================================================
-       MATERIAL MASTER LIST
+       FALLBACK MASTER MATERIAL
+
+       Hanya digunakan jika settings.js belum tersedia
+       atau materialStartPhrases tidak ditemukan.
+
+       Parser TETAP menggunakan setting.js apabila tersedia.
     ===================================================== */
 
-    const MATERIAL_MASTER = [
+    const FALLBACK_MATERIAL_MASTER = [
 
         "Pigtail",
         "Patchcord",
@@ -61,7 +69,9 @@
         "96C DOME (UNIT)",
         "144C DOME (UNIT)",
 
-        "24C INLINE (Unit)",
+        "12C INLANE (Unit)",
+        "24C INLANE (Unit)",
+
         "48C INLINE (Unit)",
         "96C INLINE (Unit)",
         "144C INLINE (Unit)",
@@ -149,6 +159,236 @@
         shortTokenMinimum: 0.92
 
     };
+
+
+    /* =====================================================
+       GET MATERIAL MASTER FROM SETTINGS.JS
+       
+       settings.js memiliki:
+
+       materialStartPhrases
+
+       Tetapi daftar contoh user adalah nama material.
+       
+       Karena itu parser juga mendukung field:
+       
+       materialMaster
+       materialList
+       materials
+       materialNames
+
+       Jika field tersebut tersedia di settings.js,
+       akan dipakai.
+
+       Jika belum ada, fallback digunakan.
+    ===================================================== */
+
+    function getSettings() {
+
+        try {
+
+            if (
+                window.ReportCheckerSettings &&
+                typeof
+                    window.ReportCheckerSettings.get ===
+                    "function"
+            ) {
+
+                return (
+                    window.ReportCheckerSettings.get()
+                );
+
+            }
+
+        } catch (error) {
+
+            console.error(
+                "Gagal membaca ReportCheckerSettings:",
+                error
+            );
+
+        }
+
+        return null;
+
+    }
+
+
+    /* =====================================================
+       GET MATERIAL MASTER
+    ===================================================== */
+
+    function getMaterialMaster() {
+
+        const settings =
+            getSettings();
+
+
+        if (settings) {
+
+            /*
+             * Prioritas 1:
+             * materialMaster
+             */
+
+            if (
+                Array.isArray(
+                    settings.materialMaster
+                ) &&
+                settings.materialMaster.length
+            ) {
+
+                return cleanMaterialMaster(
+                    settings.materialMaster
+                );
+
+            }
+
+
+            /*
+             * Prioritas 2:
+             * materialList
+             */
+
+            if (
+                Array.isArray(
+                    settings.materialList
+                ) &&
+                settings.materialList.length
+            ) {
+
+                return cleanMaterialMaster(
+                    settings.materialList
+                );
+
+            }
+
+
+            /*
+             * Prioritas 3:
+             * materials
+             */
+
+            if (
+                Array.isArray(
+                    settings.materials
+                ) &&
+                settings.materials.length
+            ) {
+
+                return cleanMaterialMaster(
+                    settings.materials
+                );
+
+            }
+
+
+            /*
+             * Prioritas 4:
+             * materialNames
+             */
+
+            if (
+                Array.isArray(
+                    settings.materialNames
+                ) &&
+                settings.materialNames.length
+            ) {
+
+                return cleanMaterialMaster(
+                    settings.materialNames
+                );
+
+            }
+
+        }
+
+
+        /*
+         * Jika settings.js belum memiliki
+         * field master material,
+         * gunakan fallback.
+         */
+
+        return FALLBACK_MATERIAL_MASTER.slice();
+
+    }
+
+
+    /* =====================================================
+       CLEAN MATERIAL MASTER
+    ===================================================== */
+
+    function cleanMaterialMaster(
+        list
+    ) {
+
+        if (
+            !Array.isArray(list)
+        ) {
+
+            return [];
+
+        }
+
+
+        const output = [];
+
+        const seen = new Set();
+
+
+        for (
+            const item
+            of list
+        ) {
+
+            const value =
+                normalizeLine(
+                    item
+                );
+
+
+            if (!value) {
+
+                continue;
+
+            }
+
+
+            const key =
+                normalizeMaterialName(
+                    value
+                );
+
+
+            if (!key) {
+
+                continue;
+
+            }
+
+
+            if (
+                seen.has(key)
+            ) {
+
+                continue;
+
+            }
+
+
+            seen.add(key);
+
+            output.push(
+                value
+            );
+
+        }
+
+
+        return output;
+
+    }
 
 
     /* =====================================================
@@ -241,11 +481,13 @@
         const normalized =
             normalizeMaterialName(value);
 
+
         if (!normalized) {
 
             return true;
 
         }
+
 
         for (
             const excluded
@@ -256,6 +498,7 @@
                 normalizeMaterialName(
                     excluded
                 );
+
 
             if (
                 normalized.includes(
@@ -268,6 +511,7 @@
             }
 
         }
+
 
         return false;
 
@@ -283,11 +527,13 @@
         const normalized =
             normalizeMaterialName(value);
 
+
         if (!normalized) {
 
             return [];
 
         }
+
 
         return normalized
 
@@ -307,11 +553,13 @@
         a = String(a || "");
         b = String(b || "");
 
+
         if (a === b) {
 
             return 0;
 
         }
+
 
         if (!a.length) {
 
@@ -319,13 +567,16 @@
 
         }
 
+
         if (!b.length) {
 
             return a.length;
 
         }
 
+
         const matrix = [];
+
 
         for (
             let i = 0;
@@ -337,6 +588,7 @@
 
         }
 
+
         for (
             let j = 0;
             j <= a.length;
@@ -346,6 +598,7 @@
             matrix[0][j] = j;
 
         }
+
 
         for (
             let i = 1;
@@ -386,6 +639,7 @@
 
         }
 
+
         return matrix[b.length][a.length];
 
     }
@@ -403,6 +657,7 @@
         const right =
             normalizeMaterialName(b);
 
+
         if (
             !left ||
             !right
@@ -412,6 +667,7 @@
 
         }
 
+
         if (
             left === right
         ) {
@@ -420,11 +676,13 @@
 
         }
 
+
         const distance =
             levenshtein(
                 left,
                 right
             );
+
 
         const maxLength =
             Math.max(
@@ -432,11 +690,13 @@
                 right.length
             );
 
+
         if (!maxLength) {
 
             return 0;
 
         }
+
 
         return 1 -
             (
@@ -461,10 +721,12 @@
                 sourceToken || ""
             ).toLowerCase();
 
+
         const target =
             String(
                 targetToken || ""
             ).toLowerCase();
+
 
         if (
             !source ||
@@ -475,9 +737,11 @@
 
         }
 
+
         /*
          * Angka wajib exact.
          */
+
         if (
             /^\d+$/.test(target)
         ) {
@@ -488,6 +752,7 @@
 
         }
 
+
         if (
             source === target
         ) {
@@ -495,6 +760,7 @@
             return 1;
 
         }
+
 
         return similarity(
             source,
@@ -514,10 +780,16 @@
     ) {
 
         const source =
-            normalizeMaterialName(input);
+            normalizeMaterialName(
+                input
+            );
+
 
         const target =
-            normalizeMaterialName(master);
+            normalizeMaterialName(
+                master
+            );
+
 
         if (
             !source ||
@@ -528,6 +800,7 @@
 
         }
 
+
         if (
             source === target
         ) {
@@ -536,11 +809,14 @@
 
         }
 
+
         const sourceTokens =
             tokenize(source);
 
+
         const targetTokens =
             tokenize(target);
+
 
         if (
             !sourceTokens.length ||
@@ -551,9 +827,11 @@
 
         }
 
+
         let matchedCount = 0;
 
         let scoreTotal = 0;
+
 
         for (
             const targetToken
@@ -561,6 +839,7 @@
         ) {
 
             let bestScore = 0;
+
 
             for (
                 const sourceToken
@@ -572,6 +851,7 @@
                         sourceToken,
                         targetToken
                     );
+
 
                 if (
                     score >
@@ -585,7 +865,9 @@
 
             }
 
+
             let minimumScore;
+
 
             if (
                 targetToken.length <= 3
@@ -611,6 +893,7 @@
 
             }
 
+
             if (
                 bestScore >=
                 minimumScore
@@ -629,6 +912,7 @@
 
         }
 
+
         if (
             matchedCount !==
             targetTokens.length
@@ -638,9 +922,11 @@
 
         }
 
+
         const tokenScore =
             scoreTotal /
             targetTokens.length;
+
 
         if (
             sourceTokens.length >
@@ -650,6 +936,7 @@
             return 0;
 
         }
+
 
         return tokenScore;
 
@@ -668,16 +955,23 @@
 
         }
 
+
         if (
-            isExcludedMaterial(input)
+            isExcludedMaterial(
+                input
+            )
         ) {
 
             return null;
 
         }
 
+
         const source =
-            normalizeMaterialName(input);
+            normalizeMaterialName(
+                input
+            );
+
 
         if (!source) {
 
@@ -685,13 +979,23 @@
 
         }
 
+
+        /*
+         * MASTER MATERIAL DARI SETTINGS.JS
+         */
+
+        const materialMaster =
+            getMaterialMaster();
+
+
         let best = null;
 
         let bestScore = 0;
 
+
         for (
             const master
-            of MATERIAL_MASTER
+            of materialMaster
         ) {
 
             const score =
@@ -699,6 +1003,7 @@
                     source,
                     master
                 );
+
 
             if (
                 score >
@@ -715,6 +1020,7 @@
 
         }
 
+
         if (
             !best ||
             bestScore <
@@ -724,6 +1030,7 @@
             return null;
 
         }
+
 
         return {
 
@@ -740,15 +1047,6 @@
 
     /* =====================================================
        GET TT NUMBER
-       
-       PRIORITAS:
-       
-       1. ARRAY -> kolom D
-       2. Object TT Number
-       3. Object Ticket
-       4. originalRow
-       5. source
-       6. row
     ===================================================== */
 
     function getTTNumber(row) {
@@ -762,12 +1060,6 @@
 
         /* ================================================
            1. ARRAY
-
-           Excel:
-           A = 0
-           B = 1
-           C = 2
-           D = 3
         ================================================ */
 
         if (
@@ -781,6 +1073,7 @@
                     ]
                 );
 
+
             if (value) {
 
                 return value;
@@ -792,8 +1085,6 @@
 
         /* ================================================
            2. OBJECT
-
-           Berbagai kemungkinan nama field.
         ================================================ */
 
         if (
@@ -819,8 +1110,6 @@
 
                 "TT No.",
                 "TT NO.",
-
-                "TT No. ",
 
                 "Ticket Number",
                 "Ticket number",
@@ -853,6 +1142,7 @@
                             row[field]
                         );
 
+
                     if (value) {
 
                         return value;
@@ -879,6 +1169,7 @@
                     row.originalRow
                 );
 
+
             if (original) {
 
                 return original;
@@ -901,6 +1192,7 @@
                     row.source
                 );
 
+
             if (source) {
 
                 return source;
@@ -911,7 +1203,7 @@
 
 
         /* ================================================
-           5. row nested
+           5. nested row
         ================================================ */
 
         if (
@@ -922,6 +1214,7 @@
                 getTTNumber(
                     row.row
                 );
+
 
             if (nested) {
 
@@ -980,6 +1273,7 @@
 
             const value =
                 row[cirField];
+
 
             if (
                 value !== undefined &&
@@ -1061,6 +1355,7 @@
 
         }
 
+
         const normalized =
             String(value)
 
@@ -1068,10 +1363,12 @@
 
                 .trim();
 
+
         const result =
             Number(
                 normalized
             );
+
 
         return Number.isFinite(
             result
@@ -1094,13 +1391,16 @@
 
         }
 
+
         const value =
             normalizeLine(text);
+
 
         let match =
             value.match(
                 /(?:qty|quantity|jumlah)\s*[:=]?\s*(\d+(?:[.,]\d+)?)/i
             );
+
 
         if (match) {
 
@@ -1116,6 +1416,7 @@
                 /(?:^|\s)(\d+(?:[.,]\d+)?)\s*(?:pcs?|piece|unit|batang|m|meter|metre)\b/i
             );
 
+
         if (match) {
 
             return normalizeNumber(
@@ -1129,6 +1430,7 @@
             value.match(
                 /[:=]\s*(\d+(?:[.,]\d+)?)\s*$/i
             );
+
 
         if (match) {
 
@@ -1156,16 +1458,19 @@
         const value =
             normalizeLine(text);
 
+
         const match =
             value.match(
                 /\b(pcs?|piece|unit|batang|m|meter|metre)\b/i
             );
+
 
         if (match) {
 
             const unit =
                 match[1]
                     .toLowerCase();
+
 
             if (
                 unit === "pc" ||
@@ -1177,6 +1482,7 @@
 
             }
 
+
             if (
                 unit === "unit"
             ) {
@@ -1185,6 +1491,7 @@
 
             }
 
+
             if (
                 unit === "batang"
             ) {
@@ -1192,6 +1499,7 @@
                 return "batang";
 
             }
+
 
             if (
                 unit === "m" ||
@@ -1211,24 +1519,33 @@
                 material
             );
 
+
         if (
-            normalized.includes("meter")
+            normalized.includes(
+                "meter"
+            )
         ) {
 
             return "m";
 
         }
 
+
         if (
-            normalized.includes("batang")
+            normalized.includes(
+                "batang"
+            )
         ) {
 
             return "batang";
 
         }
 
+
         if (
-            normalized.includes("unit")
+            normalized.includes(
+                "unit"
+            )
         ) {
 
             return "unit";
@@ -1285,6 +1602,358 @@
 
 
     /* =====================================================
+       EXTRACT MATERIAL CANDIDATES
+       
+       INI BAGIAN PENTING.
+
+       CIR bisa menulis:
+
+       matrial
+       protek:1
+       pigtail:1
+
+       atau:
+
+       material
+       Pigtail:1
+       Patchcord:2
+
+       Parser tidak lagi menganggap seluruh baris
+       sebagai nama material.
+
+       Parser mencoba mencocokkan setiap bagian
+       terhadap MASTER LIST dari settings.js.
+    ===================================================== */
+
+    function extractMaterialCandidates(
+        line
+    ) {
+
+        const candidates = [];
+
+        const originalLine =
+            normalizeLine(line);
+
+
+        if (!originalLine) {
+
+            return candidates;
+
+        }
+
+
+        /*
+         * Coba seluruh baris dahulu.
+         */
+
+        candidates.push(
+            originalLine
+        );
+
+
+        /*
+         * Pecah berdasarkan separator umum.
+         *
+         * Contoh:
+         *
+         * Pigtail:1
+         * Pigtail - 1
+         * Pigtail = 1
+         */
+
+        const separated =
+            originalLine.split(
+                /\s*(?:,|;|\||\/)\s*/
+            );
+
+
+        for (
+            const part
+            of separated
+        ) {
+
+            if (
+                part &&
+                !candidates.includes(part)
+            ) {
+
+                candidates.push(
+                    part
+                );
+
+            }
+
+        }
+
+
+        /*
+         * Coba hapus quantity.
+         */
+
+        const cleaned =
+            cleanMaterialText(
+                originalLine
+            );
+
+
+        if (
+            cleaned &&
+            !candidates.includes(
+                cleaned
+            )
+        ) {
+
+            candidates.push(
+                cleaned
+            );
+
+        }
+
+
+        return candidates;
+
+    }
+
+
+    /* =====================================================
+       FIND MATERIALS INSIDE LINE
+       
+       Ini memungkinkan:
+       
+       "protek:1 pigtail:1"
+
+       tetap menemukan Pigtail.
+
+       Tetapi hasil akhirnya HARUS salah satu dari
+       MASTER LIST settings.js.
+    ===================================================== */
+
+    function findMaterialsInLine(
+        line
+    ) {
+
+        const master =
+            getMaterialMaster();
+
+
+        if (
+            !master.length
+        ) {
+
+            return [];
+
+        }
+
+
+        const originalLine =
+            normalizeLine(line);
+
+
+        if (!originalLine) {
+
+            return [];
+
+        }
+
+
+        /*
+         * Excluded langsung ditolak.
+         */
+
+        if (
+            isExcludedMaterial(
+                originalLine
+            )
+        ) {
+
+            return [];
+
+        }
+
+
+        const found = [];
+
+
+        /*
+         * Cari setiap material MASTER di dalam
+         * tulisan CIR.
+         */
+
+        for (
+            const material
+            of master
+        ) {
+
+            if (
+                isExcludedMaterial(
+                    material
+                )
+            ) {
+
+                continue;
+
+            }
+
+
+            const normalizedMaster =
+                normalizeMaterialName(
+                    material
+                );
+
+
+            if (!normalizedMaster) {
+
+                continue;
+
+            }
+
+
+            /*
+             * Exact / normalized match
+             */
+
+            const normalizedLine =
+                normalizeMaterialName(
+                    originalLine
+                );
+
+
+            if (
+                normalizedLine.includes(
+                    normalizedMaster
+                )
+            ) {
+
+                found.push({
+
+                    material:
+                        material,
+
+                    score:
+                        1
+
+                });
+
+                continue;
+
+            }
+
+
+            /*
+             * Coba setiap candidate.
+             */
+
+            const candidates =
+                extractMaterialCandidates(
+                    originalLine
+                );
+
+
+            let bestScore = 0;
+
+
+            for (
+                const candidate
+                of candidates
+            ) {
+
+                const result =
+                    materialMatchScore(
+                        candidate,
+                        material
+                    );
+
+
+                if (
+                    result >
+                    bestScore
+                ) {
+
+                    bestScore =
+                        result;
+
+                }
+
+            }
+
+
+            if (
+                bestScore >=
+                MATCH_CONFIG.minimumScore
+            ) {
+
+                found.push({
+
+                    material:
+                        material,
+
+                    score:
+                        bestScore
+
+                });
+
+            }
+
+        }
+
+
+        /*
+         * Hilangkan duplicate.
+         */
+
+        const map =
+            new Map();
+
+
+        for (
+            const item
+            of found
+        ) {
+
+            const key =
+                normalizeMaterialName(
+                    item.material
+                );
+
+
+            if (
+                !map.has(key)
+            ) {
+
+                map.set(
+                    key,
+                    item
+                );
+
+            } else {
+
+                const existing =
+                    map.get(key);
+
+
+                if (
+                    item.score >
+                    existing.score
+                ) {
+
+                    existing.score =
+                        item.score;
+
+                }
+
+            }
+
+        }
+
+
+        return Array.from(
+            map.values()
+        );
+
+    }
+
+
+    /* =====================================================
        PARSE MATERIAL LINE
     ===================================================== */
 
@@ -1293,9 +1962,10 @@
         const originalLine =
             normalizeLine(line);
 
+
         if (!originalLine) {
 
-            return null;
+            return [];
 
         }
 
@@ -1307,132 +1977,86 @@
         if (
             /^material\s*:?\s*$/i.test(
                 originalLine
+            ) ||
+            /^matrial\s*:?\s*$/i.test(
+                originalLine
             )
         ) {
 
-            return null;
+            return [];
 
         }
 
 
         /*
-         * Excluded material.
+         * Cari material berdasarkan MASTER LIST.
          */
+
+        const found =
+            findMaterialsInLine(
+                originalLine
+            );
+
 
         if (
-            isExcludedMaterial(
-                originalLine
-            )
+            !found.length
         ) {
 
-            return {
+            return [];
 
-                material: null,
+        }
 
-                qty: 0,
 
-                satuan: "",
+        const results = [];
 
-                score: 0,
+
+        for (
+            const item
+            of found
+        ) {
+
+            const qty =
+                parseQty(
+                    originalLine
+                );
+
+
+            const satuan =
+                parseSatuan(
+                    originalLine,
+                    item.material
+                );
+
+
+            results.push({
+
+                material:
+                    item.material,
+
+                qty:
+                    qty,
+
+                satuan:
+                    satuan,
+
+                score:
+                    item.score,
 
                 sourceLine:
                     originalLine,
 
                 status:
-                    "ERROR",
+                    "OK",
 
                 error:
-                    "Material excluded"
+                    ""
 
-            };
-
-        }
-
-
-        const materialText =
-            cleanMaterialText(
-                originalLine
-            );
-
-        if (!materialText) {
-
-            return null;
+            });
 
         }
 
 
-        const result =
-            findBestMaterial(
-                materialText
-            );
-
-
-        /*
-         * Tidak ditemukan.
-         */
-
-        if (!result) {
-
-            return {
-
-                material: null,
-
-                qty: 0,
-
-                satuan: "",
-
-                score: 0,
-
-                sourceLine:
-                    originalLine,
-
-                status:
-                    "ERROR",
-
-                error:
-                    "Material tidak ditemukan di MASTER LIST"
-
-            };
-
-        }
-
-
-        const qty =
-            parseQty(
-                originalLine
-            );
-
-        const satuan =
-            parseSatuan(
-                originalLine,
-                result.material
-            );
-
-
-        return {
-
-            material:
-                result.material,
-
-            qty:
-                qty,
-
-            satuan:
-                satuan,
-
-            score:
-                result.score,
-
-            sourceLine:
-                originalLine,
-
-            status:
-                "OK",
-
-            error:
-                ""
-
-        };
+        return results;
 
     }
 
@@ -1446,14 +2070,17 @@
         const normalized =
             normalizeText(text);
 
+
         if (!normalized) {
 
             return [];
 
         }
 
+
         const lines =
             normalized.split("\n");
+
 
         const results = [];
 
@@ -1468,6 +2095,7 @@
                     line
                 );
 
+
             if (!parsed) {
 
                 continue;
@@ -1475,22 +2103,8 @@
             }
 
 
-            /*
-             * Hanya material OK
-             * masuk hasil utama.
-             */
-
-            if (
-                parsed.status !== "OK"
-            ) {
-
-                continue;
-
-            }
-
-
             results.push(
-                parsed
+                ...parsed
             );
 
         }
@@ -1512,6 +2126,7 @@
         const normalized =
             normalizeText(text);
 
+
         if (!normalized) {
 
             return {
@@ -1524,8 +2139,10 @@
 
         }
 
+
         const lines =
             normalized.split("\n");
+
 
         const materials = [];
 
@@ -1542,6 +2159,7 @@
                     line
                 );
 
+
             if (!parsed) {
 
                 continue;
@@ -1549,22 +2167,9 @@
             }
 
 
-            if (
-                parsed.status ===
-                "OK"
-            ) {
-
-                materials.push(
-                    parsed
-                );
-
-            } else {
-
-                errors.push(
-                    parsed
-                );
-
-            }
+            materials.push(
+                ...parsed
+            );
 
         }
 
@@ -1605,6 +2210,7 @@
 
             }
 
+
             if (
                 !item.material
             ) {
@@ -1612,6 +2218,7 @@
                 continue;
 
             }
+
 
             if (
                 isExcludedMaterial(
@@ -1673,10 +2280,12 @@
                 const existing =
                     map.get(key);
 
+
                 existing.qty +=
                     Number(
                         item.qty
                     ) || 0;
+
 
                 existing.score =
                     Math.max(
@@ -1712,8 +2321,6 @@
 
     /* =====================================================
        BUILD MATERIAL ROW
-       
-       Ticket selalu diambil dari getTTNumber()
     ===================================================== */
 
     function buildMaterialRows(
@@ -1745,12 +2352,6 @@
 
                 return {
 
-                    /*
-                     * ==================================
-                     * TICKET
-                     * ==================================
-                     */
-
                     ticket:
                         ttNumber,
 
@@ -1764,24 +2365,12 @@
                         ttNumber,
 
 
-                    /*
-                     * ==================================
-                     * MATERIAL
-                     * ==================================
-                     */
-
                     material:
                         item.material,
 
                     Material:
                         item.material,
 
-
-                    /*
-                     * ==================================
-                     * QUANTITY
-                     * ==================================
-                     */
 
                     quantity:
                         item.qty,
@@ -1793,12 +2382,6 @@
                         item.qty,
 
 
-                    /*
-                     * ==================================
-                     * SATUAN
-                     * ==================================
-                     */
-
                     unit:
                         item.satuan,
 
@@ -1808,12 +2391,6 @@
                     Satuan:
                         item.satuan,
 
-
-                    /*
-                     * ==================================
-                     * KODE
-                     * ==================================
-                     */
 
                     code:
                         "",
@@ -1825,12 +2402,6 @@
                         "",
 
 
-                    /*
-                     * ==================================
-                     * SCORE
-                     * ==================================
-                     */
-
                     score:
                         item.score,
 
@@ -1838,24 +2409,12 @@
                         item.score,
 
 
-                    /*
-                     * ==================================
-                     * SOURCE
-                     * ==================================
-                     */
-
                     source:
                         item.sourceLine,
 
                     Source:
                         item.sourceLine,
 
-
-                    /*
-                     * ==================================
-                     * STATUS
-                     * ==================================
-                     */
 
                     status:
                         "OK",
@@ -2036,10 +2595,6 @@
         }
 
 
-        /*
-         * Object hasil parser.
-         */
-
         if (
             !Array.isArray(input) &&
             typeof input === "object"
@@ -2071,10 +2626,6 @@
             }
 
 
-            /*
-             * Satu material object.
-             */
-
             if (
                 input.Material ||
                 input.material
@@ -2095,10 +2646,6 @@
 
         }
 
-
-        /*
-         * Array.
-         */
 
         if (
             Array.isArray(input)
@@ -2122,10 +2669,6 @@
                 }
 
 
-                /*
-                 * Nested array.
-                 */
-
                 if (
                     Array.isArray(item)
                 ) {
@@ -2140,10 +2683,6 @@
 
                 }
 
-
-                /*
-                 * Nested parser object.
-                 */
 
                 if (
                     typeof item === "object" &&
@@ -2167,10 +2706,6 @@
 
                 }
 
-
-                /*
-                 * Material object.
-                 */
 
                 if (
                     typeof item === "object"
@@ -2210,19 +2745,11 @@
         }
 
 
-        /*
-         * Ticket.
-         */
-
         const ticket =
             getTTNumber(
                 row
             );
 
-
-        /*
-         * Material.
-         */
 
         const material =
             normalizeLine(
@@ -2232,20 +2759,12 @@
             );
 
 
-        /*
-         * Quantity.
-         */
-
         const qty =
             row.quantity ??
             row.qty ??
             row.Qty ??
             1;
 
-
-        /*
-         * Unit.
-         */
 
         const unit =
             normalizeLine(
@@ -2256,10 +2775,6 @@
             );
 
 
-        /*
-         * Code.
-         */
-
         const code =
             normalizeLine(
                 row.code ||
@@ -2269,10 +2784,6 @@
             );
 
 
-        /*
-         * Score.
-         */
-
         const score =
             Number(
                 row.score ??
@@ -2280,10 +2791,6 @@
                 0
             ) || 0;
 
-
-        /*
-         * Source.
-         */
 
         const source =
             normalizeLine(
@@ -2295,10 +2802,6 @@
 
 
         return {
-
-            /*
-             * Ticket
-             */
 
             ticket:
                 ticket,
@@ -2313,20 +2816,12 @@
                 ticket,
 
 
-            /*
-             * Material
-             */
-
             material:
                 material,
 
             Material:
                 material,
 
-
-            /*
-             * Quantity
-             */
 
             quantity:
                 Number(qty) || 0,
@@ -2338,10 +2833,6 @@
                 Number(qty) || 0,
 
 
-            /*
-             * Unit
-             */
-
             unit:
                 unit,
 
@@ -2351,10 +2842,6 @@
             Satuan:
                 unit,
 
-
-            /*
-             * Code
-             */
 
             code:
                 code,
@@ -2366,10 +2853,6 @@
                 code,
 
 
-            /*
-             * Score
-             */
-
             score:
                 score,
 
@@ -2377,20 +2860,12 @@
                 score,
 
 
-            /*
-             * Source
-             */
-
             source:
                 source,
 
             Source:
                 source,
 
-
-            /*
-             * Status
-             */
 
             status:
                 row.status ||
@@ -2401,17 +2876,6 @@
                 ""
 
         };
-
-    }
-
-
-    /* =====================================================
-       GET MATERIAL MASTER
-    ===================================================== */
-
-    function getMaterialMaster() {
-
-        return MATERIAL_MASTER.slice();
 
     }
 
@@ -2468,7 +2932,10 @@
             mergeMaterials,
 
         cleanMaterialText:
-            cleanMaterialText
+            cleanMaterialText,
+
+        findMaterialsInLine:
+            findMaterialsInLine
 
     };
 
@@ -2482,7 +2949,14 @@
         {
 
             masterCount:
-                MATERIAL_MASTER.length,
+                getMaterialMaster().length,
+
+            masterSource:
+                (
+                    window.ReportCheckerSettings
+                        ? "settings.js"
+                        : "fallback"
+                ),
 
             minimumScore:
                 MATCH_CONFIG.minimumScore,
